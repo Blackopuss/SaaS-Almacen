@@ -35,13 +35,13 @@ export default async function CorreoVerificadoPage({
       <p className="mt-2 text-muted-foreground">
         {failed
           ? "Puede que haya vencido o que ya lo hayas usado. Pide uno nuevo para activar tu cuenta."
-          : "Tu cuenta está activa. Ya puedes empezar a registrar tu inventario."}
+          : "Tu cuenta está activa. Ahora crea tu empresa para empezar a registrar tu inventario."}
       </p>
       <Button asChild size="lg" className="mt-6 w-full">
         {failed ? (
           <Link href="/verifica-tu-correo">Pedir un enlace nuevo</Link>
         ) : (
-          <Link href="/inventario">Ir a mi inventario</Link>
+          <Link href="/crear-empresa">Continuar</Link>
         )}
       </Button>
     </WarehouseCard>

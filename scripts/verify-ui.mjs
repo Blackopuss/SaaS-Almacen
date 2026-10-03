@@ -514,6 +514,23 @@ try {
       fullPage: true,
     });
 
+    // Company creation (PLT-10): only for accounts without a company.
+    await page.goto(`${BASE}/crear-empresa`, { waitUntil: "networkidle" });
+    check(
+      new URL(page.url()).pathname === "/inventario",
+      "company: an account with a company skips /crear-empresa",
+    );
+    const anonymous = await newContext(browser, {
+      viewport: { width: 375, height: 812 },
+    });
+    const visitor = await anonymous.newPage();
+    await visitor.goto(`${BASE}/crear-empresa`, { waitUntil: "networkidle" });
+    check(
+      new URL(visitor.url()).pathname === "/ingresar",
+      "company: /crear-empresa needs a session",
+    );
+    await anonymous.close();
+
     await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
       new URL(page.url()).pathname === "/inventario",

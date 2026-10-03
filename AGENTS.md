@@ -86,7 +86,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Autenticación y decisiones (BAS-04/05)
 
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
-- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
+- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
 - Límite de intentos: todo flujo de autenticación nuevo (recuperación, MFA…) usa `blockedFor`/`recordAttempt` de `src/platform/auth/throttle.ts`.
 - Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
@@ -96,8 +96,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-09. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 20 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-10** (alta de empresa con titular: creación atómica de empresa y membresía titular).
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-10. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 21 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-11** (contexto de empresa activa en servidor: cambiar de empresa revalida la membresía).
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -122,3 +122,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Cuenta demo: MFA activa con `DEMO_TOTP_SECRET` (`npm run db:seed`); código con `npm run demo:codigo`; helpers en `scripts/totp.mjs`. `verify:ui` entra calculando códigos nuevos (por eso tarda ≈2.5 min).
 - Códigos de recuperación (PLT-09): generador y normalización en `backup-codes.ts`; `regenerateBackupCodes` y `disableMfa` en `mfa-recovery.ts`; `verifySignInCode({ method: "backup" })`. Se muestran una sola vez con `BackupCodesList`. Desactivar está prohibido si `isMfaRequired`.
 - Si una Server Action cambia la cookie de sesión, Next vuelve a pintar la pantalla: el aviso de éxito va en un componente que siga montado (ver `MfaPanel`).
+
+## Empresas (PLT-10)
+
+- `src/platform/tenancy`: `createOrganization` (empresa + membresía titular en una transacción, una empresa por cuenta), `hasOrganization`, `requireOrganizationMember()`. Toda pantalla de negocio en `src/app/(app)/` llama `requireOrganizationMember()` (incluye `requireSession`); sin empresa → `/crear-empresa`. Detalle en ADR 0005.
+- Selects: `NativeSelect` de `src/components/ui/native-select.tsx` (selector nativo con estilo de `Input`).
