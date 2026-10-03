@@ -6,6 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins";
 
 import { newId } from "@/lib";
+import { recordSecurityEvent } from "@/platform/audit";
 import {
   existingAccountEmail,
   passwordChangedEmail,
@@ -22,7 +23,7 @@ import {
   verifyPassword,
 } from "./password";
 import { generateBackupCodes } from "./backup-codes";
-import { clearAttempts, throttleKeys } from "./throttle";
+import { clearAttempts, clientIp, throttleKeys } from "./throttle";
 
 /** Verification links stay valid for 24 hours and work once. */
 export const VERIFICATION_HOURS = 24;
@@ -78,7 +79,12 @@ export const auth = betterAuth({
     },
     // A reset closes every session of the account (including stolen ones).
     revokeSessionsOnPasswordReset: true,
-    onPasswordReset: async ({ user }) => {
+    onPasswordReset: async ({ user }, request) => {
+      await recordSecurityEvent({
+        userId: user.id,
+        action: "password.reset",
+        ipAddress: request ? clientIp(request.headers) : null,
+      });
       // The link proved control of the mailbox: lift the sign-in block and
       // confirm the email, so the person can enter right away.
       await clearAttempts([throttleKeys.signInAccount(user.email)]);

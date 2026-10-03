@@ -8,6 +8,7 @@ import {
   mfaEnabledEmail,
   sendEmail,
 } from "@/platform/email";
+import { recordSecurityEvent } from "@/platform/audit";
 import { db } from "@/server";
 
 import { TOTP_DIGITS, auth } from "./auth";
@@ -185,6 +186,11 @@ export async function confirmTotpEnrollment(
     where: { id: userId },
     select: { email: true, name: true },
   });
+  await recordSecurityEvent({
+    userId,
+    action: "mfa.enabled",
+    ipAddress: clientIp(headers),
+  });
   await sendEmail(mfaEnabledEmail({ to: user.email, name: user.name }));
   return { ok: true, backupCodes: await readBackupCodes(userId) };
 }
@@ -279,6 +285,12 @@ export async function verifySignInCode(
   if (backup) {
     // Backup codes are removed when used; tell the owner how many are left.
     const left = (await readBackupCodes(session.userId)).length;
+    await recordSecurityEvent({
+      userId: session.userId,
+      action: "mfa.backup_code_used",
+      metadata: { left },
+      ipAddress: clientIp(headers),
+    });
     const user = await db.user.findUniqueOrThrow({
       where: { id: session.userId },
       select: { email: true, name: true },
@@ -302,5 +314,11 @@ export async function verifySignInCode(
     };
   }
   await recordAttempt([usedKey]);
+  await recordSecurityEvent({
+    userId: session.userId,
+    action: "sign_in.succeeded",
+    metadata: { mfa: true },
+    ipAddress: clientIp(headers),
+  });
   return { ok: true };
 }

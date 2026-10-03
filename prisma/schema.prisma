@@ -119,6 +119,7 @@ model Organization {
   memberships Membership[]
   memberRoles MembershipRole[]
   sessions    Session[]
+  auditEvents AuditEvent[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -188,4 +189,44 @@ model RateLimit {
   lastRequest BigInt
 
   @@map("rateLimit")
+}
+
+// ── Audit log (PLT-14) ───────────────────────────────────────────────────
+// Append-only: database triggers reject UPDATE and DELETE for every user.
+// Metadata is sanitized before it is stored (no passwords, tokens or codes).
+
+/// Sensitive changes inside a company: who, what, on which record and why.
+model AuditEvent {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Null for changes made by the system. No foreign key: the history
+  /// outlives accounts.
+  actorUserId    String?      @db.Char(36)
+  action         String       @db.VarChar(80)
+  targetType     String?      @db.VarChar(40)
+  targetId       String?      @db.VarChar(64)
+  reason         String?      @db.VarChar(500)
+  metadata       Json?
+  ipAddress      String?      @db.VarChar(64)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, targetType, targetId])
+  @@map("audit_event")
+}
+
+/// Account security events (password, MFA, sessions), not tied to a company.
+model SecurityEvent {
+  id        String   @id @db.Char(36)
+  /// No foreign key: the history outlives accounts.
+  userId    String   @db.Char(36)
+  action    String   @db.VarChar(80)
+  metadata  Json?
+  ipAddress String?  @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  @@index([userId, createdAt])
+  @@map("security_event")
 }

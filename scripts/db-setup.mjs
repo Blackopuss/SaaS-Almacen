@@ -104,6 +104,11 @@ try {
     );
   }
 
+  // The migrator creates triggers (append-only audit log, PLT-14). With
+  // binary logging on, MySQL requires this instead of SUPER. Managed MySQL
+  // services expose it as a server parameter (see docs/adr/0002).
+  await conn.query("SET PERSIST log_bin_trust_function_creators = 1");
+
   console.log(`Bases listas: ${allDbs.join(", ")}`);
   console.log(`Usuarios listos: ${app} (datos), ${migrator} (esquema)`);
 } finally {

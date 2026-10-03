@@ -88,7 +88,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
 - Antes de desplegar (BAS-09..11, PIL-01): revisar «Requisitos de producción» y «Pendientes» de `docs/adr/0003-autenticacion.md`.
-- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
+- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas, bitácora). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
 - Límite de intentos: todo flujo de autenticación nuevo (recuperación, MFA…) usa `blockedFor`/`recordAttempt` de `src/platform/auth/throttle.ts`.
 - Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
@@ -98,8 +98,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-13. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 24 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-14** (bitácora de auditoría). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-14. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 25 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-15** (batería de aislamiento con dos empresas). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -109,7 +109,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Pantallas**: Server Component que llama `requireSession()` + componente cliente con `useActionState`; acción en `actions.ts` con `"use server"` que solo traduce `FormData` ↔ servicio y hace `redirect`/`revalidatePath`.
 - **Pruebas**: unitarias junto al código (`*.test.ts`); integración en `tests/<área>/*.int.test.ts` contra `almacen_test`, con correos únicos por corrida (`algo.${Date.now()}@example.test`) y `afterAll(() => db.$disconnect())`. Pruebas lentas por scrypt: dar `timeout` explícito. Comportamiento visible: agregar casos a `scripts/verify-ui.mjs` (no crear datos persistentes salvo la cuenta demo; usar IPs de prueba con `X-Forwarded-For`).
 - **IDs** UUIDv7 (`newId`), fechas `DATETIME(3)` UTC, cantidades con `Decimal`.
-- **Datos de prueba creados en `almacen_dev`** durante verificaciones manuales: borrarlos al terminar.
+- **Datos de prueba creados en `almacen_dev`** durante verificaciones manuales: borrarlos al terminar. Excepción: la bitácora es solo-agregar (ADR 0006), así que una empresa creada en dev ya no se puede borrar; evitar crear empresas en verificaciones manuales.
+- **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)
 

@@ -4,6 +4,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { DEFAULT_TIME_ZONE, newId } from "@/lib";
+import { recordAuditEvent } from "@/platform/audit";
 import { db } from "@/server";
 
 /**
@@ -98,6 +99,14 @@ export async function createOrganization(
         ownerUserId: userId,
         memberships: { create: { id: newId(), userId } },
       },
+    });
+    // Same transaction: the company and its first record exist together.
+    await recordAuditEvent(tx, {
+      organizationId,
+      actorUserId: userId,
+      action: "organization.created",
+      target: { type: "organization", id: organizationId },
+      metadata: { name: parsed.data.name, timeZone: parsed.data.timeZone },
     });
     return true;
   });

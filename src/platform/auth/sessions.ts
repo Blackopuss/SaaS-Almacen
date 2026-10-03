@@ -1,6 +1,7 @@
 import "server-only";
 
 import { describeUserAgent, formatIp } from "@/lib";
+import { recordSecurityEvent } from "@/platform/audit";
 import { db } from "@/server";
 
 /**
@@ -64,6 +65,9 @@ export async function revokeSession(
   const { count } = await db.session.deleteMany({
     where: { id: sessionId, userId },
   });
+  if (count === 1) {
+    await recordSecurityEvent({ userId, action: "session.revoked" });
+  }
   return count === 1;
 }
 
@@ -75,5 +79,12 @@ export async function revokeOtherSessions(
   const { count } = await db.session.deleteMany({
     where: { userId, id: { not: currentSessionId } },
   });
+  if (count > 0) {
+    await recordSecurityEvent({
+      userId,
+      action: "session.revoked_others",
+      metadata: { count },
+    });
+  }
   return count;
 }

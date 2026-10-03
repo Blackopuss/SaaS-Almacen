@@ -8,6 +8,7 @@ import {
   mfaDisabledEmail,
   sendEmail,
 } from "@/platform/email";
+import { recordSecurityEvent } from "@/platform/audit";
 import { db } from "@/server";
 
 import { auth } from "./auth";
@@ -17,6 +18,7 @@ import { isMfaRequired } from "./mfa-policy";
 import {
   blockedFor,
   clearAttempts,
+  clientIp,
   recordAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
@@ -62,6 +64,11 @@ export async function regenerateBackupCodes(
       headers,
     });
     await clearAttempts([key]);
+    await recordSecurityEvent({
+      userId,
+      action: "mfa.backup_codes_regenerated",
+      ipAddress: clientIp(headers),
+    });
     const user = await owner(userId);
     await sendEmail(
       backupCodesRegeneratedEmail({ to: user.email, name: user.name }),
@@ -155,6 +162,12 @@ export async function disableMfa(
     headers,
   });
   await clearAttempts([key]);
+  await recordSecurityEvent({
+    userId,
+    action: "mfa.disabled",
+    metadata: { with: totp ? "app" : "backup_code" },
+    ipAddress: clientIp(headers),
+  });
   await sendEmail(mfaDisabledEmail({ to: user.email, name: user.name }));
   return { ok: true };
 }

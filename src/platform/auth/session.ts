@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
 
+import { recordSecurityEvent } from "@/platform/audit";
+
 import { auth } from "./auth";
 import { isMfaRequired } from "./mfa-policy";
 import {
@@ -114,6 +116,12 @@ export async function signIn(
     if ("twoFactorRedirect" in result && result.twoFactorRedirect) {
       return { ok: false, reason: "mfa" };
     }
+    await recordSecurityEvent({
+      userId: result.user.id,
+      action: "sign_in.succeeded",
+      metadata: { mfa: false },
+      ipAddress: ip,
+    });
     return { ok: true };
   } catch (error) {
     if (isAPIError(error)) {

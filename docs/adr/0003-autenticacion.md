@@ -90,7 +90,8 @@ Lista única de lo que la autenticación necesita al salir de la máquina local:
 3. **`BETTER_AUTH_SECRET` en el gestor de secretos, con respaldo y sin rotarlo a la ligera**: cifra los secretos TOTP y los códigos de recuperación. Perderlo o cambiarlo deja sin acceso a toda cuenta con MFA. Una rotación necesita un plan (secretos versionados de Better Auth o re-cifrado).
 4. **HTTPS** (cookies `Secure` con prefijo `__Secure-` se activan solas con `NODE_ENV=production`) y **proxy que sobrescriba `X-Forwarded-For`** (límites por IP).
 5. **Respaldos de MySQL cifrados**: incluyen sesiones, contraseñas con hash y secretos MFA cifrados.
-6. **Sin cuenta demo**: `db:seed` solo corre en bases `*_dev`; `DEMO_PASSWORD` y `DEMO_TOTP_SECRET` no existen en producción.
+6. **`log_bin_trust_function_creators = 1`** en el servidor MySQL (o privilegio equivalente) para que las migraciones creen los disparadores de la bitácora (ADR 0006); sin él la migración `audit_log` falla con el error 1419.
+7. **Sin cuenta demo**: `db:seed` solo corre en bases `*_dev`; `DEMO_PASSWORD` y `DEMO_TOTP_SECRET` no existen en producción.
 
 ## Pendientes y decisiones abiertas
 
