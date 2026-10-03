@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AppError, NotFoundError, isAppError } from "./errors";
 import { isId, newId } from "./ids";
-import { formatDateTime, toIsoUtc } from "./time";
+import { formatDateTime, formatRelative, toIsoUtc } from "./time";
 
 describe("ids", () => {
   it("creates valid, unique, time-ordered UUIDv7", () => {
@@ -45,5 +45,14 @@ describe("time", () => {
     // 18:30 UTC is 12:30 in Mexico City (UTC−6, no DST).
     const text = formatDateTime(new Date(Date.UTC(2026, 9, 2, 18, 30)));
     expect(text).toMatch(/12:30/);
+  });
+
+  it("formats relative times in Spanish", () => {
+    const now = new Date(Date.UTC(2026, 9, 2, 12, 0));
+    const ago = (ms: number) => new Date(now.getTime() - ms);
+    expect(formatRelative(ago(20_000), now)).toBe("Ahora");
+    expect(formatRelative(ago(5 * 60_000), now)).toBe("hace 5 minutos");
+    expect(formatRelative(ago(3 * 3_600_000), now)).toBe("hace 3 horas");
+    expect(formatRelative(ago(24 * 3_600_000), now)).toBe("ayer");
   });
 });

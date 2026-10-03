@@ -12,3 +12,9 @@ export type {
 } from "./register";
 export { getCurrentSession, requireSession, signIn, signOut } from "./session";
 export type { CurrentUser, SignInResult } from "./session";
+export {
+  listActiveSessions,
+  revokeOtherSessions,
+  revokeSession,
+} from "./sessions";
+export type { ActiveSession } from "./sessions";

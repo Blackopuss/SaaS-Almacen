@@ -33,6 +33,11 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Regreso tras iniciar sesión solo a rutas relativas del mismo sitio (`safeRedirectPath`), sin redirecciones abiertas.
 - Correo desconocido y contraseña incorrecta reciben el mismo mensaje.
 
+## Revocación de sesiones (PLT-05)
+
+- `session.cookieCache` desactivado explícitamente: toda petición valida la sesión en MySQL, así que cerrar una sesión surte efecto de inmediato. Activarlo exigiría aceptar hasta 5 minutos de sesiones revocadas aún válidas.
+- La lista y el cierre de sesiones usan consultas propias limitadas al usuario (`src/platform/auth/sessions.ts`) en lugar de los endpoints de Better Auth, para que los tokens nunca lleguen al navegador y nadie pueda cerrar sesiones ajenas.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

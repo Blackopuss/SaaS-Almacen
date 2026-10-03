@@ -73,6 +73,9 @@ export const auth = betterAuth({
     // Sessions last 7 days and are extended once a day while in use.
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
+    // Every request validates the session in the database, so revoking a
+    // session takes effect immediately (PLT-05). Do not enable the cache.
+    cookieCache: { enabled: false },
   },
   advanced: {
     database: { generateId: () => newId() },

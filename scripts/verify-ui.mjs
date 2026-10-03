@@ -40,8 +40,8 @@ async function newPage(browser, options) {
 }
 
 /** New browser context signed in through the real sign-in form. */
-async function signedInPage(browser, viewport) {
-  const context = await newContext(browser, { viewport });
+async function signedInPage(browser, viewport, options = {}) {
+  const context = await newContext(browser, { viewport, ...options });
   const page = await context.newPage();
   await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
   await page.fill("#email", DEMO.email);
@@ -335,6 +335,58 @@ try {
       "sign-out ends the session (protected screen redirects again)",
     );
     await context.close();
+  }
+
+  // Active sessions (PLT-05): close the others, then one device ends
+  // another's session and that device is signed out immediately.
+  {
+    const ANDROID =
+      "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36";
+    const a = await signedInPage(browser, { width: 1280, height: 800 });
+    await a.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    const closeOthers = a.getByRole("button", { name: "Cerrar las demás" });
+    if (await closeOthers.count()) {
+      await closeOthers.click();
+      await a.getByRole("button", { name: "Cerrar sesiones" }).click();
+      await a
+        .getByText(/Se cerr(ó|aron)/)
+        .first()
+        .waitFor();
+    }
+    const rows = a.locator("section ul > li");
+    await a.reload({ waitUntil: "networkidle" });
+    check(
+      (await rows.count()) === 1,
+      "sessions: «Cerrar las demás» leaves only this session",
+    );
+
+    const b = await signedInPage(
+      browser,
+      { width: 375, height: 812 },
+      { userAgent: ANDROID },
+    );
+    await b.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    const mobileOverflow = await b.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await b.screenshot({ path: `${OUT}/sesiones-mobile.png` });
+    await a.reload({ waitUntil: "networkidle" });
+    check(
+      (await rows.count()) === 2 && mobileOverflow <= 0,
+      "sessions: the new device appears; no overflow on mobile",
+    );
+    await a.screenshot({ path: `${OUT}/sesiones-desktop.png` });
+    await a
+      .getByRole("button", { name: "Cerrar sesión en Chrome en Android" })
+      .click();
+    await a.getByText("Sesión cerrada en ese dispositivo.").waitFor();
+    await b.goto(`${BASE}/movimientos`, { waitUntil: "networkidle" });
+    check(
+      new URL(b.url()).pathname === "/ingresar",
+      "sessions: the revoked device is signed out immediately",
+    );
+    await a.context().close();
+    await b.context().close();
   }
 
   // Registration form (PLT-02): invalid submit, inline errors and focus.

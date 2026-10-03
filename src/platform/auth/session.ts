@@ -19,11 +19,14 @@ export const getCurrentSession = cache(async () =>
 
 export type CurrentUser = { id: string; name: string; email: string };
 
-export async function requireSession(): Promise<{ user: CurrentUser }> {
+export async function requireSession(): Promise<{
+  user: CurrentUser;
+  sessionId: string;
+}> {
   const session = await getCurrentSession();
   if (!session) redirect("/ingresar");
   const { id, name, email } = session.user;
-  return { user: { id, name, email } };
+  return { user: { id, name, email }, sessionId: session.session.id };
 }
 
 const signInSchema = z.object({

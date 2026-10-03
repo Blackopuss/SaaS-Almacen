@@ -33,3 +33,26 @@ export function formatDate(
     dateStyle: "medium",
   }).format(date);
 }
+
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["minute", 60],
+  ["hour", 60 * 60],
+  ["day", 60 * 60 * 24],
+  ["week", 60 * 60 * 24 * 7],
+];
+
+/** "Ahora", "hace 5 minutos", "hace 2 días" (Spanish, Mexico). */
+export function formatRelative(date: Date, now: Date = new Date()): string {
+  const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
+  if (Math.abs(seconds) < 60) return "Ahora";
+  const format = new Intl.RelativeTimeFormat("es-MX", { numeric: "auto" });
+  let unit: Intl.RelativeTimeFormatUnit = "minute";
+  let size = 60;
+  for (const [u, s] of RELATIVE_STEPS) {
+    if (Math.abs(seconds) >= s) {
+      unit = u;
+      size = s;
+    }
+  }
+  return format.format(Math.round(seconds / size), unit);
+}
