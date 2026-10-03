@@ -24,8 +24,9 @@ export const VERIFICATION_HOURS = 24;
 
 /**
  * Authentication (BAS-04, PLT-02, PLT-03). Email + password with database
- * sessions; no session until the email is verified. Rate limits, recovery
- * and MFA are completed in PLT-04..PLT-09.
+ * sessions; no session until the email is verified. Cookies are HttpOnly,
+ * SameSite=Lax and Secure in production; Better Auth rejects requests from
+ * untrusted origins (CSRF). Rate limits, recovery and MFA: PLT-06..PLT-09.
  */
 export const auth = betterAuth({
   appName: "Almacén",
@@ -68,8 +69,19 @@ export const auth = betterAuth({
       );
     },
   },
+  session: {
+    // Sessions last 7 days and are extended once a day while in use.
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
   advanced: {
     database: { generateId: () => newId() },
+    // Secure cookies (HTTPS only, __Secure- prefix) outside local development.
+    useSecureCookies: process.env.NODE_ENV === "production",
+    defaultCookieAttributes: { httpOnly: true, sameSite: "lax", path: "/" },
+    // Better Auth skips the origin (CSRF) check when NODE_ENV=test; keep it
+    // on everywhere so tests exercise the same protection as production.
+    disableOriginCheck: false,
   },
   // Never send usage data to third parties.
   telemetry: { enabled: false },

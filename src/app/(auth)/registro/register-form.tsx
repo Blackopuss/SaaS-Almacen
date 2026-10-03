@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleAlert, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useEffect, useRef } from "react";
 
 import { FadeIn, FormField, PasswordInput } from "@/components";
@@ -119,6 +120,16 @@ export function RegisterForm({ minLength }: { minLength: number }) {
             {pending ? "Creando cuenta…" : "Crear cuenta"}
           </Button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          ¿Ya tienes cuenta?{" "}
+          <Link
+            href="/ingresar"
+            className="rounded font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Inicia sesión
+          </Link>
+        </p>
       </div>
     </FadeIn>
   );

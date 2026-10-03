@@ -2,11 +2,13 @@ import { Settings } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { requireSession } from "@/platform/auth";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
-export default function ConfiguracionPage() {
+export default async function ConfiguracionPage() {
+  await requireSession();
   return (
     <PageContainer>
       <PageHeader

@@ -9,6 +9,9 @@ if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 const values = {
   BETTER_AUTH_URL: () => "http://localhost:3000",
   BETTER_AUTH_SECRET: () => randomBytes(32).toString("base64url"),
+  // Local demo account created by `npm run db:seed` (development only).
+  DEMO_EMAIL: () => "demo@almacen.test",
+  DEMO_PASSWORD: () => randomBytes(12).toString("base64url"),
 };
 
 const added = Object.entries(values)

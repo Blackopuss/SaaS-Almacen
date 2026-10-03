@@ -25,6 +25,14 @@ El scrypt por defecto de Better Auth 1.7.7 usa `N=2^14, r=16, p=1` (32 MiB, una 
 
 Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición, se permite pegar y usar administradores de contraseñas (ASVS 2.1, WCAG 2.2 «Accessible Authentication»).
 
+## Sesiones, cookies y CSRF (PLT-04)
+
+- Sesión de 7 días renovada una vez al día con uso; cookie `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` con prefijo `__Secure-` en producción.
+- Dos capas: `src/proxy.ts` redirige sin cookie (revisión optimista) y cada pantalla o acción protegida valida la sesión contra la base (`requireSession`), como recomienda la guía de Next 16.
+- Hallazgo: Better Auth **desactiva la revisión de origen (CSRF) cuando `NODE_ENV=test`**. Se fija `advanced.disableOriginCheck: false` para que esté activa en todos los entornos y las pruebas verifiquen lo mismo que producción.
+- Regreso tras iniciar sesión solo a rutas relativas del mismo sitio (`safeRedirectPath`), sin redirecciones abiertas.
+- Correo desconocido y contraseña incorrecta reciben el mismo mensaje.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

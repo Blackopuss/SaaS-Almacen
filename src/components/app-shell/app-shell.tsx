@@ -1,6 +1,6 @@
 "use client";
 
-import { Ellipsis, Warehouse } from "lucide-react";
+import { Ellipsis, LogOut, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -17,11 +17,22 @@ import {
 } from "../ui/sheet";
 import { NAV_ITEMS, isActive, type NavItem } from "./nav";
 
+export type ShellUser = { name: string; email: string };
+
 /**
- * Application frame (BAS-13): sidebar on desktop, bottom bar on mobile
- * (4 sections + «Más»), skip link and landmarks.
+ * Application frame (BAS-13, PLT-04): sidebar on desktop, bottom bar on
+ * mobile (4 sections + «Más»), skip link, landmarks and the signed-in user
+ * with «Cerrar sesión».
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  user,
+  signOutAction,
+}: {
+  children: React.ReactNode;
+  user: ShellUser;
+  signOutAction: () => Promise<void>;
+}) {
   const pathname = usePathname();
   const primary = NAV_ITEMS.filter((item) => item.mobile);
   const secondary = NAV_ITEMS.filter((item) => !item.mobile);
@@ -50,8 +61,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </ul>
         </nav>
-        <div className="border-t px-4 py-3">
-          <ThemeToggle showLabel />
+        <div className="space-y-2 border-t px-3 py-3">
+          <div className="px-1">
+            <ThemeToggle showLabel />
+          </div>
+          <UserBlock user={user} signOutAction={signOutAction} />
         </div>
       </aside>
 
@@ -83,6 +97,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
           <li>
             <MoreMenu
+              user={user}
+              signOutAction={signOutAction}
               items={secondary}
               active={secondary.some((item) => isActive(pathname, item.href))}
               pathname={pathname}
@@ -148,10 +164,14 @@ function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 function MoreMenu({
+  user,
+  signOutAction,
   items,
   active,
   pathname,
 }: {
+  user: ShellUser;
+  signOutAction: () => Promise<void>;
   items: NavItem[];
   active: boolean;
   pathname: string;
@@ -194,7 +214,44 @@ function MoreMenu({
             })}
           </ul>
         </nav>
+        <div className="mx-4 border-t pt-3">
+          <UserBlock user={user} signOutAction={signOutAction} />
+        </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function UserBlock({
+  user,
+  signOutAction,
+}: {
+  user: ShellUser;
+  signOutAction: () => Promise<void>;
+}) {
+  const initial = user.name.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="flex items-center gap-3 rounded-lg px-1 py-1">
+      <span
+        aria-hidden="true"
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-foreground"
+      >
+        {initial}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{user.name}</p>
+        <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+      </div>
+      <form action={signOutAction}>
+        <button
+          type="submit"
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+          className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 md:size-10"
+        >
+          <LogOut aria-hidden="true" className="size-4.5" />
+        </button>
+      </form>
+    </div>
   );
 }

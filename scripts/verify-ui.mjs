@@ -1,10 +1,35 @@
 // Browser checks for the design system (BAS-12): keyboard focus, dialog
 // focus management, touch targets, horizontal overflow and screenshots.
 // Usage: start `npm run dev`, then `npm run verify:ui` (uses installed Edge).
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
 const BASE = process.env.UI_BASE_URL ?? "http://localhost:3000";
+
+// Protected screens need the local demo account (npm run db:seed).
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+const DEMO = {
+  email: process.env.DEMO_EMAIL ?? "demo@almacen.test",
+  password: process.env.DEMO_PASSWORD ?? "",
+};
+if (!DEMO.password) {
+  console.error(
+    "Falta DEMO_PASSWORD: corre npm run env:setup y npm run db:seed.",
+  );
+  process.exit(1);
+}
+
+/** New browser context signed in through the real sign-in form. */
+async function signedInPage(browser, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+  await page.fill("#email", DEMO.email);
+  await page.fill("#password", DEMO.password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await page.waitForURL("**/inventario", { timeout: 20000 });
+  return page;
+}
 const OUT = "qa/screenshots";
 mkdirSync(OUT, { recursive: true });
 
@@ -135,7 +160,7 @@ try {
     { name: "mobile", width: 375, height: 812 },
     { name: "desktop", width: 1280, height: 800 },
   ]) {
-    const page = await browser.newPage({ viewport });
+    const page = await signedInPage(browser, viewport);
     const mobile = viewport.name === "mobile";
 
     await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -240,6 +265,56 @@ try {
       );
     }
     await page.close();
+  }
+
+  // Sign-in and sign-out (PLT-04).
+  {
+    const context = await browser.newContext({
+      viewport: { width: 375, height: 812 },
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/movimientos`, { waitUntil: "networkidle" });
+    const redirected = new URL(page.url());
+    check(
+      redirected.pathname === "/ingresar" &&
+        redirected.searchParams.get("siguiente") === "/movimientos",
+      "signed out: protected screen redirects to /ingresar?siguiente=…",
+    );
+    await page.fill("#email", DEMO.email);
+    await page.fill("#password", "contraseña-incorrecta");
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    await page.getByText("Correo o contraseña incorrectos.").waitFor();
+    check(
+      (await page.evaluate(() => document.activeElement?.id)) === "password" &&
+        (await page.inputValue("#password")) === "",
+      "wrong password: neutral error, password cleared and focused",
+    );
+    await page.screenshot({ path: `${OUT}/ingresar-error-mobile.png` });
+    await page.fill("#password", DEMO.password);
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    await page.waitForURL("**/movimientos", { timeout: 20000 });
+    check(true, "sign-in returns to the requested screen");
+    const cookie = (await context.cookies()).find((c) =>
+      c.name.includes("session_token"),
+    );
+    check(
+      cookie?.httpOnly === true && cookie.sameSite === "Lax",
+      "session cookie is HttpOnly and SameSite=Lax",
+    );
+    await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+    check(
+      new URL(page.url()).pathname === "/inventario",
+      "signed in: /ingresar goes straight to the app",
+    );
+    await page.getByRole("button", { name: "Más" }).click();
+    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+    await page.waitForURL("**/ingresar", { timeout: 20000 });
+    await page.goto(`${BASE}/inventario`, { waitUntil: "networkidle" });
+    check(
+      new URL(page.url()).pathname === "/ingresar",
+      "sign-out ends the session (protected screen redirects again)",
+    );
+    await context.close();
   }
 
   // Registration form (PLT-02): invalid submit, inline errors and focus.

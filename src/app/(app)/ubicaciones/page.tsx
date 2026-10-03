@@ -2,11 +2,13 @@ import { MapPin } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { requireSession } from "@/platform/auth";
 
 export const metadata: Metadata = { title: "Ubicaciones" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
-export default function UbicacionesPage() {
+export default async function UbicacionesPage() {
+  await requireSession();
   return (
     <PageContainer>
       <PageHeader

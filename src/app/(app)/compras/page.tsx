@@ -2,11 +2,13 @@ import { ShoppingCart } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { requireSession } from "@/platform/auth";
 
 export const metadata: Metadata = { title: "Compras" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
-export default function ComprasPage() {
+export default async function ComprasPage() {
+  await requireSession();
   return (
     <PageContainer>
       <PageHeader

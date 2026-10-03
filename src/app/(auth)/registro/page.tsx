@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { PASSWORD_MIN_LENGTH } from "@/platform/auth";
+import {
+  DEFAULT_AFTER_SIGN_IN,
+  PASSWORD_MIN_LENGTH,
+  getCurrentSession,
+} from "@/platform/auth";
 
 import { RegisterForm } from "./register-form";
 
@@ -9,6 +14,7 @@ export const metadata: Metadata = {
   description: "Crea tu cuenta para controlar el inventario de tu negocio.",
 };
 
-export default function RegistroPage() {
+export default async function RegistroPage() {
+  if (await getCurrentSession()) redirect(DEFAULT_AFTER_SIGN_IN);
   return <RegisterForm minLength={PASSWORD_MIN_LENGTH} />;
 }

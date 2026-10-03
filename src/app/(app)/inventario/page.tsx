@@ -2,11 +2,13 @@ import { Package } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { requireSession } from "@/platform/auth";
 
 export const metadata: Metadata = { title: "Inventario" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
-export default function InventarioPage() {
+export default async function InventarioPage() {
+  await requireSession();
   return (
     <PageContainer>
       <PageHeader

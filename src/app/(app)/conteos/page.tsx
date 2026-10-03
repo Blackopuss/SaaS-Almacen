@@ -2,11 +2,13 @@ import { ClipboardCheck } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { requireSession } from "@/platform/auth";
 
 export const metadata: Metadata = { title: "Conteos" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
-export default function ConteosPage() {
+export default async function ConteosPage() {
+  await requireSession();
   return (
     <PageContainer>
       <PageHeader

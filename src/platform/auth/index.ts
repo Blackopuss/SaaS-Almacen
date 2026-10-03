@@ -2,6 +2,7 @@
 export { VERIFICATION_HOURS, auth } from "./auth";
 export type { Session } from "./auth";
 export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
+export { DEFAULT_AFTER_SIGN_IN, safeRedirectPath } from "./redirect";
 export { registerUser, resendVerification } from "./register";
 export type {
   RegisterField,
@@ -9,3 +10,5 @@ export type {
   RegisterResult,
   ResendResult,
 } from "./register";
+export { getCurrentSession, requireSession, signIn, signOut } from "./session";
+export type { CurrentUser, SignInResult } from "./session";
