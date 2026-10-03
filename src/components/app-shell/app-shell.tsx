@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { motion, transitions } from "../motion";
+import { ThemeToggle } from "../theme-toggle";
 import {
   Sheet,
   SheetContent,
@@ -49,12 +50,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </ul>
         </nav>
+        <div className="border-t px-4 py-3">
+          <ThemeToggle showLabel />
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md md:hidden">
           <Warehouse aria-hidden="true" className="size-5 text-primary" />
           <span className="font-semibold">{current?.label ?? "Almacén"}</span>
+          <ThemeToggle className="ml-auto" />
         </header>
 
         <main

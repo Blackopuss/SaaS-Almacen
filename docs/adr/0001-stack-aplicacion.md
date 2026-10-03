@@ -13,6 +13,10 @@ SaaS modular de inventario para pymes mexicanas, desarrollado por el fundador co
 - **npm** con versiones exactas (`.npmrc`: `save-exact`, `engine-strict`) y `overrides` para dependencias transitivas con vulnerabilidades corregidas.
 - Calidad: ESLint 9 + Prettier 3 + Vitest 5; `npm run check` y `npm run build` deben pasar para cerrar un paso.
 
+## Dependencias de desarrollo con avisos abiertos
+
+2026-10-02: `braces` (todas las versiones) tiene un aviso alto de denegación de servicio con patrones glob muy anidados, sin versión corregida. Solo llega por herramientas de desarrollo (`eslint-plugin-boundaries`, `shadcn`, ESLint de Next), que no reciben patrones de terceros. `shadcn` se movió a `devDependencies`: `npm audit --omit=dev` queda en 0. Revisar cuando exista corrección.
+
 ## Alternativas consideradas
 
 - Backend separado (Express/Nest) + SPA: más despliegues y contratos que mantener para una sola persona.

@@ -172,6 +172,41 @@ try {
       `${viewport.name}: skip link focuses the main content`,
     );
 
+    // Dark mode: the switch toggles the theme, persists and is reversible.
+    const toggle = page
+      .getByRole("switch", { name: "Modo oscuro" })
+      .filter({ visible: true })
+      .first();
+    await toggle.focus();
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(300);
+    const darkOn =
+      (await toggle.getAttribute("aria-checked")) === "true" &&
+      (await page.evaluate(() =>
+        document.documentElement.classList.contains("dark"),
+      ));
+    await page.reload({ waitUntil: "networkidle" });
+    const persisted = await page.evaluate(() =>
+      document.documentElement.classList.contains("dark"),
+    );
+    const overflowDark = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/shell-dark-${viewport.name}.png` });
+    await page
+      .getByRole("switch", { name: "Modo oscuro" })
+      .filter({ visible: true })
+      .first()
+      .click();
+    await page.waitForTimeout(300);
+    const backToLight = await page.evaluate(
+      () => !document.documentElement.classList.contains("dark"),
+    );
+    check(
+      darkOn && persisted && overflowDark <= 0 && backToLight,
+      `${viewport.name}: dark-mode switch toggles, persists and reverts`,
+    );
+
     if (mobile) {
       await page.getByRole("button", { name: "Más" }).click();
       const sheet = page.getByRole("dialog", { name: "Más opciones" });

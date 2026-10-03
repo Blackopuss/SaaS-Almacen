@@ -17,3 +17,4 @@ export {
   PageContainer,
   PageHeader,
 } from "./states";
+export { ThemeToggle } from "./theme-toggle";
