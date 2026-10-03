@@ -29,6 +29,13 @@ Cada dato de negocio pertenece a una empresa (`organization_id`). La persona que
 - Las escrituras anidadas por relaciones no se reescriben: las llaves compuestas por empresa (PLT-13) harán que la base rechace mezclar empresas.
 - Alternativa descartada por ahora: seguridad por filas en la base (MySQL no la tiene nativa; vistas por empresa complicarían Prisma).
 
+## Relaciones compuestas y unicidad por empresa (PLT-13)
+
+- Toda tabla de empresa declara `@@unique([organizationId, id])` y toda relación hacia otra tabla de empresa es **compuesta**: `fields: [organizationId, xId], references: [organizationId, id]`. MySQL rechaza unir filas de empresas distintas aunque se salte la aplicación (SQL directo incluido).
+- Solo tablas de empresa pueden apuntar a tablas de empresa. Las reglas de negocio de unicidad se declaran por empresa (por ejemplo `@@unique([organizationId, sku])`).
+- `src/server/tenant-db.test.ts` revisa `schema.prisma` en cada corrida: registro en `TENANT_MODELS`, `@@unique([organizationId, id])` y relaciones compuestas que empiezan por `organizationId`.
+- Primera tabla con el patrón: `MembershipRole` (roles de un miembro; los valores llegan con USR-01 tras aprobar FUN-07).
+
 ## Alternativas consideradas
 
 - **Crear la empresa dentro del registro**: un formulario más largo antes de confirmar el correo y empresas huérfanas de cuentas nunca verificadas.

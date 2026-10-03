@@ -107,16 +107,17 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id          String       @id @db.Char(36)
-  name        String       @db.VarChar(120)
-  timeZone    String       @default("America/Mexico_City") @db.VarChar(64)
-  currency    String       @default("MXN") @db.Char(3)
+  id          String           @id @db.Char(36)
+  name        String           @db.VarChar(120)
+  timeZone    String           @default("America/Mexico_City") @db.VarChar(64)
+  currency    String           @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId String       @db.Char(36)
-  owner       User         @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt   DateTime     @default(now()) @db.DateTime(3)
-  updatedAt   DateTime     @updatedAt @db.DateTime(3)
+  ownerUserId String           @db.Char(36)
+  owner       User             @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt   DateTime         @default(now()) @db.DateTime(3)
+  updatedAt   DateTime         @updatedAt @db.DateTime(3)
   memberships Membership[]
+  memberRoles MembershipRole[]
   sessions    Session[]
 
   @@index([ownerUserId])
@@ -137,10 +138,32 @@ model Membership {
   status         MembershipStatus @default(ACTIVE)
   createdAt      DateTime         @default(now()) @db.DateTime(3)
   updatedAt      DateTime         @updatedAt @db.DateTime(3)
+  roles          MembershipRole[]
 
   @@unique([organizationId, userId])
+  /// Target of company-scoped foreign keys (PLT-13).
+  @@unique([organizationId, id])
   @@index([userId])
   @@map("membership")
+}
+
+/// Roles of a member (USR-01/USR-06). Values come from the role catalog in
+/// code once the matrix is approved (FUN-07). The composite foreign key
+/// includes organizationId, so a role can never point to a membership of
+/// another company (PLT-13).
+model MembershipRole {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  membershipId   String       @db.Char(36)
+  membership     Membership   @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  role           String       @db.VarChar(40)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([membershipId, role])
+  @@index([organizationId, membershipId])
+  @@map("membership_role")
 }
 
 // ── Brute-force protection (PLT-06) ──────────────────────────────────────

@@ -60,6 +60,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Bases: `almacen_dev`, `almacen_test`, `almacen_shadow`.
 - Comandos: `setup`, `db:setup`, `db:migrate`, `db:deploy`, `db:status`, `db:check`. **`db:reset` borra datos: nunca ejecutarlo sin consentimiento explícito del fundador** (Prisma también lo bloquea para agentes).
 - Para operar sobre la base de pruebas: `DATABASE_NAME=almacen_test npm run db:deploy`.
+- Si `prisma migrate dev` pide confirmación (no interactivo): crear `prisma/migrations/<UTC>_<nombre>/migration.sql` con `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`, revisar el SQL, aplicar con `npm run db:deploy` (y en `almacen_test`) y `npm run db:generate`.
 
 ## Pruebas (BAS-07)
 
@@ -97,8 +98,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-12. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 23 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-13** (relaciones compuestas y unicidad por empresa) y **PLT-14** (bitácora de auditoría), en paralelo. FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-13. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 24 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-14** (bitácora de auditoría). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -128,4 +129,5 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 
 - `src/platform/tenancy`: `createOrganization` (empresa + membresía titular en una transacción, una empresa por cuenta), `hasOrganization`, `requireOrganizationContext()` (PLT-11: sesión + empresa activa guardada en `session.activeOrganizationId` y revalidada en cada petición), `switchOrganization`, `listMyOrganizations`. Toda pantalla y acción de negocio en `src/app/(app)/` llama `requireOrganizationContext()` y toma `organization.id` solo de ahí; sin empresa → `/crear-empresa`. Detalle en ADR 0005.
 - Trabajo con Codex: tareas independientes en un worktree propio (`git worktree add ../SAAS-Almacen-codex -b codex/<tarea> pruebas`) o revisiones de solo lectura; Claude revisa e integra en `pruebas`.
+- **Tabla nueva de empresa (PLT-13):** columna `organizationId` + relación a `Organization`, `@@unique([organizationId, id])`, relaciones a otras tablas de empresa compuestas (`fields: [organizationId, xId], references: [organizationId, id]`), unicidades de negocio por empresa (`@@unique([organizationId, sku])`), registrarla en `TENANT_MODELS` y usarla solo con `forOrganization`. `tenant-db.test.ts` falla si falta algo.
 - Selects: `NativeSelect` de `src/components/ui/native-select.tsx` (selector nativo con estilo de `Input`).

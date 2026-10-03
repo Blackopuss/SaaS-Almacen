@@ -23,7 +23,7 @@ import { db } from "./db";
  * Models that carry `organizationId`. tenant-db.test.ts fails when a model
  * in prisma/schema.prisma has the column but is missing here.
  */
-export const TENANT_MODELS = ["Membership"] as const;
+export const TENANT_MODELS = ["Membership", "MembershipRole"] as const;
 
 const tenantModels = new Set<string>(TENANT_MODELS);
 
