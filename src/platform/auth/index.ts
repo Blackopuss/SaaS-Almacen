@@ -1,2 +1,3 @@
-// Public API of platform/auth: Identity, sessions and MFA (PLT).
-export {};
+// Public API of platform/auth: identity, sessions and MFA (PLT).
+export { auth } from "./auth";
+export type { Session } from "./auth";

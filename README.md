@@ -1,12 +1,11 @@
 # SaaS de inventario modular
 
-Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02, BAS-03, BAS-06, BAS-07, BAS-12, BAS-13.
+Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02, BAS-03, BAS-04, BAS-05, BAS-06, BAS-07, BAS-12, BAS-13.
 
 ```powershell
 npm install
 # Primera vez: copia .env.example a .env.local y pon MYSQL_ROOT_PASSWORD
-npm run db:setup   # crea bases y usuarios locales
-npm run db:deploy  # aplica migraciones
+npm run setup      # secretos, bases, usuarios y migraciones
 npm run dev      # http://localhost:3000
 npm run check    # tipos, lint, límites, formato y pruebas
 ```

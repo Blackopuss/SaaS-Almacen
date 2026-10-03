@@ -79,3 +79,9 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Pantallas de la app en `src/app/(app)/` con `AppShell`: barra lateral en escritorio; en móvil, barra inferior con 4 secciones y «Más». Secciones en `src/components/app-shell/nav.ts`, cada una con su `module` para ocultarla si no está contratado (MOD-05).
 - Estados reutilizables en `src/components/states.tsx`: `PageHeader`, `EmptyState`, `ErrorState`, `LoadingState`, `PageContainer`. Cada sección tiene `loading.tsx` y `error.tsx` compartidos.
 - No mostrar botones deshabilitados sin explicación; una acción aparece cuando su paso está implementado.
+
+## Autenticación y decisiones (BAS-04/05)
+
+- Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
+- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
+- Versiones exactas (`.npmrc` con `save-exact`). Antes de actualizar una dependencia: `npm audit` y revisar su ADR.
