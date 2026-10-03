@@ -1,10 +1,10 @@
 "use client";
 
-import { PackagePlus, Search } from "lucide-react";
+import { Package, PackagePlus, Search } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { FadeIn } from "@/components";
+import { EmptyState, ErrorState, FadeIn, LoadingState } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,9 +71,9 @@ export function Showcase() {
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <FadeIn className="space-y-8">
         <header className="space-y-2">
-          <p className="text-primary text-sm font-medium">Sistema visual</p>
+          <p className="text-sm font-medium text-primary">Sistema visual</p>
           <h1 className="text-3xl font-semibold tracking-tight">Inventario</h1>
-          <p className="text-muted-foreground max-w-prose">
+          <p className="max-w-prose text-muted-foreground">
             Vista previa de componentes con datos ficticios. Usa Tab para
             revisar el foco visible.
           </p>
@@ -85,7 +85,7 @@ export function Showcase() {
             <div className="relative">
               <Search
                 aria-hidden="true"
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
               />
               <Input
                 id="search"
@@ -124,8 +124,8 @@ export function Showcase() {
                     id="boxes-help"
                     className={
                       valid
-                        ? "text-muted-foreground text-sm tabular-nums"
-                        : "text-destructive text-sm"
+                        ? "text-sm text-muted-foreground tabular-nums"
+                        : "text-sm text-destructive"
                     }
                   >
                     {valid
@@ -154,7 +154,7 @@ export function Showcase() {
           </div>
         </section>
 
-        <section className="bg-card rounded-xl border">
+        <section className="rounded-xl border bg-card">
           <Table>
             <TableCaption className="pb-4">Datos de ejemplo</TableCaption>
             <TableHeader>
@@ -195,6 +195,16 @@ export function Showcase() {
           <Button variant="destructive">Eliminar</Button>
           <Button variant="link">Enlace</Button>
           <Button disabled>Deshabilitado</Button>
+        </section>
+        <section aria-label="Estados" className="grid gap-6 lg:grid-cols-3">
+          <EmptyState
+            icon={Package}
+            title="Todavía no hay productos"
+            description="Agrega tu primer producto o importa tu Excel."
+            action={<Button>Agregar producto</Button>}
+          />
+          <ErrorState action={<Button variant="outline">Reintentar</Button>} />
+          <LoadingState rows={4} />
         </section>
       </FadeIn>
     </main>

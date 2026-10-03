@@ -121,6 +121,91 @@ try {
     );
     await page.close();
   }
+
+  // Application shell (BAS-13): navigation on mobile and desktop.
+  const SECTIONS = [
+    "/inventario",
+    "/movimientos",
+    "/ubicaciones",
+    "/conteos",
+    "/compras",
+    "/configuracion",
+  ];
+  for (const viewport of [
+    { name: "mobile", width: 375, height: 812 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    const page = await browser.newPage({ viewport });
+    const mobile = viewport.name === "mobile";
+
+    await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    check(
+      new URL(page.url()).pathname === "/inventario",
+      `${viewport.name}: / redirects to /inventario`,
+    );
+
+    for (const path of SECTIONS) {
+      await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      const current = await page
+        .locator(`nav a[aria-current="page"][href="${path}"]`)
+        .count();
+      const visibleNav =
+        mobile && !["/compras", "/configuracion"].includes(path);
+      check(
+        overflow <= 0 && (!mobile || visibleNav ? current > 0 : true),
+        `${viewport.name}: ${path} renders without overflow and marks the active link`,
+      );
+    }
+    await page.goto(`${BASE}/inventario`, { waitUntil: "networkidle" });
+    await page.screenshot({ path: `${OUT}/shell-${viewport.name}.png` });
+
+    // Skip link is the first focus stop and moves focus to main content.
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: "Saltar al contenido" });
+    check(await skip.isVisible(), `${viewport.name}: skip link appears on Tab`);
+    await page.keyboard.press("Enter");
+    check(
+      await page.evaluate(() => document.activeElement?.id === "contenido"),
+      `${viewport.name}: skip link focuses the main content`,
+    );
+
+    if (mobile) {
+      await page.getByRole("button", { name: "Más" }).click();
+      const sheet = page.getByRole("dialog", { name: "Más opciones" });
+      await sheet.waitFor();
+      await page.screenshot({ path: `${OUT}/shell-mas-mobile.png` });
+      await sheet.getByRole("link", { name: "Compras" }).click();
+      await page.waitForURL("**/compras");
+      await sheet.waitFor({ state: "hidden" });
+      check(true, "mobile: «Más» opens a sheet and navigates to Compras");
+      const targets = await page.$$eval(
+        "nav[aria-label='Principal'] a, nav[aria-label='Principal'] button",
+        (els) =>
+          els
+            .map((e) => e.getBoundingClientRect())
+            // Only visible targets: the desktop sidebar is hidden on mobile.
+            .filter((r) => r.height > 0 && (r.height < 44 || r.width < 44))
+            .length,
+      );
+      check(targets === 0, "mobile: bottom navigation targets ≥ 44px");
+    } else {
+      await page
+        .getByRole("navigation", { name: "Principal" })
+        .getByRole("link", { name: "Movimientos" })
+        .click();
+      await page.waitForURL("**/movimientos");
+      check(
+        (
+          await page.locator('aside a[aria-current="page"]').textContent()
+        )?.includes("Movimientos") ?? false,
+        "desktop: sidebar navigates and updates the active item",
+      );
+    }
+    await page.close();
+  }
 } finally {
   await browser.close();
 }
