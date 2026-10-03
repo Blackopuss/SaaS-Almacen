@@ -49,3 +49,6 @@ __pycache__/
 
 # prisma generated client
 /src/server/generated/
+
+# UI verification screenshots (regenerate with npm run verify:ui)
+/qa/
