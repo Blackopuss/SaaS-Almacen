@@ -232,21 +232,10 @@ function FloatingCard({
   );
 }
 
-export function WarehouseScene({
-  compact = false,
-  className,
-}: {
-  compact?: boolean;
-  className?: string;
-}) {
+export function WarehouseScene({ className }: { className?: string }) {
   return (
     <div aria-hidden="true" className={cn("relative select-none", className)}>
-      <svg
-        // Compact view crops the empty sky so the racks fill small screens.
-        viewBox={compact ? "24 92 432 240" : "0 0 480 340"}
-        className="h-full w-full"
-        role="presentation"
-      >
+      <svg viewBox="0 0 480 340" className="h-full w-full" role="presentation">
         <defs>
           <linearGradient id="scene-floor-fade" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--scene-floor)" stopOpacity="1" />
@@ -282,32 +271,30 @@ export function WarehouseScene({
         <Forklift />
       </svg>
 
-      {!compact && (
-        <>
-          <FloatingCard className="top-[6%] left-[4%]" delay={1.1}>
-            <span className="grid size-8 place-items-center rounded-lg bg-success/15 text-success">
-              <ArrowDownToLine className="size-4" />
+      <>
+        <FloatingCard className="top-[6%] left-[4%]" delay={1.1}>
+          <span className="grid size-8 place-items-center rounded-lg bg-success/15 text-success">
+            <ArrowDownToLine className="size-4" />
+          </span>
+          <span>
+            <span className="block font-medium">Entrada registrada</span>
+            <span className="block text-muted-foreground tabular-nums">
+              3 cajas × 100 = 300 pzas
             </span>
-            <span>
-              <span className="block font-medium">Entrada registrada</span>
-              <span className="block text-muted-foreground tabular-nums">
-                3 cajas × 100 = 300 pzas
-              </span>
+          </span>
+        </FloatingCard>
+        <FloatingCard className="top-[2%] right-[2%]" delay={1.6}>
+          <span className="grid size-8 place-items-center rounded-lg bg-warning/15 text-warning">
+            <TriangleAlert className="size-4" />
+          </span>
+          <span>
+            <span className="block font-medium">Existencia baja</span>
+            <span className="block text-muted-foreground tabular-nums">
+              Cable THW · 12 m
             </span>
-          </FloatingCard>
-          <FloatingCard className="top-[2%] right-[2%]" delay={1.6}>
-            <span className="grid size-8 place-items-center rounded-lg bg-warning/15 text-warning">
-              <TriangleAlert className="size-4" />
-            </span>
-            <span>
-              <span className="block font-medium">Existencia baja</span>
-              <span className="block text-muted-foreground tabular-nums">
-                Cable THW · 12 m
-              </span>
-            </span>
-          </FloatingCard>
-        </>
-      )}
+          </span>
+        </FloatingCard>
+      </>
     </div>
   );
 }

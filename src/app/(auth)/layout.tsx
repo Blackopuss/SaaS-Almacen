@@ -54,15 +54,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           id="contenido"
           className="flex flex-1 flex-col items-center px-4 pb-16 sm:justify-center"
         >
-          <div className="w-full max-w-md">
-            <div className="mb-3 overflow-hidden rounded-2xl border bg-[var(--scene-sky)] px-3 pt-3 lg:hidden">
-              <WarehouseScene
-                compact
-                className="mx-auto aspect-[432/240] max-h-48"
-              />
-            </div>
-            {children}
-          </div>
+          <div className="w-full max-w-md pt-4">{children}</div>
         </main>
       </div>
     </div>

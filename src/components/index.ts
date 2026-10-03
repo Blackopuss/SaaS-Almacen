@@ -22,3 +22,4 @@ export { ThemeToggle } from "./theme-toggle";
 export { FormField } from "./form-field";
 export { PasswordInput } from "./password-input";
 export { WarehouseScene } from "./warehouse-scene";
+export { WarehouseCard } from "./warehouse-card";
