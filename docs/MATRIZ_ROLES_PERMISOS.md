@@ -1,6 +1,6 @@
 # Matriz de roles × permisos — Inventario y Compras
 
-**Estado: Propuesta pendiente de aprobación del fundador (FUN-07)**  
+**Estado: Propuesta en revisión por el fundador (FUN-07). Preguntas 1–5 respondidas el 2026-10-03; faltan 6–8.**  
 **Fecha: 2026-10-03**
 
 Este documento propone permisos y su asignación para el lanzamiento. No constituye aprobación, implementación ni cierre de FUN-07. Su criterio «Listo cuando» exige una tabla aprobada por el fundador; FUN-05 también es prerrequisito y esta propuesta no acredita entrevistas ni su validación.
@@ -146,20 +146,20 @@ Los conteos aplicados son inmutables; `inventory.count.update` no los reabre. La
 | `purchasing.product_supplier.read` | Ver relación producto-proveedor, código y presentación de compra; CMP-03. | Sí | Sí | No | Sí | Sí |
 | `purchasing.product_supplier.create` | Vincular producto existente con proveedor de la empresa; CMP-03. | Sí | Sí | No | Sí | No |
 | `purchasing.product_supplier.update` | Editar código o presentación de compra del vínculo; no cambia el factor del catálogo; CMP-03. | Sí | Sí | No | Sí | No |
-| `purchasing.cost.read` | Consultar costos e importes de compras y último costo; CMP-03/13; pregunta 4. | Sí | Sí | No | Sí | Sí |
+| `purchasing.cost.read` | Consultar costos e importes de compras y último costo; CMP-03/13; pregunta 4 (fundador: privados de Compras). | Sí | Sí | No | Sí | No |
 | `purchasing.cost.record` | Capturar costo dentro de orden/recepción autorizada; actualizar último costo al registrar compra, sin valuación contable; CMP-04/13. | Sí | Sí | No | Sí | No |
 
-Los costos no se filtran indirectamente por ficha de producto, historial, panel, exportación o respuesta de API a quien no tenga `purchasing.cost.read`. Se propone que Consulta sí los vea dentro de Compras, sujeto a aprobación. `purchasing.cost.record` exige también el permiso para crear/editar la orden o confirmar la recepción; no ofrece edición libre del costo histórico ni de documentos recibidos. Archivar proveedores no tiene un paso explícito en CMP y no se habilita implícitamente con edición.
+Los costos no se filtran indirectamente por ficha de producto, historial, panel, exportación o respuesta de API a quien no tenga `purchasing.cost.read`. Decisión del fundador (pregunta 4): los precios son privados de Compras; Consulta no los ve en ninguna pantalla, PDF, reporte ni exportación. `purchasing.cost.record` exige también el permiso para crear/editar la orden o confirmar la recepción; no ofrece edición libre del costo histórico ni de documentos recibidos. Archivar proveedores no tiene un paso explícito en CMP y no se habilita implícitamente con edición.
 
 ### Compras — órdenes, recepciones, devoluciones y reportes
 
 | Permiso | Alcance y referencia | T | A | AL | CO | CN |
 | --- | --- | --- | --- | --- | --- | --- |
-| `purchasing.order.read` | Consultar órdenes, líneas, estados y pendientes; CMP-04/05/11. | Sí | Sí | No | Sí | Sí |
+| `purchasing.order.read` | Consultar órdenes, líneas, estados y pendientes; CMP-04/05/11. Sin `purchasing.cost.read` se ocultan precios e importes. | Sí | Sí | No | Sí | Sí |
 | `purchasing.order.create` | Crear borrador y líneas con presentación/versiones; CMP-04. | Sí | Sí | No | Sí | No |
 | `purchasing.order.update` | Editar borrador; documentos enviados/recibidos no se reescriben libremente; CMP-04/05. | Sí | Sí | No | Sí | No |
 | `purchasing.order.submit` | Confirmar transición válida de borrador a enviada; no implica aprobación por otra persona; CMP-05; pregunta 3. | Sí | Sí | No | Sí | No |
-| `purchasing.order.export` | Generar y descargar PDF de orden autorizada, sujeto a lectura de sus datos; CMP-06A. | Sí | Sí | No | Sí | Sí |
+| `purchasing.order.export` | Generar y descargar PDF de orden autorizada, sujeto a lectura de sus datos; CMP-06A. El PDF lleva precios, por eso Consulta no lo descarga (pregunta 4). | Sí | Sí | No | Sí | No |
 | `purchasing.order.send` | Enviar por correo y reintentar entrega con destinatario validado; exige orden en estado válido y `purchasing.order.submit` si cambia a enviada; CMP-06B. | Sí | Sí | No | Sí | No |
 | `purchasing.order.cancel` | Cancelar conforme a transición válida, sin borrar recepciones ni historia; CMP-05. | Sí | Sí | No | Sí | No |
 | `purchasing.order.close` | Cerrar con faltante registrado, sin inventar recepción del remanente; CMP-11. | Sí | Sí | No | Sí | No |
@@ -169,8 +169,8 @@ Los costos no se filtran indirectamente por ficha de producto, historial, panel,
 | `purchasing.return.create` | Devolver al proveedor con límite acumulado por recepción y salida atómica; CMP-12. | Sí | Sí | No | Sí | No |
 | `purchasing.suggestion.read` | Consultar sugerencias desde mínimos y proveedores; CMP-14. | Sí | Sí | No | Sí | Sí |
 | `purchasing.suggestion.generate` | Generar borradores por proveedor desde sugerencias; exige `purchasing.order.create`; CMP-14. | Sí | Sí | No | Sí | No |
-| `purchasing.report.read` | Consultar pendientes y compras por proveedor, con costos solo si están permitidos; CMP-15. | Sí | Sí | No | Sí | Sí |
-| `purchasing.report.export` | Exportar reportes de Compras que se pueden leer; CMP-15; pregunta 5. | Sí | Sí | No | Sí | Sí |
+| `purchasing.report.read` | Consultar pendientes y compras por proveedor; los costos e importes solo con `purchasing.cost.read`; CMP-15. | Sí | Sí | No | Sí | Sí |
+| `purchasing.report.export` | Exportar reportes de Compras que se pueden leer, sin costos para quien no los ve; CMP-15; preguntas 4 y 5. | Sí | Sí | No | Sí | Sí |
 
 No se propone una aprobación separada de órdenes ni un permiso activo `purchasing.order.approve`: CMP-05 solo define borrador → enviada → parcial → recibida o cancelada. Ese identificador sería una **sugerencia de ampliación**, denegada mientras no se apruebe el flujo de la pregunta 3. No se introducen pagos a proveedores, cuentas por pagar, importación masiva de órdenes ni un módulo de contabilidad.
 
@@ -191,6 +191,17 @@ No todo paso del plan es una acción asignable a una persona. Los siguientes con
 | CMP-01/05/10/13/16/17/18 | Contactos compartidos, estados válidos, concurrencia, costo sin valuación, guard de Compras, desactivación y pruebas integrales; no crean facultades de otros módulos. |
 
 Los demás pasos operativos de INV y CMP aparecen en las filas correspondientes del catálogo. Registrar auditoría de equipo/stock/cobro es un efecto obligatorio del servicio, no un permiso de escritura de bitácora para usuarios. No se propone aún una pantalla de auditoría exportable independiente: los historiales operativos y sus exportaciones conservan sus permisos propios.
+
+## Decisiones del fundador (2026-10-03)
+
+1. **Ajustes, reversas y conteos de Almacén sin aprobación: sí**, pero siempre con la **justificación** de la acción (motivo obligatorio, guardado en la bitácora).
+2. **Almacén no recibe órdenes ni devuelve al proveedor.** Lo reporta y lo consulta con la persona de Compras, que es quien registra la recepción o devolución. (Si alguien hace ambas cosas, se le asignan los dos roles.)
+3. **El Comprador envía, cancela y cierra órdenes sin otra autorización: sí.** El Comprador es responsable de los gastos.
+4. **Consulta no ve precios ni costos**: son privados de Compras. Tampoco en PDF de órdenes, reportes ni exportaciones.
+5. **Consulta puede descargar**, solo los datos que ya puede ver (sin precios).
+6. Pendiente.
+7. Pendiente.
+8. Pendiente.
 
 ## Preguntas para el fundador
 
@@ -214,7 +225,7 @@ Son casos propuestos, no pruebas implementadas ni ejecutadas. Ejecutar las llama
 | NEG-01 | Consulta llama directamente alta/edición/archivo/reactivación de producto, movimiento, ajuste, conteo o escritura de Compras. | Denegado por permiso aunque el botón esté oculto; stock y documentos intactos. |
 | NEG-02 | Consulta sube/previsualiza/confirma una importación o envía el PDF de una orden por correo. | Denegado; lectura/exportación no se convierte en importación ni envío comercial. |
 | NEG-03 | Almacén crea proveedor/orden, envía o cancela orden, recibe, devuelve o genera borradores desde mínimos. | Denegado en todas las rutas de Compras; tener entrada/salida manual no lo habilita. |
-| NEG-04 | Almacén pide costos o los intenta obtener mediante ficha, historial, reportes o exportación. | No se devuelven costos ni datos de Compras por rutas laterales. |
+| NEG-04 | Almacén o Consulta piden costos o los intentan obtener mediante ficha, historial, órdenes, PDF, reportes o exportación. | No se devuelven costos ni datos de Compras por rutas laterales. |
 | NEG-05 | Comprador crea producto, cambia factor del catálogo, registra entrada/salida manual, ajuste o aplica conteo. | Denegado; los efectos de recepción/devolución no le conceden esos permisos directos. |
 | NEG-06 | Administrador contrata/cancela, cambia método de pago, plan, usuarios facturables o activa/desactiva módulos. | Denegado incluso con todos los roles combinables; ninguna solicitud de cobro ni cambio de derechos. |
 | NEG-07 | Administrador altera `ownerUserId`, desactiva/degrada al titular o cambia sus roles por llamada directa/masiva. | Denegado; permanece un único titular activo y protegido. |
