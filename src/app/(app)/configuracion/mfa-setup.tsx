@@ -1,10 +1,15 @@
 "use client";
 
 import { Copy, Loader2, Smartphone } from "lucide-react";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { FormField, PasswordInput, QrCode } from "@/components";
+import {
+  BackupCodesList,
+  FormField,
+  PasswordInput,
+  QrCode,
+} from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -32,21 +37,45 @@ export function MfaSetup({
     { step: "password" },
   );
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const finished = useRef(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (state.step === "done") {
-      // Report once, even if the dialog re-renders while it closes.
-      if (!finished.current) onDone();
-      finished.current = true;
-    } else if (state.error && inputRef.current) {
+    if (state.step !== "codes" && state.error && inputRef.current) {
       inputRef.current.value = "";
       inputRef.current.focus();
     }
-  }, [state, onDone]);
+  }, [state]);
 
-  if (state.step === "password" || state.step === "done") {
+  if (state.step === "codes") {
+    return (
+      <>
+        <Heading
+          title="Guarda tus códigos de recuperación"
+          description="La verificación en dos pasos ya está activada. Si pierdes tu teléfono, entra con uno de estos códigos; cada uno sirve una sola vez. No los volverás a ver."
+        />
+        <BackupCodesList codes={state.backupCodes} />
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={saved}
+            onChange={(event) => setSaved(event.target.checked)}
+            className="size-5 shrink-0 accent-primary"
+          />
+          Ya guardé mis códigos en un lugar seguro
+        </label>
+        <Button
+          type="button"
+          className="w-full"
+          disabled={!saved}
+          onClick={onDone}
+        >
+          Listo
+        </Button>
+      </>
+    );
+  }
+
+  if (state.step === "password") {
     return (
       <>
         <Heading

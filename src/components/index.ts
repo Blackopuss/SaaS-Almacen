@@ -18,6 +18,7 @@ export {
   PageContainer,
   PageHeader,
 } from "./states";
+export { BackupCodesList } from "./backup-codes-list";
 export { QrCode } from "./qr-code";
 export { ThemeToggle } from "./theme-toggle";
 export { FormField } from "./form-field";

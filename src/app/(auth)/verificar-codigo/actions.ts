@@ -13,7 +13,10 @@ export async function verifyCodeAction(
 ): Promise<CodeFormState> {
   const next = safeRedirectPath(formData.get("siguiente"));
   const result = await verifySignInCode(
-    { code: String(formData.get("code") ?? "") },
+    {
+      code: String(formData.get("code") ?? ""),
+      method: formData.get("method") === "backup" ? "backup" : "totp",
+    },
     await headers(),
   );
   if (result.ok) redirect(next);

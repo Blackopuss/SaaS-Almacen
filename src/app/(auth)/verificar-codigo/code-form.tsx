@@ -2,7 +2,7 @@
 
 import { CircleAlert, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormField, WarehouseCard } from "@/components";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ export function CodeForm({ next }: { next: string }) {
     {},
   );
   const codeRef = useRef<HTMLInputElement>(null);
+  // Backup codes (PLT-09) when the phone is not at hand.
+  const [backup, setBackup] = useState(false);
 
   // After a wrong code, clear the field and focus it again.
   useEffect(() => {
@@ -34,11 +36,12 @@ export function CodeForm({ next }: { next: string }) {
         <ShieldCheck aria-hidden="true" className="size-6" />
       </span>
       <h1 className="mt-5 text-2xl font-semibold tracking-tight">
-        Escribe tu código
+        {backup ? "Usa un código de recuperación" : "Escribe tu código"}
       </h1>
       <p className="mt-2 text-muted-foreground">
-        Abre tu app de autenticación y escribe el código de 6 números de
-        Almacén.
+        {backup
+          ? "Escribe uno de los códigos que guardaste al activar la verificación. Cada uno sirve una sola vez."
+          : "Abre tu app de autenticación y escribe el código de 6 números de Almacén."}
       </p>
 
       {state.restart ? (
@@ -62,17 +65,29 @@ export function CodeForm({ next }: { next: string }) {
       ) : (
         <form action={formAction} noValidate className="mt-6 space-y-5">
           <input type="hidden" name="siguiente" value={next} />
-          <FormField id="code" label="Código de 6 números" error={state.error}>
+          <input
+            type="hidden"
+            name="method"
+            value={backup ? "backup" : "totp"}
+          />
+          <FormField
+            id="code"
+            label={backup ? "Código de recuperación" : "Código de 6 números"}
+            error={state.error}
+          >
             {(control) => (
               <Input
                 {...control}
+                key={backup ? "backup" : "totp"}
                 ref={codeRef}
                 name="code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={7}
+                inputMode={backup ? "text" : "numeric"}
+                autoComplete={backup ? "off" : "one-time-code"}
+                autoCapitalize="none"
+                maxLength={backup ? 13 : 7}
                 spellCheck={false}
                 autoFocus
+                placeholder={backup ? "k7m2p-9xq4t" : undefined}
                 className="font-mono tracking-widest"
                 required
               />
@@ -81,6 +96,16 @@ export function CodeForm({ next }: { next: string }) {
           <Button type="submit" size="lg" className="w-full" disabled={pending}>
             {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
             {pending ? "Verificando…" : "Verificar"}
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            className="w-full"
+            onClick={() => setBackup((value) => !value)}
+          >
+            {backup
+              ? "Usar el código de mi app"
+              : "¿No tienes tu teléfono? Usa un código de recuperación"}
           </Button>
         </form>
       )}

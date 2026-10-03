@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+import { BackupCodesRow, DisableMfaRow } from "./mfa-manage";
 import { MfaSetup, type MfaSetupHeading } from "./mfa-setup";
 
 const DialogHeading: MfaSetupHeading = ({ title, description }) => (
@@ -24,17 +25,32 @@ const DialogHeading: MfaSetupHeading = ({ title, description }) => (
   </DialogHeader>
 );
 
-/** Two-step verification status and enrollment (PLT-08A). */
+/**
+ * Two-step verification: status and enrollment (PLT-08A), backup codes and
+ * turning it off when it is optional (PLT-09).
+ */
 export function MfaPanel({
   enabled,
   required,
+  backupCodesLeft,
 }: {
   enabled: boolean;
   required: boolean;
+  backupCodesLeft: number;
 }) {
   const [open, setOpen] = useState(false);
   // A new key on every opening starts the enrollment from the beginning.
   const [attempt, setAttempt] = useState(0);
+
+  // Turning MFA off replaces the session cookie, so Next re-renders the page
+  // and the «Desactivar» dialog is gone before it can report: report here.
+  const wasEnabled = useRef(enabled);
+  useEffect(() => {
+    if (wasEnabled.current && !enabled) {
+      toast.success("Verificación en dos pasos desactivada.");
+    }
+    wasEnabled.current = enabled;
+  }, [enabled]);
 
   return (
     <div className="rounded-xl border bg-card">
@@ -85,6 +101,12 @@ export function MfaPanel({
           </DialogContent>
         </Dialog>
       </div>
+      {enabled && (
+        <div className="divide-y border-t">
+          <BackupCodesRow left={backupCodesLeft} />
+          {!required && <DisableMfaRow />}
+        </div>
+      )}
     </div>
   );
 }

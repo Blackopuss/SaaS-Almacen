@@ -72,6 +72,15 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Restablecer la contraseña no desactiva la MFA (la recuperación no la elude).
 - Cuenta demo local: es titular, así que `db:seed` le activa MFA con `DEMO_TOTP_SECRET` (cifrado como lo hace Better Auth) y `npm run demo:codigo` muestra el código. `verify:ui` calcula códigos nuevos por paso de 30 s.
 
+## Códigos de recuperación y desactivación (PLT-09)
+
+- 10 códigos de un solo uso con formato `xxxxx-xxxxx` (minúsculas y dígitos sin caracteres confundibles; generador propio en `backup-codes.ts` porque Better Auth los compara exactos y por defecto mezcla mayúsculas). Se normaliza lo escrito (mayúsculas, espacios, sin guion). Guardados cifrados.
+- Se muestran **una sola vez**: al terminar la activación (paso obligatorio «Ya guardé mis códigos») y al generar nuevos en Configuración (pide la contraseña; los anteriores dejan de servir; aviso por correo).
+- Entrar con un código de recuperación usa **el mismo desafío** que el código de la app: requiere contraseña, cuenta los mismos 5 intentos por desafío, el bloqueo de cuenta y el límite por IP. Se avisa por correo con los códigos que quedan. Usarlo no desactiva la MFA.
+- Desactivar exige contraseña y un código vigente (de la app o de recuperación), está prohibido cuando la MFA es obligatoria (titulares) y avisa por correo. Better Auth borra el secreto y rota la sesión.
+- Si alguien pierde teléfono y códigos, no hay salida automática: la recuperación de la cuenta será un proceso de soporte con verificación de identidad (pendiente de definir con el fundador).
+- Hallazgo: cuando una acción cambia la cookie de sesión, Next vuelve a pintar la pantalla y desmonta el diálogo que la llamó; los avisos de éxito se muestran desde el panel que permanece montado.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

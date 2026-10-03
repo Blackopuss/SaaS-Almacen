@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 
 import {
   confirmTotpEnrollment,
+  disableMfa,
+  regenerateBackupCodes,
   requireSession,
   revokeOtherSessions,
   revokeSession,
@@ -40,7 +42,8 @@ export async function revokeOtherSessionsAction(): Promise<SessionActionResult> 
 export type MfaSetupState =
   | { step: "password"; error?: string }
   | { step: "scan"; totpUri: string; secret: string; error?: string }
-  | { step: "done" };
+  /** MFA is on; the backup codes are shown once (PLT-09). */
+  | { step: "codes"; backupCodes: string[] };
 
 /** Two-step MFA enrollment (PLT-08A): password, then the app's code. */
 export async function mfaSetupAction(
@@ -59,7 +62,7 @@ export async function mfaSetupAction(
     );
     if (!result.ok) return { ...prev, error: result.error };
     revalidatePath("/", "layout");
-    return { step: "done" };
+    return { step: "codes", backupCodes: result.backupCodes };
   }
 
   const result = await startTotpEnrollment(
@@ -70,4 +73,43 @@ export async function mfaSetupAction(
   return result.ok
     ? { step: "scan", totpUri: result.totpUri, secret: result.secret }
     : { step: "password", error: result.error };
+}
+
+export type BackupCodesState = { error?: string; backupCodes?: string[] };
+
+/** Replaces the backup codes after checking the password (PLT-09). */
+export async function regenerateBackupCodesAction(
+  _prev: BackupCodesState,
+  formData: FormData,
+): Promise<BackupCodesState> {
+  const { user } = await requireSession();
+  const result = await regenerateBackupCodes(
+    user.id,
+    { password: String(formData.get("password") ?? "") },
+    await headers(),
+  );
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/configuracion");
+  return { backupCodes: result.backupCodes };
+}
+
+export type DisableMfaState = { error?: string; done?: boolean };
+
+/** Turns MFA off with the password and a current code (PLT-09). */
+export async function disableMfaAction(
+  _prev: DisableMfaState,
+  formData: FormData,
+): Promise<DisableMfaState> {
+  const { user } = await requireSession();
+  const result = await disableMfa(
+    user.id,
+    {
+      password: String(formData.get("password") ?? ""),
+      code: String(formData.get("code") ?? ""),
+    },
+    await headers(),
+  );
+  // No revalidation here: the dialog reports success first, then the
+  // client refreshes (re-rendering now would unmount the dialog).
+  return result.ok ? { done: true } : { error: result.error };
 }

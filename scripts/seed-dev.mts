@@ -32,8 +32,8 @@ if (!totpSecret) {
 const { newId } = await import("@/lib");
 const { hashPassword } = await import("@/platform/auth/password");
 const { db } = await import("@/server/db");
-const { generateRandomString, symmetricEncrypt } =
-  await import("better-auth/crypto");
+const { symmetricEncrypt } = await import("better-auth/crypto");
+const { generateBackupCodes } = await import("@/platform/auth/backup-codes");
 const { base32 } = await import("./totp.mjs");
 
 const hash = await hashPassword(password);
@@ -80,15 +80,13 @@ if (!existing) {
 }
 
 // MFA with the known secret, encrypted like Better Auth does. Backup codes
-// are random and unknown (PLT-09 adds a way to see new ones).
+// are random: generate new ones in Configuración to see them.
 const key = process.env.BETTER_AUTH_SECRET ?? "";
 const mfa = {
   secret: await symmetricEncrypt({ key, data: totpSecret }),
   backupCodes: await symmetricEncrypt({
     key,
-    data: JSON.stringify(
-      Array.from({ length: 10 }, () => generateRandomString(10, "a-z", "0-9")),
-    ),
+    data: JSON.stringify(generateBackupCodes()),
   }),
   verified: true,
   failedVerificationCount: 0,

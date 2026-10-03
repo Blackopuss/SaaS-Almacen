@@ -21,6 +21,7 @@ import {
   hashPassword,
   verifyPassword,
 } from "./password";
+import { generateBackupCodes } from "./backup-codes";
 import { clearAttempts, throttleKeys } from "./throttle";
 
 /** Verification links stay valid for 24 hours and work once. */
@@ -155,7 +156,8 @@ export const auth = betterAuth({
     twoFactor({
       issuer: "Almacén",
       totpOptions: { digits: TOTP_DIGITS, period: 30 },
-      backupCodeOptions: { amount: 10, length: 10 },
+      // Easy-to-type codes; see ./backup-codes.ts (PLT-09).
+      backupCodeOptions: { customBackupCodesGenerate: generateBackupCodes },
     }),
     // Must be last: lets server actions set auth cookies.
     nextCookies(),

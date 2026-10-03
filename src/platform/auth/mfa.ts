@@ -3,10 +3,15 @@ import "server-only";
 import { isAPIError } from "better-auth/api";
 import { z } from "zod";
 
-import { mfaEnabledEmail, sendEmail } from "@/platform/email";
+import {
+  backupCodeUsedEmail,
+  mfaEnabledEmail,
+  sendEmail,
+} from "@/platform/email";
 import { db } from "@/server";
 
 import { TOTP_DIGITS, auth } from "./auth";
+import { normalizeBackupCode } from "./backup-codes";
 import { isMfaRequired } from "./mfa-policy";
 import {
   blockedFor,
@@ -29,7 +34,22 @@ import {
 
 export { isMfaRequired } from "./mfa-policy";
 
-export type MfaStatus = { enabled: boolean; required: boolean };
+export type MfaStatus = {
+  enabled: boolean;
+  required: boolean;
+  /** Unused backup codes (PLT-09); 0 when MFA is off. */
+  backupCodesLeft: number;
+};
+
+/** Current backup codes of a user (decrypted on the server only). */
+export async function readBackupCodes(userId: string): Promise<string[]> {
+  try {
+    const result = await auth.api.viewBackupCodes({ body: { userId } });
+    return result.backupCodes;
+  } catch {
+    return [];
+  }
+}
 
 export async function getMfaStatus(userId: string): Promise<MfaStatus> {
   const user = await db.user.findUnique({
@@ -39,6 +59,9 @@ export async function getMfaStatus(userId: string): Promise<MfaStatus> {
   return {
     enabled: user?.twoFactorEnabled ?? false,
     required: await isMfaRequired(userId),
+    backupCodesLeft: user?.twoFactorEnabled
+      ? (await readBackupCodes(userId)).length
+      : 0,
   };
 }
 
@@ -105,7 +128,9 @@ export function normalizeTotpCode(value: string): string | null {
   return new RegExp(`^\\d{${TOTP_DIGITS}}$`).test(digits) ? digits : null;
 }
 
-export type ConfirmTotpResult = { ok: true } | { ok: false; error: string };
+export type ConfirmTotpResult =
+  /** `backupCodes` are shown once so the person can save them (PLT-09). */
+  { ok: true; backupCodes: string[] } | { ok: false; error: string };
 
 export async function confirmTotpEnrollment(
   userId: string,
@@ -161,7 +186,7 @@ export async function confirmTotpEnrollment(
     select: { email: true, name: true },
   });
   await sendEmail(mfaEnabledEmail({ to: user.email, name: user.name }));
-  return { ok: true };
+  return { ok: true, backupCodes: await readBackupCodes(userId) };
 }
 
 export type SignInCodeResult =
@@ -177,15 +202,19 @@ export type SignInCodeResult =
  * Auth) and per IP.
  */
 export async function verifySignInCode(
-  input: { code: string },
+  input: { code: string; method?: "totp" | "backup" },
   headers: Headers,
 ): Promise<SignInCodeResult> {
-  const code = normalizeTotpCode(String(input.code ?? ""));
+  const backup = input.method === "backup";
+  const raw = String(input.code ?? "");
+  const code = backup ? normalizeBackupCode(raw) : normalizeTotpCode(raw);
   if (!code) {
     return {
       ok: false,
       reason: "invalid",
-      error: `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
+      error: backup
+        ? "Escribe uno de tus códigos de recuperación, por ejemplo k7m2p-9xq4t."
+        : `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
     };
   }
   const ipKey = throttleKeys.mfaChallengeIp(clientIp(headers));
@@ -200,16 +229,23 @@ export async function verifySignInCode(
 
   let session: { token: string; userId: string };
   try {
-    const result = await auth.api.verifyTOTP({ body: { code }, headers });
+    // Backup codes go through the same challenge, attempt limits and
+    // account lock as app codes: recovery never skips the controls.
+    const result = backup
+      ? await auth.api.verifyBackupCode({ body: { code }, headers })
+      : await auth.api.verifyTOTP({ body: { code }, headers });
+    if (!result.token) throw new Error("No session after the MFA code");
     session = { token: result.token, userId: result.user.id };
   } catch (error) {
     const errorCode = isAPIError(error) ? String(error.body?.code ?? "") : "";
-    if (errorCode === "INVALID_CODE") {
+    if (errorCode === "INVALID_CODE" || errorCode === "INVALID_BACKUP_CODE") {
       await recordAttempt([ipKey]);
       return {
         ok: false,
         reason: "invalid",
-        error: "El código no coincide. Usa el código más reciente de tu app.",
+        error: backup
+          ? "Ese código de recuperación no es válido o ya se usó."
+          : "El código no coincide. Usa el código más reciente de tu app.",
       };
     }
     if (errorCode === "ACCOUNT_TEMPORARILY_LOCKED") {
@@ -223,7 +259,8 @@ export async function verifySignInCode(
     if (
       errorCode === "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE" ||
       errorCode === "INVALID_TWO_FACTOR_COOKIE" ||
-      errorCode === "TOTP_NOT_ENABLED"
+      errorCode === "TOTP_NOT_ENABLED" ||
+      errorCode === "BACKUP_CODES_NOT_ENABLED"
     ) {
       return {
         ok: false,
@@ -237,6 +274,19 @@ export async function verifySignInCode(
       reason: "invalid",
       error: "No pudimos verificar el código. Inténtalo de nuevo.",
     };
+  }
+
+  if (backup) {
+    // Backup codes are removed when used; tell the owner how many are left.
+    const left = (await readBackupCodes(session.userId)).length;
+    const user = await db.user.findUniqueOrThrow({
+      where: { id: session.userId },
+      select: { email: true, name: true },
+    });
+    await sendEmail(
+      backupCodeUsedEmail({ to: user.email, name: user.name, left }),
+    );
+    return { ok: true };
   }
 
   // One-time use: a code seen before (e.g. read over someone's shoulder)

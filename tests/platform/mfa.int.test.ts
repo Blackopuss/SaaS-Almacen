@@ -73,6 +73,7 @@ describe("startTotpEnrollment", () => {
     expect(await getMfaStatus(userId)).toEqual({
       enabled: false,
       required: false,
+      backupCodesLeft: 0,
     });
   });
 
@@ -108,6 +109,7 @@ describe("startTotpEnrollment", () => {
     expect(await getMfaStatus(userId)).toEqual({
       enabled: false,
       required: false,
+      backupCodesLeft: 0,
     });
   }, 30_000);
 });
@@ -145,6 +147,7 @@ describe("confirmTotpEnrollment", () => {
     expect(await getMfaStatus(userId)).toEqual({
       enabled: false,
       required: false,
+      backupCodesLeft: 0,
     });
   });
 
@@ -157,10 +160,11 @@ describe("confirmTotpEnrollment", () => {
         { code: `${code.slice(0, 3)} ${code.slice(3)}` },
         withSession(),
       ),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, backupCodes: expect.any(Array) });
     expect(await getMfaStatus(userId)).toEqual({
       enabled: true,
       required: false,
+      backupCodesLeft: 10,
     });
     const row = await db.twoFactor.findUniqueOrThrow({ where: { userId } });
     expect(row.verified).toBe(true);

@@ -103,3 +103,59 @@ export function mfaEnabledEmail(input: {
     ].join("\n"),
   };
 }
+
+export function backupCodeUsedEmail(input: {
+  to: string;
+  name: string;
+  left: number;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Entraste con un código de recuperación",
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "Se inició sesión en tu cuenta de Almacén con un código de recuperación. Ese código ya no sirve.",
+      input.left === 1
+        ? "Te queda 1 código de recuperación."
+        : `Te quedan ${input.left} códigos de recuperación.`,
+      "Si perdiste tu teléfono, genera códigos nuevos en Configuración → Seguridad.",
+      "",
+      "Si no fuiste tú, cambia tu contraseña de inmediato.",
+    ].join("\n"),
+  };
+}
+
+export function backupCodesRegeneratedEmail(input: {
+  to: string;
+  name: string;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Generaste nuevos códigos de recuperación",
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "Se generaron nuevos códigos de recuperación para tu cuenta de Almacén. Los anteriores ya no sirven.",
+      "",
+      "Si no fuiste tú, cambia tu contraseña de inmediato.",
+    ].join("\n"),
+  };
+}
+
+export function mfaDisabledEmail(input: {
+  to: string;
+  name: string;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Desactivaste la verificación en dos pasos",
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "Tu cuenta de Almacén ya no pide un código de tu app al iniciar sesión.",
+      "",
+      "Si no fuiste tú, cambia tu contraseña de inmediato y vuelve a activarla en Configuración → Seguridad.",
+    ].join("\n"),
+  };
+}

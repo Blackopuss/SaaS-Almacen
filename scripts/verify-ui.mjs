@@ -438,7 +438,8 @@ try {
     await b.context().close();
   }
 
-  // MFA status (PLT-08A/B): the demo titular has MFA on and required.
+  // MFA status (PLT-08A/B, PLT-09): the demo titular has MFA on and
+  // required; its backup codes are replaced on every run.
   // Enrollment itself is covered by tests/platform/mfa.int.test.ts, since
   // these checks never create accounts.
   {
@@ -454,6 +455,65 @@ try {
         (await page.getByRole("button", { name: "Activar" }).count()) === 0,
       "MFA: Configuración shows it on and required for the titular",
     );
+    check(
+      (await page.getByRole("button", { name: "Desactivar" }).count()) === 0,
+      "MFA: a titular gets no «Desactivar» (PLT-09)",
+    );
+
+    // Backup codes (PLT-09): new codes after the password, shown once.
+    await page.getByRole("button", { name: "Generar nuevos" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator("#codes-password").fill(DEMO.password);
+    await dialog.getByRole("button", { name: "Generar códigos" }).click();
+    const list = dialog.getByRole("list", { name: "Códigos de recuperación" });
+    await list.waitFor();
+    const codes = (await list.getByRole("listitem").allTextContents()).map(
+      (c) => c.trim(),
+    );
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/codigos-recuperacion-mobile.png` });
+    check(
+      codes.length === 10 &&
+        codes.every((c) => /^[a-z2-9]{5}-[a-z2-9]{5}$/.test(c)) &&
+        overflow <= 0,
+      "MFA: «Generar nuevos» shows 10 backup codes without overflow",
+    );
+    await dialog.getByRole("button", { name: "Listo" }).click();
+    await page.getByText("Te quedan 10 códigos").waitFor();
+
+    // Sign in on another device with a backup code instead of the app.
+    const other = await newContext(browser, {
+      viewport: { width: 1280, height: 800 },
+    });
+    const second = await other.newPage();
+    await second.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+    await second.fill("#email", DEMO.email);
+    await second.fill("#password", DEMO.password);
+    await second.getByRole("button", { name: "Iniciar sesión" }).click();
+    await second.waitForURL("**/verificar-codigo**", { timeout: 20000 });
+    await second
+      .getByRole("button", { name: /Usa un código de recuperación/ })
+      .click();
+    await second.fill("#code", codes[0].toUpperCase().replace("-", " "));
+    await second.waitForTimeout(1500); // let the door animation finish
+    await second.screenshot({ path: `${OUT}/verificar-respaldo-desktop.png` });
+    await second.getByRole("button", { name: "Verificar" }).click();
+    await second.waitForURL("**/inventario", { timeout: 20000 });
+    check(true, "MFA: signing in with a backup code works (typed loosely)");
+    await other.close();
+
+    await page.reload({ waitUntil: "networkidle" });
+    check(
+      await page.getByText("Te quedan 9 códigos").isVisible(),
+      "MFA: a used backup code is gone",
+    );
+    await page.screenshot({
+      path: `${OUT}/seguridad-mobile.png`,
+      fullPage: true,
+    });
+
     await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
       new URL(page.url()).pathname === "/inventario",
