@@ -27,6 +27,8 @@ export const RULES = {
   registerIp: { max: 10, windowSeconds: 60 * 60, blockSeconds: 60 * 60 },
   resendEmail: { max: 3, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   resendIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  resetEmail: { max: 3, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  resetIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
 } as const satisfies Record<string, ThrottleRule>;
 
 export type ThrottleKey = { key: string; rule: ThrottleRule };
@@ -54,6 +56,14 @@ export const throttleKeys = {
   resendIp: (ip: string): ThrottleKey => ({
     key: `resend:ip:${ip}`,
     rule: RULES.resendIp,
+  }),
+  resetEmail: (email: string): ThrottleKey => ({
+    key: `reset:email:${hash(email)}`,
+    rule: RULES.resetEmail,
+  }),
+  resetIp: (ip: string): ThrottleKey => ({
+    key: `reset:ip:${ip}`,
+    rule: RULES.resetIp,
   }),
 };
 

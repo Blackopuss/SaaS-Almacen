@@ -96,8 +96,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-06. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 16 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-07** (recuperación de contraseña).
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-07. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 17 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-08A** (alta de MFA con TOTP).
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -109,12 +109,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **IDs** UUIDv7 (`newId`), fechas `DATETIME(3)` UTC, cantidades con `Decimal`.
 - **Datos de prueba creados en `almacen_dev`** durante verificaciones manuales: borrarlos al terminar.
 
-## Notas para PLT-07 (recuperación de contraseña)
+## Recuperación de contraseña (PLT-07)
 
-- Usar los endpoints de Better Auth desde el servidor (`auth.api.requestPasswordReset`, `auth.api.resetPassword`) con `emailAndPassword.sendResetPassword` → `sendEmail` + plantilla nueva en `src/platform/email/templates.ts`. El hash de la nueva contraseña ya pasa por `hashPassword` (scrypt OWASP) porque está configurado en `emailAndPassword.password`.
-- **Sin enumeración**: misma respuesta exista o no el correo (como `resendVerification`).
-- **Límites**: agregar reglas en `RULES`/`throttleKeys` de `src/platform/auth/throttle.ts` (por correo y por IP) y usar `blockedFor` + `recordAttempt` antes de pedir el enlace; agregar la ruta a `rateLimit.customRules` de `auth.ts`.
-- Token de un solo uso con expiración; al restablecer: `revokeSessionsOnPasswordReset: true` (cerrar las demás sesiones) y limpiar `throttleKeys.signInAccount(email)`.
-- Validar la nueva contraseña con `PASSWORD_MIN_LENGTH`/`PASSWORD_MAX_LENGTH` y mensajes como en `registerSchema`.
-- Pantallas en `src/app/(auth)/` dentro de `WarehouseCard`; enlace «¿Olvidaste tu contraseña?» en `/ingresar`; probar en `/correos`.
-
+- Servicio en `src/platform/auth/recovery.ts` (`requestPasswordReset`, `resetPassword`); efectos al restablecer en `emailAndPassword.onPasswordReset` de `auth.ts` (limpia bloqueo, confirma correo, avisa por correo). Política de contraseña nueva compartida: `newPasswordSchema` de `register.ts`.
+- Pantallas `/recuperar-contrasena` y `/restablecer-contrasena` (`referrer: no-referrer` porque el token va en la URL). Probar el enlace real en `/correos`.

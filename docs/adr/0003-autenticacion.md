@@ -47,6 +47,14 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - **Requisito de despliegue:** la IP se toma de `X-Forwarded-For`. En producción la app debe estar detrás de un proxy que sobrescriba esa cabecera; si se expone directo, un atacante podría variar la IP y evadir el límite por IP (el límite por cuenta sigue aplicando).
 - Pendiente: limpieza periódica de contadores viejos con el worker (IMP-01).
 
+## Recuperación de contraseña (PLT-07)
+
+- Endpoints de Better Auth llamados desde Server Actions (`src/platform/auth/recovery.ts`). El enlace del correo pasa por `/api/auth/reset-password/:token`, que valida el token y redirige a `/restablecer-contrasena?token=…` o `?error=INVALID_TOKEN`.
+- Token aleatorio de un solo uso (se consume al restablecer) que vence en 60 minutos (`RESET_PASSWORD_MINUTES`).
+- Misma respuesta exista o no el correo. Límite propio: 3 solicitudes por correo y 10 por IP cada 15 min; `rateLimit` HTTP también para `/request-password-reset`, `/reset-password` y `/reset-password/*`.
+- Al restablecer: la contraseña nueva sigue la política del registro (`newPasswordSchema`) y se guarda con el scrypt propio; se cierran **todas** las sesiones de la cuenta (`revokeSessionsOnPasswordReset`), se limpia el bloqueo de inicio de sesión de la cuenta, se marca el correo como verificado (el enlace demostró control del buzón) y se avisa por correo del cambio.
+- La página del enlace usa `referrer: no-referrer` para que el token de la URL no viaje a otros sitios.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.
@@ -56,4 +64,4 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 
 - Revisar avisos de seguridad de Better Auth en cada actualización (ASVS, PLT-16).
 - El CLI `@better-auth/cli` está obsoleto; el esquema se mantiene a mano en `prisma/schema.prisma` y lo valida la prueba de integración.
-- Pendiente en PLT: verificación de correo obligatoria, límites de intentos, recuperación y MFA.
+- Pendiente en PLT: MFA (PLT-08A..PLT-09).

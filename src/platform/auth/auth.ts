@@ -7,6 +7,8 @@ import { nextCookies } from "better-auth/next-js";
 import { newId } from "@/lib";
 import {
   existingAccountEmail,
+  passwordChangedEmail,
+  passwordResetEmail,
   sendEmail,
   verificationEmail,
 } from "@/platform/email";
@@ -18,16 +20,20 @@ import {
   hashPassword,
   verifyPassword,
 } from "./password";
+import { clearAttempts, throttleKeys } from "./throttle";
 
 /** Verification links stay valid for 24 hours and work once. */
 export const VERIFICATION_HOURS = 24;
+
+/** Password reset links stay valid for 60 minutes and work once (PLT-07). */
+export const RESET_PASSWORD_MINUTES = 60;
 
 /**
  * Authentication (BAS-04, PLT-02, PLT-03). Email + password with database
  * sessions; no session until the email is verified. Cookies are HttpOnly,
  * SameSite=Lax and Secure in production; Better Auth rejects requests from
- * untrusted origins (CSRF). Attempt limits: PLT-06. Recovery and MFA:
- * PLT-07..PLT-09.
+ * untrusted origins (CSRF). Attempt limits: PLT-06. Password recovery:
+ * PLT-07. MFA: PLT-08..PLT-09.
  */
 export const auth = betterAuth({
   appName: "Almacén",
@@ -50,6 +56,38 @@ export const auth = betterAuth({
           to: user.email,
           name: user.name,
           signInUrl: `${process.env.BETTER_AUTH_URL ?? ""}/ingresar`,
+        }),
+      );
+    },
+    // Password recovery (PLT-07): single-use link that expires.
+    resetPasswordTokenExpiresIn: RESET_PASSWORD_MINUTES * 60,
+    sendResetPassword: async ({ user, url }) => {
+      await sendEmail(
+        passwordResetEmail({
+          to: user.email,
+          name: user.name,
+          url,
+          minutes: RESET_PASSWORD_MINUTES,
+        }),
+      );
+    },
+    // A reset closes every session of the account (including stolen ones).
+    revokeSessionsOnPasswordReset: true,
+    onPasswordReset: async ({ user }) => {
+      // The link proved control of the mailbox: lift the sign-in block and
+      // confirm the email, so the person can enter right away.
+      await clearAttempts([throttleKeys.signInAccount(user.email)]);
+      if (!user.emailVerified) {
+        await db.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        });
+      }
+      await sendEmail(
+        passwordChangedEmail({
+          to: user.email,
+          name: user.name,
+          recoverUrl: `${process.env.BETTER_AUTH_URL ?? ""}/recuperar-contrasena`,
         }),
       );
     },
@@ -99,6 +137,9 @@ export const auth = betterAuth({
       "/sign-in/email": { window: 15 * 60, max: 20 },
       "/sign-up/email": { window: 60 * 60, max: 10 },
       "/send-verification-email": { window: 15 * 60, max: 10 },
+      "/request-password-reset": { window: 15 * 60, max: 10 },
+      "/reset-password": { window: 15 * 60, max: 10 },
+      "/reset-password/*": { window: 15 * 60, max: 20 },
     },
   },
   // Never send usage data to third parties.

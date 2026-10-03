@@ -44,3 +44,45 @@ export function existingAccountEmail(input: {
     ].join("\n"),
   };
 }
+
+export function passwordResetEmail(input: {
+  to: string;
+  name: string;
+  url: string;
+  minutes: number;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Restablece tu contraseña de Almacén",
+    actionUrl: input.url,
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "Recibimos una solicitud para restablecer la contraseña de tu cuenta de Almacén. Elige una nueva con este enlace:",
+      input.url,
+      "",
+      `El enlace vence en ${input.minutes} minutos y solo funciona una vez.`,
+      "Si no lo pediste, ignora este mensaje: tu contraseña no cambiará.",
+    ].join("\n"),
+  };
+}
+
+export function passwordChangedEmail(input: {
+  to: string;
+  name: string;
+  recoverUrl: string;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Tu contraseña de Almacén cambió",
+    actionUrl: input.recoverUrl,
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "La contraseña de tu cuenta de Almacén se acaba de cambiar y cerramos todas tus sesiones abiertas.",
+      "",
+      "Si no fuiste tú, restablécela de inmediato con este enlace:",
+      input.recoverUrl,
+    ].join("\n"),
+  };
+}

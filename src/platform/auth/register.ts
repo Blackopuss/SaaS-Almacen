@@ -13,6 +13,22 @@ import {
   tooManyAttemptsMessage,
 } from "./throttle";
 
+/** Password policy for new passwords (registration and reset, PLT-07). */
+export const newPasswordSchema = z
+  .string()
+  .min(
+    PASSWORD_MIN_LENGTH,
+    `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+  )
+  .max(
+    PASSWORD_MAX_LENGTH,
+    `La contraseña puede tener hasta ${PASSWORD_MAX_LENGTH} caracteres.`,
+  )
+  .refine(
+    (value) => value.trim().length > 0,
+    "La contraseña no puede ser solo espacios.",
+  );
+
 /** Registration input (PLT-02). Messages are shown to people in Spanish. */
 export const registerSchema = z.object({
   name: z
@@ -26,20 +42,7 @@ export const registerSchema = z.object({
     .toLowerCase()
     .max(254, "El correo es demasiado largo.")
     .pipe(z.email("Escribe un correo válido, por ejemplo nombre@negocio.mx.")),
-  password: z
-    .string()
-    .min(
-      PASSWORD_MIN_LENGTH,
-      `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
-    )
-    .max(
-      PASSWORD_MAX_LENGTH,
-      `La contraseña puede tener hasta ${PASSWORD_MAX_LENGTH} caracteres.`,
-    )
-    .refine(
-      (value) => value.trim().length > 0,
-      "La contraseña no puede ser solo espacios.",
-    ),
+  password: newPasswordSchema,
 });
 
 export type RegisterInput = z.input<typeof registerSchema>;

@@ -419,6 +419,82 @@ try {
     await context.close();
   }
 
+  // Password recovery (PLT-07): link from sign-in, neutral answer for an
+  // unknown email (test IP), invalid and made-up links. No account changes.
+  for (const viewport of [
+    { name: "mobile", width: 375, height: 812 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 20}`;
+    const context = await newContext(browser, {
+      viewport,
+      extraHTTPHeaders: { "x-forwarded-for": ip },
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+    const forgot = page.getByRole("link", {
+      name: "¿Olvidaste tu contraseña?",
+    });
+    const forgotHeight = (await forgot.boundingBox())?.height ?? 0;
+    await forgot.click();
+    await page.waitForURL("**/recuperar-contrasena");
+    check(
+      viewport.name === "desktop" || forgotHeight >= 44,
+      `${viewport.name}: «¿Olvidaste tu contraseña?» leads to recovery (≥ 44px on mobile)`,
+    );
+
+    await page.fill("#email", `fantasma.${Date.now()}@example.test`);
+    await page.getByRole("button", { name: "Enviar enlace" }).click();
+    const sent = page.getByRole("status");
+    await sent.waitFor();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/recuperar-${viewport.name}.png` });
+    check(
+      /Si hay una cuenta con ese correo/.test(
+        (await sent.textContent()) ?? "",
+      ) && overflow <= 0,
+      `${viewport.name}: recovery answers neutrally without overflow`,
+    );
+
+    await page.goto(`${BASE}/restablecer-contrasena?error=INVALID_TOKEN`, {
+      waitUntil: "networkidle",
+    });
+    check(
+      (await page
+        .getByRole("heading", { name: "El enlace no es válido" })
+        .isVisible()) &&
+        (await page
+          .getByRole("link", { name: "Pedir un enlace nuevo" })
+          .isVisible()),
+      `${viewport.name}: an invalid link offers a new one`,
+    );
+
+    await page.goto(`${BASE}/restablecer-contrasena?token=inventado`, {
+      waitUntil: "networkidle",
+    });
+    await page.fill("#password", "corta");
+    await page.getByRole("button", { name: "Guardar contraseña" }).click();
+    await page.locator("#password-error").waitFor();
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    const referrer = await page.getAttribute("meta[name=referrer]", "content");
+    await page.screenshot({
+      path: `${OUT}/restablecer-${viewport.name}.png`,
+    });
+    check(
+      focused === "password" && referrer === "no-referrer",
+      `${viewport.name}: reset form shows the password error and hides the token from referrers`,
+    );
+    await page.fill("#password", "una-contrasena-nueva-y-larga");
+    await page.getByRole("button", { name: "Guardar contraseña" }).click();
+    await page
+      .getByRole("heading", { name: "El enlace no es válido" })
+      .waitFor();
+    check(true, `${viewport.name}: a made-up token is refused`);
+    await context.close();
+  }
+
   // Registration form (PLT-02): invalid submit, inline errors and focus.
   // Only the invalid path runs here so no accounts are created.
   for (const viewport of [

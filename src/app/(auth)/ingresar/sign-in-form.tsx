@@ -73,6 +73,14 @@ export function SignInForm({ next }: { next: string }) {
             />
           )}
         </FormField>
+        <p className="-mt-2 text-right text-sm">
+          <Link
+            href="/recuperar-contrasena"
+            className="inline-flex min-h-11 items-center rounded font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
           {pending ? "Entrando…" : "Iniciar sesión"}
