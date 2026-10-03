@@ -70,7 +70,10 @@ afterAll(async () => {
 
 describe("startTotpEnrollment", () => {
   it("starts disabled", async () => {
-    expect(await getMfaStatus(userId)).toEqual({ enabled: false, required: false });
+    expect(await getMfaStatus(userId)).toEqual({
+      enabled: false,
+      required: false,
+    });
   });
 
   it("refuses a wrong password without creating a secret", async () => {
@@ -102,7 +105,10 @@ describe("startTotpEnrollment", () => {
     const row = await db.twoFactor.findUniqueOrThrow({ where: { userId } });
     expect(row.verified).toBe(false);
     expect(row.secret).not.toContain(result.secret);
-    expect(await getMfaStatus(userId)).toEqual({ enabled: false, required: false });
+    expect(await getMfaStatus(userId)).toEqual({
+      enabled: false,
+      required: false,
+    });
   }, 30_000);
 });
 
@@ -136,7 +142,10 @@ describe("confirmTotpEnrollment", () => {
       withSession(),
     );
     expect(result.ok === false && result.error).toMatch(/no coincide/);
-    expect(await getMfaStatus(userId)).toEqual({ enabled: false, required: false });
+    expect(await getMfaStatus(userId)).toEqual({
+      enabled: false,
+      required: false,
+    });
   });
 
   it("turns MFA on with the app's current code, rotates the session and emails the owner", async () => {
@@ -149,7 +158,10 @@ describe("confirmTotpEnrollment", () => {
         withSession(),
       ),
     ).toEqual({ ok: true });
-    expect(await getMfaStatus(userId)).toEqual({ enabled: true, required: false });
+    expect(await getMfaStatus(userId)).toEqual({
+      enabled: true,
+      required: false,
+    });
     const row = await db.twoFactor.findUniqueOrThrow({ where: { userId } });
     expect(row.verified).toBe(true);
 
