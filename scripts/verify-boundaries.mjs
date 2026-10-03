@@ -1,4 +1,5 @@
-// Verifies the architectural lint rules (BAS-02) against temporary fixtures.
+// Verifies the architectural lint rules (BAS-02, PLT-12) against temporary
+// fixtures.
 // Usage: npm run lint:boundaries
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -68,6 +69,24 @@ const cases = [
     expectError: true,
   },
   {
+    name: "a module uses the unscoped database client (PLT-12)",
+    file: `${dirs.b}/unscoped-db.ts`,
+    code: 'import { db } from "@/server";\nexport const x = db;\n',
+    expectError: true,
+  },
+  {
+    name: "a module reaches the database client file directly (PLT-12)",
+    file: `${dirs.b}/unscoped-db-file.ts`,
+    code: 'import { db } from "@/server/db";\nexport const x = db;\n',
+    expectError: true,
+  },
+  {
+    name: "a module uses the company-scoped client (PLT-12)",
+    file: `${dirs.b}/scoped-db.ts`,
+    code: 'import { forOrganization } from "@/server";\nexport const x = forOrganization;\n',
+    expectError: false,
+  },
+  {
     name: "a module imports its own internal file",
     file: `${dirs.a}/own.ts`,
     code: 'import { internalValue } from "./internal";\nexport const x = internalValue;\n',
@@ -75,7 +94,8 @@ const cases = [
   },
 ];
 
-const boundaryRule = (m) => m.ruleId?.startsWith("boundaries/");
+const boundaryRule = (m) =>
+  m.ruleId?.startsWith("boundaries/") || m.ruleId === "no-restricted-imports";
 
 let failures = 0;
 try {

@@ -84,10 +84,37 @@ const architecture = {
   },
 };
 
+// Company-scoped data (PLT-12): business code reaches the database only
+// through forOrganization(), never the unscoped client.
+const unscopedDb =
+  "Usa forOrganization(organizationId) de @/server: los datos de negocio siempre van con su empresa (PLT-12).";
+const tenantData = {
+  files: [
+    "src/modules/**/*.{ts,tsx}",
+    "src/platform/catalog/**/*.{ts,tsx}",
+    "src/platform/contacts/**/*.{ts,tsx}",
+  ],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [{ name: "@/server", importNames: ["db"], message: unscopedDb }],
+        patterns: [
+          {
+            group: ["@/server/db", "@/server/generated/**", "**/server/db"],
+            message: unscopedDb,
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   architecture,
+  tenantData,
   prettier,
   // Override default ignores of eslint-config-next.
   globalIgnores([

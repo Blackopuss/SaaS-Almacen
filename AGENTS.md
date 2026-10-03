@@ -26,7 +26,7 @@ Contexto compartido por Claude Code y Codex. Leer antes de trabajar:
 
 - Interfaz en español (México). Código e identificadores en inglés; documentación y mensajes de commit en español.
 - Las reglas de negocio viven en servicios de `src/modules/*` o `src/platform/*`, nunca en componentes.
-- Cada consulta de negocio lleva contexto de empresa (`organization_id`).
+- Cada consulta de negocio lleva contexto de empresa (`organization_id`): se hace con `forOrganization(ctx.organization.id)` de `@/server` (PLT-12), nunca con `db`. Toda tabla nueva con `organizationId` se agrega a `TENANT_MODELS`.
 - Cantidades y dinero con decimal exacto; nunca `number` de punto flotante para stock o importes.
 - Secretos solo en `.env.local` (ignorado por git). Plantilla sin secretos en `.env.example`.
 - Antes de cerrar un paso: `npm run check` y `npm run build` deben pasar.
@@ -97,8 +97,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-11. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 22 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-12** (capa de acceso a datos con `organization_id` obligatorio). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-12. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 23 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-13** (relaciones compuestas y unicidad por empresa) y **PLT-14** (bitácora de auditoría), en paralelo. FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código

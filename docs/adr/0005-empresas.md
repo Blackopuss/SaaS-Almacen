@@ -21,6 +21,14 @@ Cada dato de negocio pertenece a una empresa (`organization_id`). La persona que
 - `switchOrganization` solo cambia a una empresa con membresía activa, y solo la sesión propia; «no existe» y «no eres miembro» reciben la misma respuesta. Al cambiar se vuelve a pintar todo (layout incluido) y se empieza en Inventario.
 - La interfaz muestra la empresa activa en la barra lateral y en «Más»; el selector aparece solo con dos o más empresas.
 
+## Acceso a datos por empresa (PLT-12)
+
+- El código de negocio usa `forOrganization(organizationId)` (`src/server/tenant-db.ts`), una extensión de Prisma que agrega `organizationId` a todo filtro de lectura, actualización y borrado, exige que cada alta traiga el `organizationId` de la empresa activa (los tipos lo piden explícito), impide mover un registro a otra empresa y rechaza modelos sin `organizationId` y SQL directo (también dentro de transacciones). Sin id de empresa no hay cliente: «Consulta de negocio sin contexto de empresa».
+- `TENANT_MODELS` lista los modelos con `organizationId`; una prueba lee `prisma/schema.prisma` y falla si una tabla nueva con esa columna no está registrada (denegar por defecto).
+- ESLint prohíbe importar el cliente sin filtro (`db`, `@/server/db`, el cliente generado) en `src/modules/*`, `platform/catalog` y `platform/contacts`; `npm run lint:boundaries` lo demuestra.
+- Las escrituras anidadas por relaciones no se reescriben: las llaves compuestas por empresa (PLT-13) harán que la base rechace mezclar empresas.
+- Alternativa descartada por ahora: seguridad por filas en la base (MySQL no la tiene nativa; vistas por empresa complicarían Prisma).
+
 ## Alternativas consideradas
 
 - **Crear la empresa dentro del registro**: un formulario más largo antes de confirmar el correo y empresas huérfanas de cuentas nunca verificadas.
