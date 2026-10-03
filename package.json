@@ -21,7 +21,9 @@
     "db:check": "node scripts/db-check.mjs",
     "db:reset": "prisma migrate reset",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",

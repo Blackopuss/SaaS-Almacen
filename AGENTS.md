@@ -60,3 +60,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Bases: `almacen_dev`, `almacen_test`, `almacen_shadow`.
 - Comandos: `db:setup`, `db:migrate`, `db:deploy`, `db:status`, `db:check`. **`db:reset` borra datos: nunca ejecutarlo sin consentimiento explícito del fundador** (Prisma también lo bloquea para agentes).
 - Para operar sobre la base de pruebas: `DATABASE_NAME=almacen_test npm run db:deploy`.
+
+## Pruebas (BAS-07)
+
+- `npm test` corre `unit` (`src/**/*.test.ts`) e `integration` (`*.int.test.ts`). Requiere MySQL local corriendo.
+- La integración usa siempre `almacen_test` (nunca dev): migra y vacía tablas al iniciar. Fixtures con DDL usan `migratorConnection()` de `tests/setup/test-db.ts`; el código bajo prueba usa `db` (usuario de la app).
