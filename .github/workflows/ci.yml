@@ -1,0 +1,67 @@
+# BAS-08: types, lint, boundaries, format, unit + integration tests (MySQL)
+# and production build on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [pruebas, main]
+  pull_request:
+    branches: [pruebas, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Revisión y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:9.4
+        env:
+          # Throwaway container that only lives for this job.
+          MYSQL_ROOT_PASSWORD: ci-root-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-root-only"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      MYSQL_ROOT_PASSWORD: ci-root-only
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: "3306"
+      # MySQL sees runner connections from the Docker gateway, not 127.0.0.1.
+      DATABASE_USER_HOST: "%"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Preparar entorno, bases y migraciones
+        run: npm run setup
+
+      - name: Tipos, lint, límites, formato y pruebas
+        run: npm run check
+
+      - name: Build de producción
+        run: npm run build
+
+      - name: Auditoría de dependencias de producción
+        run: npm audit --omit=dev --audit-level=high

@@ -50,7 +50,13 @@ const ident = (name) => {
 };
 const host = env("DATABASE_HOST");
 if (!/^[A-Za-z0-9.:-]+$/.test(host)) throw new Error(`Host inválido: ${host}`);
-const account = (user) => `'${user}'@'${host}'`;
+// Host the MySQL accounts accept connections from. Locally the same as
+// DATABASE_HOST; in CI the server sees the Docker gateway, so CI uses "%".
+const userHost = env("DATABASE_USER_HOST") ?? host;
+if (!/^[A-Za-z0-9.:%-]+$/.test(userHost)) {
+  throw new Error(`Host de usuarios inválido: ${userHost}`);
+}
+const account = (user) => `'${user}'@'${userHost}'`;
 
 const conn = await mariadb.createConnection({
   host,
