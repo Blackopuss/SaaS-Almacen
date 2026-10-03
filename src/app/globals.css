@@ -109,49 +109,72 @@
   --sidebar-accent-foreground: #1e293b;
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #2563eb;
+
+  /* Warehouse illustration (decorative). */
+  --scene-sky: #eaf1fb;
+  --scene-floor: #dbe4ef;
+  --scene-rack: #64748b;
+  --scene-beam: #f59e0b;
+  --scene-box: #d4a373;
+  --scene-box-shade: #b07d4f;
+  --scene-tape: #ecd2ac;
+  --scene-forklift: #f59e0b;
+  --scene-forklift-dark: #334155;
 }
 
 .dark {
   color-scheme: dark;
-  --background: #0b1120;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --card-foreground: #e2e8f0;
-  --popover: #111827;
-  --popover-foreground: #e2e8f0;
+  /* Neutral grays (zinc); blue stays only for actions and links. */
+  --background: #0f0f10;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
   --primary: #60a5fa;
-  --primary-foreground: #0b1120;
+  --primary-foreground: #0f0f10;
   --primary-hover: #93c5fd;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #e2e8f0;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #f4f4f5;
   --destructive: #f87171;
-  --destructive-foreground: #0b1120;
+  --destructive-foreground: #0f0f10;
   --success: #4ade80;
-  --success-foreground: #0b1120;
+  --success-foreground: #0f0f10;
   --warning: #fbbf24;
-  --warning-foreground: #0b1120;
-  --border: #1e293b;
-  --input: #5b6b82;
+  --warning-foreground: #0f0f10;
+  --border: #27272a;
+  --input: #71717a;
   --ring: #60a5fa;
 
   --chart-1: #60a5fa;
   --chart-2: #2dd4bf;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
-  --chart-5: #94a3b8;
+  --chart-5: #a1a1aa;
 
-  --sidebar: #111827;
-  --sidebar-foreground: #e2e8f0;
+  --sidebar: #141416;
+  --sidebar-foreground: #f4f4f5;
   --sidebar-primary: #60a5fa;
-  --sidebar-primary-foreground: #0b1120;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #e2e8f0;
-  --sidebar-border: #1e293b;
+  --sidebar-primary-foreground: #0f0f10;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #27272a;
   --sidebar-ring: #60a5fa;
+
+  /* Warehouse illustration (decorative). */
+  --scene-sky: #111113;
+  --scene-floor: #27272a;
+  --scene-rack: #52525b;
+  --scene-beam: #f59e0b;
+  --scene-box: #b7895a;
+  --scene-box-shade: #8a6440;
+  --scene-tape: #d9b98d;
+  --scene-forklift: #f59e0b;
+  --scene-forklift-dark: #3f3f46;
 }
 
 @layer base {

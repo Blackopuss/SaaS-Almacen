@@ -57,7 +57,7 @@ export function ThemeToggle({
         className={cn(
           "relative flex h-8 w-14 shrink-0 items-center overflow-hidden rounded-full p-1 shadow-inner ring-1 ring-black/5 transition-colors duration-300",
           dark
-            ? "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-800 ring-white/10"
+            ? "bg-gradient-to-br from-zinc-950 via-zinc-800 to-zinc-700 ring-white/10"
             : "bg-gradient-to-br from-sky-300 via-sky-200 to-amber-100",
         )}
       >
@@ -86,7 +86,7 @@ export function ThemeToggle({
         <motion.span
           className={cn(
             "relative z-10 grid size-6 place-items-center rounded-full shadow-md",
-            dark ? "bg-slate-200 text-indigo-950" : "bg-white text-amber-500",
+            dark ? "bg-zinc-200 text-zinc-900" : "bg-white text-amber-500",
           )}
           initial={false}
           animate={{ x: dark ? 24 : 0 }}

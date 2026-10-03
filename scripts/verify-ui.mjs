@@ -19,9 +19,29 @@ if (!DEMO.password) {
   process.exit(1);
 }
 
+/**
+ * Browser context without the Next.js dev indicator: it only exists in
+ * development and can sit on top of controls (e.g. the mobile header).
+ */
+async function newContext(browser, options) {
+  const context = await browser.newContext(options);
+  await context.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent = "nextjs-portal{display:none!important}";
+    document.addEventListener("DOMContentLoaded", () =>
+      document.head.appendChild(style),
+    );
+  });
+  return context;
+}
+
+async function newPage(browser, options) {
+  return (await newContext(browser, options)).newPage();
+}
+
 /** New browser context signed in through the real sign-in form. */
 async function signedInPage(browser, viewport) {
-  const context = await browser.newContext({ viewport });
+  const context = await newContext(browser, { viewport });
   const page = await context.newPage();
   await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
   await page.fill("#email", DEMO.email);
@@ -47,7 +67,7 @@ try {
     { name: "mobile", width: 375, height: 812 },
     { name: "desktop", width: 1280, height: 800 },
   ]) {
-    const page = await browser.newPage({ viewport });
+    const page = await newPage(browser, { viewport });
     await page.goto(`${BASE}/sistema-visual`, { waitUntil: "networkidle" });
     await page.waitForTimeout(400); // let the entry animation finish
 
@@ -269,7 +289,7 @@ try {
 
   // Sign-in and sign-out (PLT-04).
   {
-    const context = await browser.newContext({
+    const context = await newContext(browser, {
       viewport: { width: 375, height: 812 },
     });
     const page = await context.newPage();
@@ -323,7 +343,7 @@ try {
     { name: "mobile", width: 375, height: 812 },
     { name: "desktop", width: 1280, height: 800 },
   ]) {
-    const page = await browser.newPage({ viewport });
+    const page = await newPage(browser, { viewport });
     await page.goto(`${BASE}/registro`, { waitUntil: "networkidle" });
     await page.fill("#name", "A");
     await page.fill("#email", "no-es-correo");

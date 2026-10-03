@@ -12,7 +12,8 @@ El fundador pidió claridad tipo Apple, Framer Motion y las skills `ui-ux-pro-ma
 - **Tailwind CSS 4.3.3** con tokens en `src/app/globals.css`; contraste WCAG verificado por prueba (texto ≥ 4.5:1, bordes y foco ≥ 3:1).
 - **shadcn/ui 4.21.1** (base Radix, preset nova) con ajustes propios: 44 px táctiles en móvil, textos en español, variantes de stock.
 - **motion 14.0.0** (Framer Motion) con `reducedMotion="user"` y presets cortos.
-- **Modo oscuro** con `next-themes` 0.4.6: claro por defecto, preferencia guardada en el navegador e interruptor deslizante propio (cielo de día/noche con sol y luna animados con `motion`), accesible como `role="switch"`.
+- **Modo oscuro gris neutro** (escala zinc: fondo `#0F0F10`, tarjetas `#18181B`, bordes `#27272A`; el azul solo en acciones y enlaces), pedido por el fundador en lugar del azul marino inicial, con `next-themes` 0.4.6: claro por defecto, preferencia guardada en el navegador e interruptor deslizante propio (cielo de día/noche con sol y luna animados con `motion`), accesible como `role="switch"`.
+- **Pantallas de acceso con escena de almacén** (`WarehouseScene`, SVG + `motion`): estantes donde las cajas se acomodan una vez y un montacargas que cruza el piso, más dos tarjetas flotantes con datos del producto. Panel ilustrado en escritorio y versión compacta en móvil. Con movimiento reducido, el montacargas queda estacionado (elegido por CSS `motion-reduce` para no causar errores de hidratación). Colores de la escena en tokens `--scene-*`.
 - Navegación: barra lateral en escritorio; barra inferior de 4 + «Más» en móvil.
 - Verificación en navegador con Playwright 1.63.0 y Edge instalado (`npm run verify:ui`).
 

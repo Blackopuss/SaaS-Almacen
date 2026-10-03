@@ -69,9 +69,10 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Sistema visual (BAS-12)
 
 - Fuente de verdad: `design-system/almacen/MASTER.md` (generado con `ui-ux-pro-max`). Estilo Minimal & Swiss, claridad tipo Apple, modo claro por defecto. Tipografía Inter.
-- Modo oscuro con `next-themes` (clase `dark` en `<html>`, clave `almacen-tema`, claro por defecto) y el interruptor `ThemeToggle` (barra lateral y encabezado móvil). Todo color nuevo necesita su valor en `:root` y `.dark`.
+- Modo oscuro gris neutro (zinc; azul solo en acciones) con `next-themes` (clase `dark` en `<html>`, clave `almacen-tema`, claro por defecto) y el interruptor `ThemeToggle` (barra lateral y encabezado móvil). Todo color nuevo necesita su valor en `:root` y `.dark`.
 - Tokens en `src/app/globals.css` (`primary #2563EB`, `success`, `warning`, `destructive`…). Nunca colores sueltos en componentes. Cambiar un token exige que pase `src/components/design-tokens.test.ts` (contraste WCAG: texto ≥ 4.5:1, bordes/anillos ≥ 3:1).
 - shadcn/ui (base Radix, preset nova) en `src/components/ui`, ajustado: objetivos táctiles ≥ 44 px en móvil, textos en español, avisos con Sonner (`toast.success/error`).
+- Animaciones que dependen de «reducir movimiento» se eligen con CSS (`motion-reduce:`), no con `useReducedMotion`, para que servidor y cliente generen el mismo HTML.
 - Animación con `motion` (`src/components/motion.tsx`): presets cortos, salida más rápida que entrada, `reducedMotion="user"`.
 - Formularios: `FormField` (etiqueta, ayuda y error enlazados con `aria-describedby`) y `PasswordInput`; Server Actions con `useActionState` y validación Zod en el servicio de `platform`/`modules`.
 - `/sistema-visual` (solo desarrollo) muestra los componentes. Con `npm run dev` activo (puerto 3000 por defecto, `UI_BASE_URL` para otro), `npm run verify:ui` comprueba foco visible, diálogo accesible, tamaños táctiles y desbordamiento en móvil y escritorio (Edge instalado).
