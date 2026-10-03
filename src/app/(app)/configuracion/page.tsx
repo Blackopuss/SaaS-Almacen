@@ -29,7 +29,7 @@ export default async function ConfiguracionPage() {
         <h2 id="seguridad" className="text-lg font-semibold">
           Seguridad
         </h2>
-        <MfaPanel enabled={mfa.enabled} />
+        <MfaPanel enabled={mfa.enabled} required={mfa.required} />
         <SessionsPanel
           sessions={sessions.map((s) => ({
             ...s,

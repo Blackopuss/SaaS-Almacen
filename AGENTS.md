@@ -96,8 +96,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-07, PLT-08A. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 18 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-08B** (desafío MFA al iniciar sesión: hoy una cuenta con MFA activa no puede entrar por `/ingresar`).
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-07, PLT-08A, PLT-08B. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 19 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-09** (códigos de recuperación de MFA y desactivación segura).
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -114,8 +114,9 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Servicio en `src/platform/auth/recovery.ts` (`requestPasswordReset`, `resetPassword`); efectos al restablecer en `emailAndPassword.onPasswordReset` de `auth.ts` (limpia bloqueo, confirma correo, avisa por correo). Política de contraseña nueva compartida: `newPasswordSchema` de `register.ts`.
 - Pantallas `/recuperar-contrasena` y `/restablecer-contrasena` (`referrer: no-referrer` porque el token va en la URL). Probar el enlace real en `/correos`.
 
-## MFA (PLT-08A)
+## MFA (PLT-08A/B)
 
 - Complemento `twoFactor` de Better Auth en `auth.ts`; servicio `src/platform/auth/mfa.ts` (`getMfaStatus`, `startTotpEnrollment`, `confirmTotpEnrollment`); panel `MfaPanel` en `/configuracion`; QR con el componente `QrCode` (`uqr`).
 - `getCurrentSession` toma la cookie de `cookies()` (no de `headers()`) para ver la sesión rotada dentro de la misma Server Action.
-- `verify:ui` nunca confirma un código real en la cuenta demo (dejaría la MFA activa).
+- Inicio de sesión con MFA: `signIn` devuelve `reason: "mfa"` → `/verificar-codigo` (`verifySignInCode`; cada código sirve una vez). MFA obligatoria según `isMfaRequired` (`mfa-policy.ts`, hoy: titulares; agregar administradores y personal de plataforma cuando existan). `requireSession()` redirige a `/activa-dos-pasos`; solo esa pantalla y `mfaSetupAction` pasan `allowMissingMfa`.
+- Cuenta demo: MFA activa con `DEMO_TOTP_SECRET` (`npm run db:seed`); código con `npm run demo:codigo`; helpers en `scripts/totp.mjs`. `verify:ui` entra calculando códigos nuevos (por eso tarda ≈2.5 min).

@@ -63,6 +63,15 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - No se ofrece «confiar en este dispositivo»: con MFA activa se pedirá el código en cada inicio de sesión (PLT-08B).
 - Hallazgo: tras una Server Action que cambia la cookie de sesión, `headers()` conserva la cookie original y la pantalla se re-renderizaba sin sesión. `getCurrentSession` arma la cabecera `cookie` desde `cookies()`, que sí refleja lo escrito en la acción.
 
+## Desafío MFA al iniciar sesión y MFA obligatoria (PLT-08B)
+
+- Con MFA activa, la contraseña correcta **no crea sesión**: Better Auth borra la que creó y deja una cookie firmada de desafío (10 min). La sesión nace solo al validar el código en `/verificar-codigo` (`verifySignInCode`).
+- Límites del código: 5 intentos por desafío y bloqueo de la cuenta 15 min tras 10 fallos seguidos (Better Auth), más 20 fallos por IP cada 15 min (propio).
+- **Un solo uso** (ASVS): Better Auth acepta el paso actual ± 1 y no impide repetir un código. Se registra cada código aceptado por usuario durante 90 s; si se repite, se borra la sesión recién creada y se pide iniciar sesión de nuevo.
+- **Obligatoria** para el titular de cualquier empresa (`isMfaRequired`, `src/platform/auth/mfa-policy.ts`). `requireSession()` envía a `/activa-dos-pasos` a quien la necesita y no la tiene; solo esa pantalla y su acción usan `allowMissingMfa`. Pendiente: administradores (USR-01) y personal de plataforma (MOD-09) se agregan en `isMfaRequired` cuando existan esos roles.
+- Restablecer la contraseña no desactiva la MFA (la recuperación no la elude).
+- Cuenta demo local: es titular, así que `db:seed` le activa MFA con `DEMO_TOTP_SECRET` (cifrado como lo hace Better Auth) y `npm run demo:codigo` muestra el código. `verify:ui` calcula códigos nuevos por paso de 30 s.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

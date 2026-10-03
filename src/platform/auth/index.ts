@@ -9,9 +9,17 @@ export type { Session } from "./auth";
 export {
   confirmTotpEnrollment,
   getMfaStatus,
+  isMfaRequired,
+  normalizeTotpCode,
   startTotpEnrollment,
+  verifySignInCode,
 } from "./mfa";
-export type { ConfirmTotpResult, MfaStatus, StartTotpResult } from "./mfa";
+export type {
+  ConfirmTotpResult,
+  MfaStatus,
+  SignInCodeResult,
+  StartTotpResult,
+} from "./mfa";
 export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
 export { requestPasswordReset, resetPassword } from "./recovery";
 export type {
@@ -26,7 +34,13 @@ export type {
   RegisterResult,
   ResendResult,
 } from "./register";
-export { getCurrentSession, requireSession, signIn, signOut } from "./session";
+export {
+  MFA_SETUP_PATH,
+  getCurrentSession,
+  requireSession,
+  signIn,
+  signOut,
+} from "./session";
 export type { CurrentUser, SignInResult } from "./session";
 export {
   listActiveSessions,

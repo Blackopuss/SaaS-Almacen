@@ -7,9 +7,11 @@ import { mfaEnabledEmail, sendEmail } from "@/platform/email";
 import { db } from "@/server";
 
 import { TOTP_DIGITS, auth } from "./auth";
+import { isMfaRequired } from "./mfa-policy";
 import {
   blockedFor,
   clearAttempts,
+  clientIp,
   recordAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
@@ -25,14 +27,19 @@ import {
  * Wrong passwords and codes are limited per user (RULES.mfaSetup).
  */
 
-export type MfaStatus = { enabled: boolean };
+export { isMfaRequired } from "./mfa-policy";
+
+export type MfaStatus = { enabled: boolean; required: boolean };
 
 export async function getMfaStatus(userId: string): Promise<MfaStatus> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { twoFactorEnabled: true },
   });
-  return { enabled: user?.twoFactorEnabled ?? false };
+  return {
+    enabled: user?.twoFactorEnabled ?? false,
+    required: await isMfaRequired(userId),
+  };
 }
 
 export type StartTotpResult =
@@ -154,5 +161,96 @@ export async function confirmTotpEnrollment(
     select: { email: true, name: true },
   });
   await sendEmail(mfaEnabledEmail({ to: user.email, name: user.name }));
+  return { ok: true };
+}
+
+export type SignInCodeResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid"; error: string }
+  /** The challenge expired, was used up or the code was replayed. */
+  | { ok: false; reason: "restart"; error: string };
+
+/**
+ * Second step of signing in with MFA on (PLT-08B). `headers` must carry the
+ * challenge cookie set by signIn; the session starts only here. Each code
+ * works once, wrong codes are limited per challenge, per account (Better
+ * Auth) and per IP.
+ */
+export async function verifySignInCode(
+  input: { code: string },
+  headers: Headers,
+): Promise<SignInCodeResult> {
+  const code = normalizeTotpCode(String(input.code ?? ""));
+  if (!code) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
+    };
+  }
+  const ipKey = throttleKeys.mfaChallengeIp(clientIp(headers));
+  const wait = await blockedFor([ipKey]);
+  if (wait > 0) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: tooManyAttemptsMessage(wait),
+    };
+  }
+
+  let session: { token: string; userId: string };
+  try {
+    const result = await auth.api.verifyTOTP({ body: { code }, headers });
+    session = { token: result.token, userId: result.user.id };
+  } catch (error) {
+    const errorCode = isAPIError(error) ? String(error.body?.code ?? "") : "";
+    if (errorCode === "INVALID_CODE") {
+      await recordAttempt([ipKey]);
+      return {
+        ok: false,
+        reason: "invalid",
+        error: "El código no coincide. Usa el código más reciente de tu app.",
+      };
+    }
+    if (errorCode === "ACCOUNT_TEMPORARILY_LOCKED") {
+      return {
+        ok: false,
+        reason: "restart",
+        error:
+          "Demasiados códigos incorrectos. Espera 15 minutos e inicia sesión de nuevo.",
+      };
+    }
+    if (
+      errorCode === "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE" ||
+      errorCode === "INVALID_TWO_FACTOR_COOKIE" ||
+      errorCode === "TOTP_NOT_ENABLED"
+    ) {
+      return {
+        ok: false,
+        reason: "restart",
+        error: "Tu verificación venció. Inicia sesión de nuevo.",
+      };
+    }
+    console.error("verifySignInCode failed", error);
+    return {
+      ok: false,
+      reason: "invalid",
+      error: "No pudimos verificar el código. Inténtalo de nuevo.",
+    };
+  }
+
+  // One-time use: a code seen before (e.g. read over someone's shoulder)
+  // does not open a second session.
+  const usedKey = throttleKeys.totpUsed(session.userId, code);
+  if ((await blockedFor([usedKey])) > 0) {
+    await db.session.deleteMany({ where: { token: session.token } });
+    return {
+      ok: false,
+      reason: "restart",
+      error:
+        "Ese código ya se usó. Espera a que tu app muestre uno nuevo e inicia sesión de nuevo.",
+    };
+  }
+  await recordAttempt([usedKey]);
   return { ok: true };
 }

@@ -12,6 +12,9 @@ const values = {
   // Local demo account created by `npm run db:seed` (development only).
   DEMO_EMAIL: () => "demo@almacen.test",
   DEMO_PASSWORD: () => randomBytes(12).toString("base64url"),
+  // The demo account owns a company, so it must use MFA (PLT-08B).
+  // `npm run demo:codigo` prints its current code.
+  DEMO_TOTP_SECRET: () => randomBytes(24).toString("base64url").slice(0, 32),
 };
 
 const added = Object.entries(values)

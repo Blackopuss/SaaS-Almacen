@@ -47,7 +47,8 @@ export async function mfaSetupAction(
   prev: MfaSetupState,
   formData: FormData,
 ): Promise<MfaSetupState> {
-  const { user } = await requireSession();
+  // Also used by the mandatory setup screen, before MFA is on.
+  const { user } = await requireSession({ allowMissingMfa: true });
   const requestHeaders = await headers();
 
   if (prev.step === "scan") {
@@ -57,7 +58,7 @@ export async function mfaSetupAction(
       requestHeaders,
     );
     if (!result.ok) return { ...prev, error: result.error };
-    revalidatePath("/configuracion");
+    revalidatePath("/", "layout");
     return { step: "done" };
   }
 

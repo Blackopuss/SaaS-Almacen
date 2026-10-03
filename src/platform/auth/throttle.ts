@@ -31,6 +31,12 @@ export const RULES = {
   resetIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   // Wrong passwords or codes while setting up MFA, per signed-in user.
   mfaSetup: { max: 5, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  // Wrong sign-in codes per IP (Better Auth also limits each challenge to 5
+  // tries and locks the account after 10 failures in a row).
+  mfaChallengeIp: { max: 20, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  // A sign-in code works once: it stays "used" for the whole time an app
+  // code is accepted (current step ± 1 = 90 s).
+  totpUsed: { max: 1, windowSeconds: 90, blockSeconds: 90 },
 } as const satisfies Record<string, ThrottleRule>;
 
 export type ThrottleKey = { key: string; rule: ThrottleRule };
@@ -70,6 +76,14 @@ export const throttleKeys = {
   mfaSetup: (userId: string): ThrottleKey => ({
     key: `mfa:setup:${userId}`,
     rule: RULES.mfaSetup,
+  }),
+  mfaChallengeIp: (ip: string): ThrottleKey => ({
+    key: `mfa:challenge:ip:${ip}`,
+    rule: RULES.mfaChallengeIp,
+  }),
+  totpUsed: (userId: string, code: string): ThrottleKey => ({
+    key: `mfa:used:${userId}:${hash(code)}`,
+    rule: RULES.totpUsed,
   }),
 };
 

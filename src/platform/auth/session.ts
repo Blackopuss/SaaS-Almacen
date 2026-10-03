@@ -7,6 +7,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { auth } from "./auth";
+import { isMfaRequired } from "./mfa-policy";
 import {
   blockedFor,
   clearAttempts,
@@ -32,14 +33,33 @@ export const getCurrentSession = cache(async () => {
 
 export type CurrentUser = { id: string; name: string; email: string };
 
-export async function requireSession(): Promise<{
+/** Where accounts that must use MFA set it up before using the app. */
+export const MFA_SETUP_PATH = "/activa-dos-pasos";
+
+/**
+ * Server-side guard for protected screens and actions. Accounts that must
+ * use MFA (PLT-08B) and have not set it up are sent to MFA_SETUP_PATH;
+ * only that screen passes `allowMissingMfa`.
+ */
+export async function requireSession(
+  options: { allowMissingMfa?: boolean } = {},
+): Promise<{
   user: CurrentUser;
   sessionId: string;
+  mfaEnabled: boolean;
 }> {
   const session = await getCurrentSession();
   if (!session) redirect("/ingresar");
   const { id, name, email } = session.user;
-  return { user: { id, name, email }, sessionId: session.session.id };
+  const mfaEnabled = Boolean(session.user.twoFactorEnabled);
+  if (!mfaEnabled && !options.allowMissingMfa && (await isMfaRequired(id))) {
+    redirect(MFA_SETUP_PATH);
+  }
+  return {
+    user: { id, name, email },
+    sessionId: session.session.id,
+    mfaEnabled,
+  };
 }
 
 const signInSchema = z.object({
@@ -50,6 +70,8 @@ const signInSchema = z.object({
 export type SignInResult =
   | { ok: true }
   | { ok: false; reason: "invalid" | "unverified" | "unavailable" }
+  /** Password accepted; no session until the MFA code is confirmed. */
+  | { ok: false; reason: "mfa" }
   | { ok: false; reason: "throttled"; message: string };
 
 /**
@@ -82,8 +104,16 @@ export async function signIn(
   }
 
   try {
-    await auth.api.signInEmail({ body: parsed.data, headers: requestHeaders });
+    const result = await auth.api.signInEmail({
+      body: parsed.data,
+      headers: requestHeaders,
+    });
     await clearAttempts([throttleKeys.signInAccount(email)]);
+    // MFA on: Better Auth kept no session and set a short-lived challenge
+    // cookie; the code is checked by verifySignInCode (./mfa.ts).
+    if ("twoFactorRedirect" in result && result.twoFactorRedirect) {
+      return { ok: false, reason: "mfa" };
+    }
     return { ok: true };
   } catch (error) {
     if (isAPIError(error)) {

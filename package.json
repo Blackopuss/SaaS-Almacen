@@ -27,7 +27,8 @@
     "verify:ui": "node scripts/verify-ui.mjs",
     "env:setup": "node scripts/env-setup.mjs",
     "setup": "npm run env:setup && npm run db:setup && npm run db:deploy",
-    "db:seed": "tsx --conditions=react-server scripts/seed-dev.mts"
+    "db:seed": "tsx --conditions=react-server scripts/seed-dev.mts",
+    "demo:codigo": "node scripts/demo-code.mjs"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",

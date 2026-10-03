@@ -14,6 +14,7 @@ const PROTECTED = [
   "/conteos",
   "/compras",
   "/configuracion",
+  "/activa-dos-pasos",
 ];
 
 export default function proxy(request: NextRequest) {
@@ -37,5 +38,6 @@ export const config = {
     "/conteos/:path*",
     "/compras/:path*",
     "/configuracion/:path*",
+    "/activa-dos-pasos",
   ],
 };

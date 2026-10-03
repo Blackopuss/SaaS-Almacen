@@ -1,12 +1,13 @@
 # SaaS de inventario modular
 
-Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02, BAS-03, BAS-04, BAS-05, BAS-06, BAS-07, BAS-08, BAS-12, BAS-13, PLT-01, PLT-02, PLT-03, PLT-04, PLT-05, PLT-06, PLT-07, PLT-08A. Rama de trabajo: `pruebas` (CI en GitHub Actions).
+Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02, BAS-03, BAS-04, BAS-05, BAS-06, BAS-07, BAS-08, BAS-12, BAS-13, PLT-01, PLT-02, PLT-03, PLT-04, PLT-05, PLT-06, PLT-07, PLT-08A, PLT-08B. Rama de trabajo: `pruebas` (CI en GitHub Actions).
 
 ```powershell
 npm install
 # Primera vez: copia .env.example a .env.local y pon MYSQL_ROOT_PASSWORD
 npm run setup      # secretos, bases, usuarios y migraciones
 npm run db:seed    # cuenta demo: DEMO_EMAIL / DEMO_PASSWORD en .env.local
+npm run demo:codigo  # código de verificación en dos pasos de la cuenta demo
 npm run dev      # http://localhost:3000
 npm run check    # tipos, lint, límites, formato y pruebas
 # Correos en desarrollo: se guardan localmente; ábrelos en http://localhost:3000/correos

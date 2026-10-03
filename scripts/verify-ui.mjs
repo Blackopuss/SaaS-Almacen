@@ -4,6 +4,8 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
+import { totpCode, totpStep } from "./totp.mjs";
+
 const BASE = process.env.UI_BASE_URL ?? "http://localhost:3000";
 
 // Protected screens need the local demo account (npm run db:seed).
@@ -11,10 +13,12 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const DEMO = {
   email: process.env.DEMO_EMAIL ?? "demo@almacen.test",
   password: process.env.DEMO_PASSWORD ?? "",
+  // The demo account is a titular: MFA is on (PLT-08B).
+  totpSecret: process.env.DEMO_TOTP_SECRET ?? "",
 };
-if (!DEMO.password) {
+if (!DEMO.password || !DEMO.totpSecret) {
   console.error(
-    "Falta DEMO_PASSWORD: corre npm run env:setup y npm run db:seed.",
+    "Falta DEMO_PASSWORD o DEMO_TOTP_SECRET: corre npm run env:setup y npm run db:seed.",
   );
   process.exit(1);
 }
@@ -39,16 +43,43 @@ async function newPage(browser, options) {
   return (await newContext(browser, options)).newPage();
 }
 
-/** New browser context signed in through the real sign-in form. */
+/**
+ * A fresh MFA code for the demo account. Each code works once, so every
+ * sign-in uses a new 30-second step (the current one or the next, both
+ * accepted), waiting when both were already used.
+ */
+let lastStep = 0;
+async function nextDemoCode(page) {
+  const step = Math.max(totpStep(), lastStep + 1);
+  while (step > totpStep() + 1) await page.waitForTimeout(1000);
+  lastStep = step;
+  return totpCode(DEMO.totpSecret, step);
+}
+
+/** Enters the MFA code on /verificar-codigo; false if it must start over. */
+async function enterDemoCode(page, target) {
+  await page.waitForURL("**/verificar-codigo**", { timeout: 20000 });
+  await page.fill("#code", await nextDemoCode(page));
+  await page.getByRole("button", { name: "Verificar" }).click();
+  const done = page.waitForURL(`**${target}`, { timeout: 20000 });
+  const restart = page.getByRole("link", { name: "Volver a iniciar sesión" });
+  await Promise.race([done, restart.waitFor({ timeout: 20000 })]);
+  return new URL(page.url()).pathname === target;
+}
+
+/** New browser context signed in through the real sign-in form + MFA. */
 async function signedInPage(browser, viewport, options = {}) {
   const context = await newContext(browser, { viewport, ...options });
   const page = await context.newPage();
-  await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
-  await page.fill("#email", DEMO.email);
-  await page.fill("#password", DEMO.password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await page.waitForURL("**/inventario", { timeout: 20000 });
-  return page;
+  // A run right after another may hit a code used seconds ago: retry once.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+    await page.fill("#email", DEMO.email);
+    await page.fill("#password", DEMO.password);
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    if (await enterDemoCode(page, "/inventario")) return page;
+  }
+  throw new Error("No se pudo entrar con la cuenta demo.");
 }
 const OUT = "qa/screenshots";
 mkdirSync(OUT, { recursive: true });
@@ -312,8 +343,26 @@ try {
     await page.screenshot({ path: `${OUT}/ingresar-error-mobile.png` });
     await page.fill("#password", DEMO.password);
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
+
+    // MFA challenge (PLT-08B): no session until the code is confirmed.
+    await page.waitForURL("**/verificar-codigo**", { timeout: 20000 });
+    const noSessionYet = (await context.cookies()).every(
+      (c) => !c.name.includes("session_token"),
+    );
+    await page.fill("#code", "12345");
+    await page.getByRole("button", { name: "Verificar" }).click();
+    await page.locator("#code-error").waitFor();
+    const codeFocused =
+      (await page.evaluate(() => document.activeElement?.id)) === "code";
+    await page.screenshot({ path: `${OUT}/verificar-codigo-mobile.png` });
+    check(
+      noSessionYet && codeFocused,
+      "MFA: password alone opens no session; an invalid code is refused in place",
+    );
+    await page.fill("#code", await nextDemoCode(page));
+    await page.getByRole("button", { name: "Verificar" }).click();
     await page.waitForURL("**/movimientos", { timeout: 20000 });
-    check(true, "sign-in returns to the requested screen");
+    check(true, "sign-in with MFA returns to the requested screen");
     const cookie = (await context.cookies()).find((c) =>
       c.name.includes("session_token"),
     );
@@ -389,56 +438,26 @@ try {
     await b.context().close();
   }
 
-  // MFA enrollment (PLT-08A): password step, QR + manual key, wrong code.
-  // Never confirms a real code, so the demo account keeps MFA off. Only one
-  // wrong code per run (the setup limit is 5 per 15 minutes).
-  for (const viewport of [
-    { name: "mobile", width: 375, height: 812 },
-    { name: "desktop", width: 1280, height: 800 },
-  ]) {
-    const page = await signedInPage(browser, viewport);
+  // MFA status (PLT-08A/B): the demo titular has MFA on and required.
+  // Enrollment itself is covered by tests/platform/mfa.int.test.ts, since
+  // these checks never create accounts.
+  {
+    const page = await signedInPage(browser, { width: 375, height: 812 });
     await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: "Activar" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.locator("#mfa-password").fill(DEMO.password);
-    await dialog.getByRole("button", { name: "Continuar" }).click();
-    await dialog
-      .getByRole("heading", { name: "Agrega tu cuenta a la app" })
-      .waitFor();
-    const qr = dialog.getByRole("img", { name: /Código QR/ });
-    const box = await qr.boundingBox();
-    const key = (await dialog.locator("code").textContent()) ?? "";
-    // Plain locator: the link is hidden (not in the accessibility tree) on desktop.
-    const openInApp = dialog.locator('a[href^="otpauth:"]');
-    const href = await openInApp.getAttribute("href");
-    const appLinkVisible = await openInApp.isVisible();
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
-    );
-    await page.screenshot({ path: `${OUT}/mfa-${viewport.name}.png` });
+    const panel = page.locator("div", { hasText: "Verificación en dos pasos" });
     check(
-      (box?.width ?? 0) >= 160 &&
-        /^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(key.trim()) &&
-        href?.startsWith("otpauth://totp/") === true &&
-        appLinkVisible === (viewport.name === "mobile") &&
-        overflow <= 0,
-      `${viewport.name}: MFA setup shows QR, manual key and app link (mobile only)`,
+      (await page.getByText("Activada", { exact: true }).isVisible()) &&
+        (await panel
+          .getByText("Es obligatoria para el titular de la empresa.")
+          .first()
+          .isVisible()) &&
+        (await page.getByRole("button", { name: "Activar" }).count()) === 0,
+      "MFA: Configuración shows it on and required for the titular",
     );
-    if (viewport.name === "desktop") {
-      await dialog.locator("#mfa-code").fill("000000");
-      await dialog.getByRole("button", { name: "Activar" }).click();
-      await dialog.locator("#mfa-code-error").waitFor();
-      const focused = await page.evaluate(() => document.activeElement?.id);
-      check(
-        focused === "mfa-code",
-        "desktop: a wrong MFA code shows an error and refocuses the field",
-      );
-    }
-    await page.keyboard.press("Escape");
-    await page.reload({ waitUntil: "networkidle" });
+    await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
-      await page.getByText("Desactivada").isVisible(),
-      `${viewport.name}: MFA stays off until a code is confirmed`,
+      new URL(page.url()).pathname === "/inventario",
+      "MFA: the mandatory setup screen sends accounts with MFA to the app",
     );
     await page.context().close();
   }
