@@ -376,7 +376,7 @@ D01–D06 dejaron preparados (sin validación externa) los documentos de [fase 1
 | BAS-06 | Utilidades base: decimal exacto, identificadores, errores de dominio y fechas UTC | BAS-02 | Pruebas de decimal (0.1 + 0.2, 197.25) pasan |
 | BAS-07 | Pruebas con Vitest y base MySQL aislada por ejecución | BAS-03 | Prueba de transacción con rollback pasa |
 | BAS-08 | CI: build, tipos, lint y pruebas con MySQL | BAS-07 | Un PR con prueba rota queda bloqueado |
-| BAS-09 | Staging: elegir proveedor y desplegar con TLS | BAS-08 | URL de staging con HTTPS desplegada desde CI |
+| BAS-09 | Staging: elegir proveedor y desplegar con TLS | BAS-08 | URL de staging con HTTPS desplegada desde CI; cumple los «Requisitos de producción» de `docs/adr/0003-autenticacion.md` (correo, reloj, secretos, proxy) |
 | BAS-10 | MySQL administrado en staging, red privada y secretos por ambiente | BAS-09 | DB sin acceso público; ningún secreto en el repositorio |
 | BAS-11 | Logs estructurados, captura de errores y primer respaldo verificado | BAS-10 | Error de prueba visible en el monitor; respaldo restaurado en una copia |
 | BAS-12 | Sistema visual: tokens, tipografía y componentes base | BAS-01 | Botón, campo, tabla, diálogo y aviso con foco y contraste verificados |

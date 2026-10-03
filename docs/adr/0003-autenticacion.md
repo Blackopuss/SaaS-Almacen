@@ -81,6 +81,24 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Si alguien pierde teléfono y códigos, no hay salida automática: la recuperación de la cuenta será un proceso de soporte con verificación de identidad (pendiente de definir con el fundador).
 - Hallazgo: cuando una acción cambia la cookie de sesión, Next vuelve a pintar la pantalla y desmonta el diálogo que la llamó; los avisos de éxito se muestran desde el panel que permanece montado.
 
+## Requisitos de producción (revisar en BAS-09..BAS-11 y PIL-01)
+
+Lista única de lo que la autenticación necesita al salir de la máquina local:
+
+1. **Proveedor de correo real** (`MAIL_DRIVER`): sin él la app no arranca en producción; verificación, recuperación y avisos de seguridad dependen del correo.
+2. **Reloj del servidor sincronizado (NTP)**: los códigos de la app de autenticación se aceptan solo en el paso actual ± 30 s; un reloj desfasado rechazaría códigos válidos.
+3. **`BETTER_AUTH_SECRET` en el gestor de secretos, con respaldo y sin rotarlo a la ligera**: cifra los secretos TOTP y los códigos de recuperación. Perderlo o cambiarlo deja sin acceso a toda cuenta con MFA. Una rotación necesita un plan (secretos versionados de Better Auth o re-cifrado).
+4. **HTTPS** (cookies `Secure` con prefijo `__Secure-` se activan solas con `NODE_ENV=production`) y **proxy que sobrescriba `X-Forwarded-For`** (límites por IP).
+5. **Respaldos de MySQL cifrados**: incluyen sesiones, contraseñas con hash y secretos MFA cifrados.
+6. **Sin cuenta demo**: `db:seed` solo corre en bases `*_dev`; `DEMO_PASSWORD` y `DEMO_TOTP_SECRET` no existen en producción.
+
+## Pendientes y decisiones abiertas
+
+- **Persona que pierde teléfono y códigos de recuperación** (decisión del fundador): definir proceso de soporte con verificación de identidad, quién autoriza y cómo se registra; después, herramienta interna con bitácora (PLT-14).
+- **MFA obligatoria para administradores y personal de plataforma**: agregar en `isMfaRequired` al crear esos roles (USR-01, MOD-09).
+- **Bitácora** (PLT-14): registrar activar/desactivar MFA, uso de código de recuperación y generación de códigos nuevos.
+- **Mejoras opcionales evaluadas**: llaves de acceso (passkeys/WebAuthn) recomendadas para una versión posterior; «confiar en este dispositivo» desactivado a propósito (menos seguridad); **SMS descartado** (costo y robo por duplicado de SIM).
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.
