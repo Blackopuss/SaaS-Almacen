@@ -1,6 +1,8 @@
 # Plan de implementación — SaaS de inventario modular
 
-Versión 0.4 · 1 de octubre de 2026 · Inventario para ferreterías con capacidad por plan, módulos y presentaciones configurables; exclusivamente con internet.
+Versión 0.6 · 2 de octubre de 2026 · Modelo modular acordado: Inventario como base por capacidad, Compras en el primer lanzamiento, después Ventas (punto de venta, cotizaciones) y CRM; varios usuarios con roles. Plan revisado en conjunto por Claude y Codex en 224 pasos de unas 3 horas.
+
+Ejecución de la primera fase: [definición, reglas, investigación y riesgos](FASE_01_DEFINICION.md). Prototipo navegable: [instrucciones y validación](../prototype/README.md). Entregables internos preparados; entrevistas, validación con ferreterías y decisiones comerciales siguen pendientes.
 
 ## 1. Producto y alcance
 
@@ -10,18 +12,20 @@ El mercado inicial confirmado es México y el primer segmento son las ferreterí
 
 El fundador estima alrededor de 1,000 productos para la primera ferretería. El servicio deberá atender desde unos 100 productos hasta miles y limitar el catálogo según el plan contratado. Esta cifra orienta el primer caso de uso; no es una medición del mercado ni un límite técnico ya probado.
 
-El primer lanzamiento se centra exclusivamente en control de inventario: qué hay, cuánto hay y dónde está. Alcance físico confirmado: una ferretería con zonas, pasillos y estantes. Se propone incluir catálogo, existencias por ubicación, entradas, salidas, reubicaciones, ajustes, conteos, mínimos, historial e importación/exportación. Usuarios con permisos, suscripción, seguridad y soporte son la plataforma necesaria para vender ese inventario. Varias bodegas o sucursales quedan para una expansión posterior.
+El primer lanzamiento vende **Inventario + Compras**: qué hay, cuánto hay, dónde está y cómo se repone. Después siguen Ventas (punto de venta primero, luego cotizaciones y pedidos) y CRM, cada uno contratable por separado sobre la base de Inventario (sección 4). Alcance físico confirmado: una ferretería con zonas, pasillos y estantes. Se propone incluir catálogo, existencias por ubicación, entradas, salidas, reubicaciones, ajustes, conteos, mínimos, historial e importación/exportación. Usuarios con roles, suscripción, seguridad y soporte forman la plataforma necesaria para venderlo. Mientras no exista Ventas, una **salida rápida** de varias líneas y la importación de salidas diarias evitan que el inventario se desactualice. Varias bodegas o sucursales quedan para una expansión posterior.
+
+El 2026-10-02 el fundador cambió la decisión de un solo tipo de usuario: ahora habrá **varios usuarios con roles predefinidos y combinables** (sección 4). Cada plan incluye un número de usuarios y se pueden agregar más. La autorización se sigue validando en el servidor por empresa, rol, módulo contratado y cupo.
 
 SAP es la referencia confirmada por el fundador, simplificado para ferreterías. No se ha indicado una edición ni se promete equivalencia funcional: la referencia se traducirá en operaciones concretas de inventario para este segmento. El alcance inicial sigue siendo exclusivamente inventario.
 
-Quedan para expansiones: punto de venta, compras avanzadas, lotes/caducidades, series, facturación fiscal, contabilidad, integraciones y operación sin conexión. Si alguno es indispensable para el segmento elegido, sustituirá alcance del primer lanzamiento y se reestimará; no se añadirá silenciosamente al mismo plazo.
+Quedan para fases posteriores al lanzamiento: Ventas (punto de venta, cotizaciones y pedidos) y CRM. Quedan para expansiones por demanda: lotes/caducidades, series, facturación fiscal, contabilidad, integraciones y operación sin conexión. Si alguno es indispensable para el segmento elegido, sustituirá alcance del primer lanzamiento y se reestimará; no se añadirá silenciosamente al mismo plazo.
 
 Hipótesis para poder planear: una persona con experiencia full-stack, seis horas efectivas por jornada, interfaz en español, MXN, una moneda por empresa, sin datos personales sensibles como requisito del producto. El usuario todavía no ha confirmado estas hipótesis. México y operación exclusivamente con internet sí están confirmados; no se implementará sincronización offline en v1.
 
 ### Alcance funcional propuesto para la ferretería
 
 | Necesidad | Comportamiento de la primera versión |
-|---|---|
+| --- | --- |
 | Qué es | Código/SKU, nombre, descripción, categoría, marca y unidad; código de barras y atributos como medida o material cuando apliquen |
 | Cuánto hay | Existencia total de un producto y desglose por ubicación; sumar únicamente cantidades del mismo producto/unidad |
 | Dónde está | Zonas, pasillos y estantes nombrados por el negocio; niveles opcionales |
@@ -40,7 +44,7 @@ Tamaños/materiales que identifican productos distintos tendrán SKU propio. Una
 Propuesta inicial de catálogo: conteo (pieza, par, docena), masa (kg, g), longitud (m, cm, mm), volumen (L, mL) y superficie (m²). Cada producto usa una unidad base y una precisión/incremento admitidos. Las presentaciones comerciales —caja, bolsa, rollo, saco, paquete— se definen por producto y empresa; su nombre por sí solo no determina cantidad ni unidad.
 
 | Producto | Unidad base | Presentación configurada por el tendero | Efecto de una entrada |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Tornillo TOR-001 | Pieza | Caja = 100 piezas | 3 cajas agregan 300 piezas |
 | Cable CAB-001 | Metro | Rollo = 100 metros | 2 rollos agregan 200 m |
 | Clavo CLA-001 a granel | Kilogramo | Bolsa = 5 kg | 3 bolsas agregan 15 kg |
@@ -53,7 +57,7 @@ Reglas propuestas de integridad:
 - Guardar un único saldo en unidad base por producto/ubicación. Cajas y piezas no son inventarios paralelos que puedan sumarse dos veces.
 - Convertir en servidor: cantidad base = cantidad capturada × factor de la presentación. Resolver el factor desde una versión autorizada, no confiar en un factor enviado libremente por el navegador.
 - Factores positivos, finitos y asociados a empresa/producto. Una caja de un producto puede contener 100 piezas y la de otro 24. Versionar cambios con permiso y auditoría.
-- Usar aritmética decimal exacta, límites de magnitud e incremento permitido por producto. Rechazar cantidades que no se puedan representar según esa configuración; no redondear stock silenciosamente. La precisión concreta se fijará en U01 con ejemplos del piloto.
+- Usar aritmética decimal exacta, límites de magnitud e incremento permitido por producto. Rechazar cantidades que no se puedan representar según esa configuración; no redondear stock silenciosamente. La precisión concreta se fijará en INV-06 con ejemplos de las entrevistas y del piloto.
 - Pieza se maneja en enteros; metros, kilos y litros pueden fraccionarse. Si una presentación solo admite paquetes enteros, ofrecer la unidad base para registrar salidas parciales.
 - Conservar en cada línea cantidad/unidad capturadas, factor aplicado, versión y cantidad base. Cambiar una caja de 100 a 120 piezas afecta movimientos futuros; los anteriores mantienen su equivalencia. Reversar utiliza el valor original.
 - La unidad base no se edita libremente después del primer movimiento. Cambiarla requiere una migración explícita y conciliada, fuera del flujo normal de v1.
@@ -83,13 +87,13 @@ Una instalación y sus estantes son conceptos distintos de varias sucursales. La
 ## 2. Stack recomendado
 
 | Capa | Propuesta | Motivo y límite |
-|---|---|---|
+| --- | --- | --- |
 | Interfaz | React + Next.js + TypeScript | Libertad de composición visual y frontend/backend en un proyecto. |
 | Diseño | Tailwind CSS + shadcn/ui | Componentes con código editable y sistema visual propio. No depender de una plantilla cerrada. |
 | Backend | Node.js en Next.js, con servicios de dominio separados | Un solo despliegue web inicial; las reglas de inventario no viven en los componentes visuales. |
 | Datos | MySQL administrado, InnoDB, versión con soporte vigente | Transacciones, índices y operación administrada. El rendimiento se medirá con cargas reales. |
 | Acceso a datos | Prisma | Esquema y migraciones versionados; usar transacciones y SQL controlado cuando el bloqueo lo requiera. |
-| Autenticación | Better Auth, candidato inicial | Sesiones, verificación, recuperación y MFA; evaluar actualización, operación y alternativa administrada en D08. |
+| Autenticación | Better Auth, candidato inicial | Sesiones, verificación, recuperación y MFA; evaluar actualización, operación y alternativa administrada en BAS-04. |
 | Validación | Esquemas compartidos, por ejemplo Zod | Validar siempre en servidor, aunque también se valide en pantalla. |
 | Procesos en segundo plano | Worker del mismo repositorio y cola durable inicialmente en MySQL | Importaciones, correos, alertas y reconciliación; reintentos, idempotencia y registro de errores. |
 | Archivos | Almacenamiento de objetos privado compatible con S3 | Aislamiento por empresa, enlaces temporales y expiración de importaciones. |
@@ -116,17 +120,20 @@ src/
   platform/
     auth/                  Identidad y sesiones
     tenancy/               Empresa activa y membresías
-    permissions/           Roles y permisos
+    authorization/         Roles predefinidos y permisos declarados por módulo
+    contacts/              Clientes y proveedores compartidos por Compras, Ventas y CRM
+    catalog/               Productos (cupo compartido por todos los módulos)
     billing/               Suscripciones y derechos contratados
     audit/                 Bitácora de operaciones
     jobs/                  Cola durable y tareas
   modules/
-    catalog/               Productos y unidades
+    units/                 Unidades y presentaciones
     inventory/             Movimientos y saldos
     imports/               Importaciones y exportaciones
     warehouses/            Ubicaciones y traspasos
-    purchasing/            Expansión posterior
-    sales/                 Expansión posterior
+    purchasing/            Compras (primer lanzamiento)
+    sales/                 Punto de venta, cotizaciones y pedidos
+    crm/                   Oportunidades y actividades
   server/                  Infraestructura de acceso a datos
 prisma/                    Esquema y migraciones
 tests/                     Pruebas críticas
@@ -135,14 +142,15 @@ docs/                      Decisiones, operación y producto
 
 El contrato de cada módulo define identificador, versión, dependencias, permisos, capacidades, límites y reglas de activación/cancelación. No permitir complementos con código subido por clientes en la primera versión.
 
-Para autorizar una operación, el servidor comprueba: sesión válida → pertenencia a la empresa → permiso sobre la acción/recurso → módulo contratado → límite disponible. Ocultar un botón o menú no basta. Las tareas en segundo plano aplican las mismas reglas pertinentes y conservan el contexto de empresa.
+Para autorizar una operación, el servidor comprueba: sesión válida → pertenencia a la empresa → permiso del rol sobre la acción/recurso → módulo contratado y vigente → límite disponible. Ocultar un botón o menú no basta. Las tareas en segundo plano aplican las mismas reglas pertinentes y conservan el contexto de empresa.
 
 ### Modelo de datos inicial
 
 | Área | Entidades principales |
-|---|---|
-| Plataforma | User, Session, Organization, Membership, Invitation, Role/Permission |
+| --- | --- |
+| Plataforma | User, Session, Organization, Membership, MembershipRole, Invitation, Contact (roles predefinidos; sin roles personalizables en el lanzamiento) |
 | Comercial | CapacityPlanVersion, ModuleDefinition, ModuleDependency, Subscription, SubscriptionItem, Entitlement, UsageLimit, UsageCounter, CapacityReservation, BillingEvent |
+| Compras | PurchaseOrder, PurchaseOrderLine, Receipt, ReceiptLine, SupplierReturn, ProductSupplier |
 | Inventario | Product, Unit, ProductPresentation, PresentationVersion, Warehouse, Location, StockMovement, StockMovementLine, StockBalance, CountSession, Transfer |
 | Operación | ImportJob, ImportRow, ExportJob, AuditEvent, BackgroundJob, OutboxEvent |
 | Legal | LegalDocumentVersion, AcceptanceRecord, PrivacyRequest |
@@ -167,35 +175,71 @@ Con MySQL compartido, el aislamiento se impondrá en la capa de acceso a datos y
 
 ## 4. Módulos y modelo comercial
 
-| Oferta | Incluye | Dependencia | Momento propuesto |
-|---|---|---|---|
-| Inventario base, obligatorio | Catálogo, unidades/presentaciones y conversiones, una instalación con ubicaciones internas, entradas/salidas, reubicaciones, conteos, mínimos, historial, importar/exportar y permisos | Plataforma | Primer lanzamiento |
-| Multi-almacén | Instalaciones adicionales, existencias por instalación y traspasos entre ellas | Base | Expansión posterior |
-| Compras | Proveedores, órdenes, recepciones parciales y devoluciones | Base | Después del piloto |
-| Ventas/POS | Venta, devolución, caja y ticket no fiscal | Base | Según segmento |
-| Lotes y caducidades | Trazabilidad y alertas de vencimiento | Base; integración con movimientos | Según segmento |
-| Series | Seguimiento individual por producto | Base | Refacciones/equipos según demanda |
-| Reportes avanzados | Rotación, tendencias, valuación definida y reportes programados | Base y fuentes requeridas | Después de validar datos |
-| Facturación fiscal | Integración con proveedor autorizado según jurisdicción | Datos de venta y fiscales | Proyecto posterior |
-| Integraciones | API, webhooks de salida y conectores específicos | Base y módulo de origen | Según demanda |
+Modelo acordado con el fundador el 2026-10-02 y revisado en conjunto por Claude y Codex. **Inventario es siempre la base obligatoria**. Cada empresa elige un nivel de capacidad (productos activos) y suma los módulos que necesite. El precio de cada módulo escala con el nivel de capacidad. Los precios siguientes son hipótesis para validar en entrevistas (FUN-06), no tarifas publicadas.
 
-La base incluye seguridad, MFA, respaldo, exportación y permisos esenciales. Los módulos cobran por utilidad operativa adicional. Diferenciar módulos funcionales de capacidad: usuarios, instalaciones, productos y almacenamiento pueden tener límites transparentes; no introducir cobros sorpresivos por cada movimiento. Las ubicaciones internas forman parte del inventario base propuesto. En el primer lanzamiento se vende únicamente la base de inventario; la arquitectura queda preparada para módulos posteriores sin anunciarlos como disponibles.
+### Catálogo de módulos
 
-**Fórmula inicial:** precio del plan de capacidad elegido + módulos adicionales contratados + impuestos aplicables. Cada plan incluye el inventario base y su cupo de productos; no cobrar una segunda base por separado. No se han fijado tarifas. Preparar combinaciones recomendadas para reducir la dificultad de elegir, manteniendo la opción de personalizar.
+| Módulo | Incluye | Depende de | Momento |
+| --- | --- | --- | --- |
+| **Inventario (base, obligatorio)** | Catálogo, unidades/presentaciones, ubicaciones internas, entradas, salidas y salida rápida, reubicaciones, ajustes, conteos, mínimos, historial, importar/exportar, reportes operativos básicos | Plataforma | Primer lanzamiento |
+| **Compras** | Proveedores, órdenes de compra, recepciones parciales que generan entradas, devoluciones a proveedor, sugerencia desde mínimos | Inventario, Contactos | Primer lanzamiento |
+| **Ventas — Punto de venta** | Mostrador con lector, carrito, cobro (efectivo, tarjeta con terminal externa, transferencia), ticket no fiscal, caja (apertura, corte, diferencias), devoluciones | Inventario, Contactos | Después del lanzamiento |
+| **Ventas — Cotizaciones y pedidos** | Cotizaciones, pedidos, surtido parcial y cobro en POS. Se incluye en el mismo módulo de Ventas | Ventas (dominio compartido, sin depender de la caja) | Después de POS |
+| **CRM** | Prospectos, oportunidades, embudo, actividades, recordatorios e historial del cliente; se enlaza con Ventas si está contratado | Contactos (no requiere Ventas) | Después de Ventas |
+| Multi-sucursal | Instalaciones adicionales y traspasos | Inventario | Por demanda |
+| Lotes/caducidad · Series | Trazabilidad | Inventario | Por demanda |
+| Reportes avanzados | Rotación, tendencias, valuación definida | Módulos fuente | Por demanda |
+| Facturación CFDI de ventas del cliente | Timbrado con PAC; los timbres se cobran como consumo | Ventas | Proyecto aparte |
+| API / integraciones | Claves con alcance, webhooks, conectores | Según origen | Por demanda |
 
-### Planes por cantidad de productos y módulos por función
+**Catálogo de productos y Contactos (clientes/proveedores) pertenecen al núcleo**, no a un módulo: Compras, Ventas y CRM los comparten sin duplicarlos. Ningún módulo lee las tablas de otro; usa sus servicios. Las operaciones que mueven stock (recepción de compra, venta) se confirman en la **misma transacción** que el movimiento de inventario. Los eventos se usan solo para tareas posteriores, como notificaciones o reportes.
 
-La capacidad responde a «cuántos productos puedo gestionar» y los módulos a «qué funciones adicionales necesito». Ambos ejes se combinan: una empresa podrá tener 500 productos con un módulo adicional y otra 3,000 con solo inventario base. En v1 se comercializan los niveles de capacidad con inventario base; los módulos posteriores se habilitan al estar implementados.
+Lo que **no** se cobra aparte: conversiones, historial, exportación, seguridad, respaldos, ubicaciones internas, movimientos o documentos (ventas, compras y cotizaciones no tienen cargo por operación). Los límites comerciales son productos activos y usuarios; más adelante también contactos CRM y sucursales.
 
-| Nivel propuesto | Cupo de productos activos por empresa | Caso ilustrativo |
-|---|---|---|
-| 100 | Hasta 100 | Inventario pequeño |
-| 500 | Hasta 500 | Negocio con catálogo en crecimiento |
-| 1,000 | Hasta 1,000 | Referencia inicial aportada por el fundador |
-| 3,000 | Hasta 3,000 | Catálogo más amplio |
-| 10,000 | Hasta 10,000 | Operación con miles de referencias |
+### Precios hipotéticos por nivel (MXN/mes, antes de IVA)
 
-Los umbrales son propuestas, pendientes de validar junto con el precio y el costo de soporte. No ofrecer «ilimitado» ni niveles mayores hasta probar su operación. Todos los niveles conservan las funciones de inventario base, conversiones, ubicaciones internas y seguridad. Cantidad de usuarios incluida y límites de archivos/almacenamiento siguen pendientes; no se asumen ilimitados.
+| Productos activos | Usuarios incluidos | Inventario (base) | + Compras | + Ventas | + CRM |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 100 | 2 | 149 | 79 | 89 | 59 |
+| 500 | 3 | 249 | 119 | 149 | 99 |
+| 1,000 | 5 | 349 | 179 | 209 | 139 |
+| 3,000 | 8 | 599 | 299 | 359 | 239 |
+| 10,000 | 15 | 999 | 499 | 599 | 399 |
+
+- **Usuario adicional:** 49/mes, sin descuento. Un usuario con varios roles ocupa un solo lugar. Las invitaciones pendientes cuentan como usuarios.
+- **Paquetes (15% de descuento, redondeado al peso; la misma regla se aplica al facturar):** *Ferretería* = Inventario + Compras + Ventas; *Crecimiento* = Ferretería + CRM. En el nivel 1,000: Ferretería 626 y Crecimiento 745.
+- **Ejemplo del fundador:** tienda con 500 productos + Ventas + CRM = 249 + 149 + 99 = **497/mes**.
+- **Primer lanzamiento (nivel 1,000):** Inventario + Compras = **528/mes**.
+- Los porcentajes (40–60% del precio base) orientan el cálculo, pero no son una fórmula: cada módulo debe justificar su precio frente a alternativas con POS e inventario incluidos en México. Validar el costo total para el cliente, no solo la base.
+- Subir de nivel encarece todos los módulos contratados: mostrar el total nuevo antes de confirmar.
+- Publicar únicamente los módulos y paquetes que ya existen. Los niveles 3,000 y 10,000 se publican hasta que su rendimiento esté probado (PIL-06).
+
+### Usuarios y roles
+
+El fundador cambió la decisión anterior: ahora habrá **varios usuarios con roles predefinidos**. Se pueden combinar roles; los roles personalizables quedan para después.
+
+| Rol | Puede | Disponible desde |
+| --- | --- | --- |
+| Titular | Todo, además de contratar, cancelar, cambiar el método de pago y transferir la titularidad. Uno por empresa | Lanzamiento |
+| Administrador | Operar todos los módulos contratados, administrar usuarios y configuración. Sin acciones de cobro | Lanzamiento |
+| Almacén | Catálogo, movimientos, conteos y ubicaciones | Lanzamiento |
+| Comprador | Proveedores, órdenes y recepciones; consultar inventario | Lanzamiento |
+| Consulta | Solo lectura | Lanzamiento |
+| Cajero | Punto de venta y su caja | Con Ventas |
+| Vendedor | Cotizaciones, pedidos y CRM propio | Con Ventas/CRM |
+
+Cada módulo declara sus permisos en su contrato. Un rol solo otorga permisos de módulos contratados y vigentes.
+
+### Cobro de suscripciones
+
+- **Pilotos con cobro asistido:** transferencia SPEI registrada en una consola interna, vigencia y derechos asignados manualmente con auditoría, y CFDI emitido mediante contador o servicio de facturación. Esto permite cobrar antes de automatizar la facturación.
+- **Pasarela por decidir en BIL-01**, con criterios medidos y no por la marca: suscripción con conceptos variables (nivel + módulos + usuarios), prorrateo, métodos de pago locales, comisiones, webhooks y conciliación. Candidatas: Stripe Billing, Conekta y Mercado Pago. Detrás de un adaptador pequeño.
+- **Automatizar** cuando la carga administrativa o los impagos lo justifiquen. Unos diez clientes es una referencia, no un umbral técnico.
+- El **CFDI de nuestra suscripción** se resuelve antes del primer cobro (PIL-10). Es independiente del módulo futuro para facturar las ventas del cliente.
+
+### Planes por cantidad de productos
+
+La capacidad responde a «cuántos productos puedo gestionar» y los módulos a «qué funciones necesito». El cupo de productos es único por empresa y lo comparten todos los módulos.
 
 **Definición propuesta de producto que consume cupo:** un registro activo de catálogo, normalmente identificado por un SKU, dentro de una empresa. Cero existencias no lo exime del cupo. No se factura cada unidad física: 5,000 tornillos del mismo SKU cuentan como un producto. Caja y pieza como presentaciones del mismo producto cuentan como uno; tenerlo en tres estantes también cuenta como uno. Tornillos de medidas diferentes con SKU independiente cuentan por separado.
 
@@ -235,18 +279,18 @@ Al desactivar un módulo, conservar el historial y permitir consulta/exportació
 El objetivo es una seguridad verificable y mantenible. Adoptar una matriz de controles aplicables de [OWASP ASVS](https://owasp.org/projects/asvs), con objetivo de nivel 2 y evidencia de revisión. No presentar esa meta como certificación ni afirmar seguridad absoluta.
 
 | Área | Requisito de la propuesta | Evidencia requerida |
-|---|---|---|
+| --- | --- | --- |
 | Autenticación | Biblioteca mantenida, correo verificado, recuperación con tokens de un uso y límites de intentos | Pruebas de expiración, repetición y recuperación |
 | Sesiones | Cookies HttpOnly/Secure/SameSite según el flujo, expiración y revocación; protección CSRF/origen | Sesión revocada deja de servir; cambio de credenciales invalida sesiones según política |
 | MFA | Disponible para todos, obligatorio para personal de plataforma y administradores de empresa | Alta, recuperación y desactivación verificadas; recuperación no elude controles |
-| Autorización | Denegar por defecto; roles propietario, administrador, operador y consulta | Acceso directo a rutas y acciones no autorizadas rechazado |
+| Autorización | Roles predefinidos por módulo; denegar por defecto, sin sesión válida, sin pertenencia o sin módulo contratado | Rutas/acciones de otra empresa rechazadas aunque se conozca el identificador |
 | Aislamiento | Verificación de pertenencia y relaciones dentro de la empresa | Batería con dos empresas y manipulación de identificadores |
 | Aplicación | Validación en servidor, consultas parametrizadas, límites de tamaño, cabeceras y CSP probada | Revisión de inyección, XSS, CSRF y exposición de errores |
 | Archivos | Validar tipo/contenido, filas y tamaño; almacenamiento privado; no ejecutar macros ni fórmulas | Archivo malicioso rechazado, enlace ajeno inaccesible, exportación resistente a fórmulas |
 | Abuso | Límites por IP/cuenta/empresa para login, importaciones y endpoints costosos | Carga y abuso no bloquean toda la plataforma |
 | Infraestructura | TLS, DB privada, cifrado administrado en reposo y secretos separados por ambiente | Revisión de configuración y rotación practicada |
 | Privilegios | Usuario de aplicación con permisos mínimos y credencial separada para migraciones | Aplicación no puede administrar usuarios ni ejecutar cambios de esquema |
-| Auditoría | Operaciones sensibles, cambios de rol, stock y cobro trazables | Eventos sin contraseñas/tokens; escritura restringida y retención definida |
+| Auditoría | Operaciones sensibles, cambios de cuenta, stock y cobro trazables | Eventos sin contraseñas/tokens; escritura restringida y retención definida |
 | Soporte | Acceso a datos por autorización, temporal y auditado | Operador de plataforma sin acceso libre permanente a inventarios |
 | Entrega | Revisión de cambios, análisis de dependencias/secretos y ambientes separados | Pipeline bloquea fallas críticas y no usa datos reales en pruebas |
 | Recuperación | Respaldos automáticos y recuperación a un punto en el tiempo si el proveedor la soporta | Restauración probada, tiempos y pérdida máxima medidos |
@@ -265,7 +309,7 @@ El mercado inicial confirmado es México. Revisar para el lanzamiento el texto v
 Preparar con revisión jurídica local:
 
 | Entregable | Contenido a resolver |
-|---|---|
+| --- | --- |
 | Términos y condiciones | Identidad del vendedor, alcance, propiedad de datos, uso permitido, soporte, responsabilidades y procedimiento de controversias |
 | Condiciones de suscripción | Módulos, precios/impuestos, renovación, prueba, cancelación, prorrateo, impago y reembolsos |
 | Aviso de privacidad | Datos y finalidades, proveedores, transferencias aplicables, contacto, derechos y conservación |
@@ -278,145 +322,350 @@ Guardar versión del documento, fecha y usuario que aceptó, minimizando datos a
 
 Distinguir dos necesidades: **emitir el comprobante fiscal por la suscripción que tú vendes** y **permitir al cliente facturar sus propias ventas**. La primera debe resolverse con asesoría fiscal antes de cobrar; la segunda es un módulo independiente. Un recibo de la pasarela no debe suponerse suficiente para obligaciones fiscales locales. Este plan organiza la revisión; no constituye contratos terminados ni validación jurídica.
 
-## 7. Plan en jornadas pequeñas
+## 7. Plan en pasos pequeños
 
-Cada fila representa una jornada objetivo de unas seis horas de trabajo efectivo, incluyendo revisión y validación del incremento. La secuencia es D01–D23 → U01–U04 → D24–D60. Se conservan los identificadores originales para no perder referencias; las cuatro jornadas U se añaden para el alcance confirmado de conversiones. Los prerrequisitos refuerzan los hitos que no pueden saltarse. Una tarea que exceda el día se divide en A/B, conservando su criterio de cierre. No sacrificar pruebas críticas para mantener una fecha.
+**Tamaño de paso:** unas 3 horas efectivas, incluida su prueba. El equipo es el fundador apoyado por IA (Claude y Codex), a medio tiempo, así que se avanza aproximadamente **un paso por día**. Si un paso excede ese tiempo, se divide en A/B y se conserva su criterio de cierre. Un paso solo se cierra con evidencia: una prueba que pasa, una demostración o un documento revisado. Una pantalla sin reglas, permisos o persistencia no cuenta como terminada.
 
-**Estimación de referencia: 64 jornadas ≈ 13 semanas de ejecución, más 25–35% de reserva (unas 16–18 semanas laborales en total).** Son 384 horas de trabajo efectivo antes de reserva. Pilotos, agenda de usuarios, verificación de pasarela y revisión legal pueden ampliar el calendario. Con tres horas disponibles al día, cada jornada ocupará aproximadamente dos días. Se reestimará después de D06 y D22.
+**Orden:** FUN → BAS → PLT → USR → MOD → INV → IMP → CMP → PIL → BIL → VEN → COT → CRM. Los prerrequisitos indican lo que no puede saltarse. Dentro de una fase, los pasos van en orden salvo indicación.
 
-### Etapa A — Validar y definir, D01–D06
+| Fase | Pasos | Resultado |
+| --- | ---: | --- |
+| FUN — Validación comercial | 8 | Entrevistas, precios y roles validados |
+| BAS — Fundación técnica | 13 | Proyecto, CI, staging y sistema visual |
+| PLT — Identidad y aislamiento | 17 | Cuentas seguras y empresas separadas |
+| USR — Usuarios y roles | 12 | Invitaciones, cupo de usuarios y permisos |
+| MOD — Módulos y derechos | 11 | Contratos de módulo, planes y aprovisionamiento manual |
+| INV — Inventario | 36 | Motor de inventario confiable con conversiones |
+| IMP — Migración | 13 | Importación desde Excel y salidas importadas |
+| CMP — Compras | 19 | Órdenes y recepciones conectadas a inventario |
+| PIL — Piloto y lanzamiento limitado | 19 | Primeros clientes pagando; lanzamiento limitado con cobro asistido |
+| BIL — Cobro automático y apertura | 18 | Contratación y pago en línea sin intervención manual |
+| VEN — Ventas: punto de venta | 28 | Mostrador y caja |
+| COT — Ventas: cotizaciones y pedidos | 12 | Cotizar, pedir y surtir |
+| CRM | 18 | Seguimiento comercial |
+| **Total** | **224** | |
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D01 | Precisar perfil de ferretería, problema y resultado esperado | México y ferreterías confirmados | Una ficha de cliente ideal, tamaño operativo y cinco hipótesis comprobables |
-| D02 | Entrevistas y revisión de hojas anonimizadas | D01 y disponibilidad de negocios | Cinco conversaciones documentadas o agenda pendiente explícita; problemas priorizados |
-| D03 | Alcance base, niveles de capacidad y módulos | D02 | Definir producto facturable, niveles y tres propuestas de precio; distinguir cupos de unidades físicas |
-| D04 | Reglas de inventario, unidades, ubicaciones y permisos | D03 | Ejemplos de presentaciones/conversiones, fracciones, cambio de factor, entradas, salidas, conteos y roles |
-| D05 | Prototipo de consulta, movimiento e importación | D04 | Usuarios encuentran producto/cantidad/ubicación y registran un movimiento; tiempos y fricciones anotados |
-| D06 | Mapa de datos, amenazas, obligaciones y presupuesto | D01–D05 | Decisiones iniciales documentadas y solicitudes de revisión externa preparadas |
+**Estimación:** 148 pasos hasta el lanzamiento limitado de Inventario + Compras (PIL-17), es decir, unas 440 horas o unos 7 meses a medio tiempo. Agregar 25–35% de reserva y 1–2 semanas de observación por piloto. El primer piloto empieza en PIL-13, alrededor del paso 143. BIL agrega 18 pasos y puede hacerse antes o en paralelo con Ventas, según la carga de cobro manual. Ventas, Cotizaciones y CRM suman 58 pasos más. Es una referencia para reestimar al cerrar cada fase, no una promesa de fecha.
 
-### Etapa B — Base técnica, D07–D12
+**Hitos visibles:** demo interna de inventario al terminar INV-27; demo con un Excel real al terminar IMP-12; demo de compra → recepción → stock al terminar CMP-09; primer cobro en PIL-16; lanzamiento limitado en PIL-17; contratación en línea en BIL-16.
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D07 | Proyecto TypeScript, reglas de calidad y configuración local | D06 | Arranque reproducible y configuración de ejemplo sin secretos |
-| D08 | Prueba técnica auth/ORM/MySQL y selección de versiones | D07 | Registro/sesión experimental y transacción funcionan con versiones compatibles |
-| D09 | Esquema inicial y migraciones | D04, D08 | Dos empresas de prueba; esquema limpio reconstruible con restricciones |
-| D10 | Integración continua y pruebas sobre MySQL | D09 | Build, tipos y prueba de transacción ejecutan en ambiente aislado |
-| D11 | Ambiente de staging, secretos, logs y primer respaldo | D10 | Despliegue accesible por TLS, sin DB pública; respaldo verificado |
-| D12 | Sistema visual y estructura de navegación | D05, D07 | Componentes base con foco/contraste y vista móvil de pantallas principales |
+### FUN — Validación comercial (8)
 
-### Etapa C — Identidad y separación de clientes, D13–D22
+D01–D06 dejaron preparados (sin validación externa) los documentos de [fase 1](FASE_01_DEFINICION.md) y el [prototipo](../prototype/README.md). Esta fase los completa con el nuevo alcance modular.
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D13 | Registro y verificación de correo | D08–D11 | Usuario sin verificar no accede al negocio; correo se entrega en pruebas |
-| D14 | Inicio/cierre de sesión y revocación | D13 | Cookies configuradas; logout y revocación invalidan acceso |
-| D15 | Recuperación de cuenta y límites de intentos | D14 | Token expira, no se reutiliza y no revela si existe una cuenta |
-| D16 | MFA y recuperación segura | D15 | Administrador completa alta de MFA y prueba un código de recuperación |
-| D17 | Alta de empresa y membresía del propietario | D09, D14 | Creación atómica; acceso a empresa ajena rechazado |
-| D18 | Invitaciones y baja de miembros | D17 | Invitación con caducidad/uso único; expulsión revoca acceso efectivo |
-| D19 | Roles y permisos de servidor | D18 | Operador no administra usuarios ni cobro; consulta no escribe |
-| D20 | Acceso a datos limitado por empresa | D17–D19 | Consultas de negocio requieren contexto validado y relaciones correctas |
-| D21 | Auditoría y acceso administrativo restringido | D20 | Cambio sensible deja actor/empresa/motivo; soporte sin acceso amplio por defecto |
-| D22 | Batería de aislamiento y revisión de amenazas | D13–D21 | Dos empresas no comparten datos al manipular URLs, cuerpos ni jobs disponibles |
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| FUN-01 | Actualizar ficha de cliente e hipótesis con Compras, salidas diarias, roles y módulos | Entregables internos de D01–D06 | Hipótesis nuevas medibles: frecuencia de compras, cómo registran salidas y quién opera |
+| FUN-02 | Ampliar el cuestionario: compras a proveedor, salidas/ventas diarias, usuarios, métodos de pago y CFDI | FUN-01 | Preguntas añadidas sin orientar hacia el prototipo |
+| FUN-03 | Conseguir y agendar cinco entrevistas (2 pequeñas, 2 cerca de 1,000 SKU, 1 grande) | FUN-02 | Cinco citas o lista explícita de faltantes |
+| FUN-04 | Entrevistas 1–2 y prueba del prototipo | FUN-03 | Notas, tiempos de tareas y hojas anonimizadas registradas |
+| FUN-05 | Entrevistas 3–5 y síntesis | FUN-04 | Problemas priorizados; hipótesis aceptadas o rechazadas con evidencia |
+| FUN-06 | Probar la tabla de precios, los paquetes y la definición de cupo | FUN-05 | Disposición a pagar y objeciones por nivel; precios ajustados |
+| FUN-07 | Matriz de roles × permisos para Inventario y Compras | FUN-05 | Tabla aprobada por el fundador; titular separado de administrador |
+| FUN-08 | Cierre de alcance: reglas de compras con ejemplos, salida rápida y lista de 3 pilotos | FUN-06, FUN-07 | Casos de aceptación de compras escritos; pilotos con nombre de quien decide; plan reestimado |
 
-### Etapa D — Inventario confiable, D23–D34 y U01–U04
+### BAS — Fundación técnica (13)
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D23 | Catálogo, descripción, SKU, atributos y unidad base | D19–D22 | SKU único por empresa; alta/reactivación centralizadas; archivo sin stock ni pérdida de historia |
-| U01 | Catálogo de unidades, dimensiones y precisión | D23 | Reglas de pieza/metro/kg/L/m² y sus límites definidas con casos; precisión rechaza pérdida silenciosa |
-| U02 | Configuración de presentaciones por producto | U01 | Tendero define caja = 100 piezas; factores inválidos y productos de otra empresa rechazados |
-| U03 | Servicio de conversión y vista previa | U02 | Servidor normaliza cantidades exactamente; dimensiones incompatibles y excesos rechazados |
-| U04 | Versiones de factor y contrato de historial | U03 | Cambio 100 → 120 conserva cálculos previos; pruebas de conversión y datos históricos pasan |
-| D24 | Búsqueda, filtros y tabla paginada | U04 | Buscar por nombre/SKU/código; filtros por categoría y marca con índices |
-| D25 | Instalación, ubicación General y saldos por ubicación | U04 | Esquema preparado para ubicaciones internas; saldo inicial por movimiento en unidad base |
-| D26 | Entrada y stock inicial con presentaciones | D25 | 3 cajas de 100 agregan 300 piezas; factor histórico y saldo se guardan atómicamente |
-| D27 | Salidas parciales y prevención de negativos | D26 | Salidas en piezas/decimales respetan incremento; falta de stock falla sin escritura parcial |
-| D28 | Ajustes y reversas con motivos | D27 | Reversa conserva equivalencia original incluso si cambió el factor de presentación |
-| D29 | Idempotencia, concurrencia y conexión interrumpida | D26–D28 | Dos salidas por la última unidad: una sola prospera; perder respuesta/reintentar no duplica |
-| D30 | Historial de movimientos y permisos de consulta | D29 | Filtros por fecha/producto/usuario y detalle trazable |
-| D31 | Captura de conteo físico | D30 | Cajas y unidades sueltas normalizadas con vista previa; referencia temporal, permisos y estado |
-| D32 | Reconciliación de conteo | D31 | Movimientos concurrentes se detectan; aplicar dos veces no duplica ajustes |
-| D33 | Mínimos y panel operativo | D30 | Alertas en pantalla derivadas de saldo real y separadas por empresa |
-| D34 | Reconciliación automática y revisión del motor | D23–D33, U01–U04 | Casos 300 → 275 → 395 piezas y 197.25 m pasan; saldos/historial concilian sin escritura parcial |
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| BAS-01 | Proyecto Next.js + TypeScript estricto, lint y formato | FUN-08 | `dev`, `build` y `lint` funcionan desde un clon limpio |
+| BAS-02 | Estructura `platform/`, `modules/` y regla de límites entre módulos | BAS-01 | Un módulo que importe internals de otro falla en lint |
+| BAS-03 | MySQL local con Docker y Prisma conectado | BAS-01 | Migración vacía aplicada y revertible localmente |
+| BAS-04 | Prueba técnica de Better Auth + Prisma + MySQL | BAS-03 | Registro y sesión experimentales funcionan; alternativa anotada |
+| BAS-05 | Fijar versiones y registrar decisiones (ADR) | BAS-04 | Versiones fijadas; ADR de stack, auth y ORM en `docs/` |
+| BAS-06 | Utilidades base: decimal exacto, identificadores, errores de dominio y fechas UTC | BAS-02 | Pruebas de decimal (0.1 + 0.2, 197.25) pasan |
+| BAS-07 | Pruebas con Vitest y base MySQL aislada por ejecución | BAS-03 | Prueba de transacción con rollback pasa |
+| BAS-08 | CI: build, tipos, lint y pruebas con MySQL | BAS-07 | Un PR con prueba rota queda bloqueado |
+| BAS-09 | Staging: elegir proveedor y desplegar con TLS | BAS-08 | URL de staging con HTTPS desplegada desde CI |
+| BAS-10 | MySQL administrado en staging, red privada y secretos por ambiente | BAS-09 | DB sin acceso público; ningún secreto en el repositorio |
+| BAS-11 | Logs estructurados, captura de errores y primer respaldo verificado | BAS-10 | Error de prueba visible en el monitor; respaldo restaurado en una copia |
+| BAS-12 | Sistema visual: tokens, tipografía y componentes base | BAS-01 | Botón, campo, tabla, diálogo y aviso con foco y contraste verificados |
+| BAS-13 | Layout de navegación y estados vacío, carga y error | BAS-12 | Navegación de escritorio y móvil sin desbordamiento |
 
-### Etapa E — Migración y ubicación física, D35–D42
+### PLT — Identidad, empresa y aislamiento (17)
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D35 | Worker, cola durable y archivos privados | D20, D34 | Tarea fallida reintenta con límites; archivo solo accesible por su empresa |
-| D36 | Importación CSV/XLSX: lectura, mapeo y vista previa | D35 | Validar unidad/presentación, factor y separador decimal explícito; errores por celda sin modificar stock |
-| D37 | Confirmación de importación y stock inicial por ubicación | D36 | Clasificar nuevos/actualizados y resultado por lote; fijar factores; reintentos no duplican stock |
-| D38 | Exportación y guía de primer uso | D37 | Exportación autorizada segura; usuario termina catálogo → importación → movimiento |
-| D39 | Módulos, planes de capacidad y cupos transaccionales | D19, D38 | 99/100 con dos altas permite una; importación reserva cupos; fallo libera reservas; módulos controlados en servidor |
-| D40 | Zonas/estantes y consulta de existencias por ubicación | D25, D39 | Desglose suma el total; jerarquía sin ciclos; filtro por ubicación y archivo con stock bloqueado |
-| D41 | Reubicación dentro de la instalación | D29, D40 | Salida y entrada atómicas; reintento no duplica ni cambia el total del producto |
-| D42 | Validación de ubicaciones, conteos e importaciones | D31–D41 | Caso 120/80 → 100/100 → 85/100 pasa; conteo y reubicación concurrentes no pierden stock |
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| PLT-01 | Esquema User, Session, Organization y Membership | BAS-05 | Migración con restricciones; dos empresas de prueba |
+| PLT-02 | Registro con correo y contraseña | PLT-01 | Contraseña con hash de la biblioteca; política de longitud |
+| PLT-03 | Verificación de correo | PLT-02 | Usuario sin verificar no entra; correo capturado en pruebas |
+| PLT-04 | Inicio de sesión y cookies seguras | PLT-03 | Cookies HttpOnly/Secure/SameSite; protección CSRF por origen |
+| PLT-05 | Cierre de sesión y revocación | PLT-04 | Sesión revocada deja de servir de inmediato |
+| PLT-06 | Límite de intentos por IP y por cuenta | PLT-04 | Fuerza bruta bloqueada sin revelar si la cuenta existe |
+| PLT-07 | Recuperación de contraseña | PLT-06 | Token de un solo uso con expiración; cierra otras sesiones |
+| PLT-08A | MFA con TOTP: alta | PLT-05 | Alta y verificación de código probadas |
+| PLT-08B | Desafío MFA al iniciar sesión | PLT-08A | Sesión incompleta hasta validar el código; MFA obligatorio para titular, administradores y personal de plataforma |
+| PLT-09 | Códigos de recuperación de MFA y desactivación segura | PLT-08B | Recuperación no elude controles |
+| PLT-10 | Alta de empresa con titular | PLT-03 | Creación atómica de empresa y membresía titular |
+| PLT-11 | Contexto de empresa activa en servidor | PLT-10 | Cambiar de empresa revalida la membresía |
+| PLT-12 | Capa de acceso a datos con `organization_id` obligatorio | PLT-11 | Consulta de negocio sin contexto de empresa falla en pruebas |
+| PLT-13 | Relaciones compuestas y unicidad por empresa | PLT-12 | Asociar registros de otra empresa falla en la base de datos |
+| PLT-14 | Bitácora de auditoría | PLT-12 | Cambios sensibles registran actor, empresa y motivo, sin secretos |
+| PLT-15 | Batería de aislamiento con dos empresas | PLT-13 | Manipular URL, cuerpo o identificador nunca expone datos ajenos |
+| PLT-16 | Revisión de amenazas de la etapa | PLT-15 | Hallazgos altos corregidos; matriz ASVS iniciada |
 
-La reubicación de D41 es inmediata entre ubicaciones de la misma instalación y está incluida en la base. Varias instalaciones y sus traspasos quedan fuera de la primera versión. Despacho, stock en tránsito, recepción parcial y faltantes requieren otra expansión antes de vender logística entre sucursales.
+### USR — Usuarios y roles (12)
 
-### Etapa F — Cobro y preparación contractual, D43–D50
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| USR-01 | Catálogo de roles y permisos en código | FUN-07, PLT-11 | Roles de lanzamiento definidos según la matriz |
+| USR-02 | Función central de autorización | USR-01 | Pruebas por rol y acción; denegar por defecto |
+| USR-03A | Acciones reservadas al titular | USR-02 | Solo el titular contrata, cancela y cambia el método de pago |
+| USR-03B | Transferir titularidad y proteger al titular | USR-03A | Transferencia atómica (un solo titular); un administrador no puede desactivar ni degradar al titular ni otorgarse permisos superiores |
+| USR-04 | Crear invitación por correo | USR-02 | Token de un solo uso con expiración y rol asignado |
+| USR-05 | Aceptar invitación como usuario nuevo o existente | USR-04 | Membresía creada; token reutilizado o vencido rechazado |
+| USR-06 | Asignar y combinar roles | USR-02 | Los permisos se unen; ocupa un solo lugar |
+| USR-07 | Desactivar miembro | USR-06 | Revoca sus sesiones; conserva su autoría en el historial |
+| USR-08 | Pantalla de equipo | USR-07, BAS-13 | Lista, estado, roles, reenviar y cancelar invitación |
+| USR-09 | Menú y acciones según permisos | USR-08 | La UI oculta lo no permitido y el servidor igual lo rechaza |
+| USR-10 | Pruebas negativas por rol | USR-09 | Consulta no escribe; Almacén no compra; Administrador no cobra |
+| USR-11 | Auditoría de cambios de equipo | USR-10, PLT-14 | Invitar, cambiar rol o desactivar deja registro |
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D43 | Precios por capacidad y suscripción en sandbox | D03, D39 | Cada nivel incluye la base; mostrar cupo/definición, moneda e impuestos; módulos futuros sin venta pública |
-| D44 | Checkout y asociación empresa-cliente de pago | D43 | Solo propietario autorizado compra; retorno de checkout no concede acceso por sí solo |
-| D45 | Recepción firmada y procesamiento durable de webhooks | D35, D44 | Firma inválida rechazada; evento repetido/desordenado no altera derechos indebidamente |
-| D46 | Derechos efectivos y reconciliación periódica | D39, D45 | Suscripción vigente habilita módulos; evento perdido se recupera por consulta al proveedor |
-| D47 | Cambio de capacidad, cancelación y módulos futuros | D42, D46 | Ampliación confirmada, reducción excedida sin borrado, fecha/precio visibles; dependencias probadas |
-| D48 | Pago fallido, gracia y recuperación | D47 | Simulación recorre fallo → gracia → restricción → recuperación sin perder datos |
-| D49 | Publicación de documentos revisados y aceptación versionada | D06, D47 y revisión legal | Términos/privacidad accesibles; cambios y aceptación trazables |
-| D50 | Solicitudes de privacidad, salida y comprobación fiscal | D38, D49 | Exportación/borrado autorizado con retención definida; circuito fiscal de la suscripción resuelto |
+### MOD — Módulos, planes y derechos (11)
 
-La elaboración/revisión jurídica se inicia en D06 y avanza durante el desarrollo. D49 es una jornada de integración, no la promesa de terminar una revisión legal en un día. Verificar cuenta de cobro y requisitos fiscales antes de esta etapa.
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| MOD-01 | Contrato de módulo: id, versión, dependencias, permisos y límites | USR-02 | Tipo y validación del contrato con pruebas |
+| MOD-02 | Registrar Inventario y Compras; Ventas y CRM como no disponibles | MOD-01 | Registro arranca y detecta dependencias inválidas o cíclicas |
+| MOD-03 | Esquema comercial con precios versionados | MOD-01 | PlanVersion, Subscription, SubscriptionItem y Entitlement migrados |
+| MOD-04 | Servicio de derechos efectivos | MOD-03 | Empresa → módulos activos y límites, con caché invalidable |
+| MOD-05 | Guard de servidor: sesión → membresía → rol → módulo → límite | MOD-04, USR-02 | Acción de un módulo no contratado se rechaza aunque se llame a la API |
+| MOD-06 | Activar y desactivar módulos con dependencias | MOD-05 | No se puede quitar Inventario con Compras activo |
+| MOD-07 | Contador de cupo de productos con control de concurrencia | MOD-04 | Con 99/100, dos reservas simultáneas permiten solo una |
+| MOD-08 | Cupo de usuarios por plan | MOD-07, USR-05 | Con 4 de 5 lugares, dos invitaciones simultáneas permiten solo una; invitaciones pendientes cuentan |
+| MOD-09 | Consola interna de aprovisionamiento manual | MOD-06 | Personal de plataforma asigna nivel, módulos y vigencia con MFA y auditoría |
+| MOD-10 | Pantalla «Mi plan» | MOD-09 | Muestra cupos (productos y usuarios), módulos y vigencia |
+| MOD-11 | Estados de suscripción y su efecto | MOD-09 | Vencida → solo lectura y exportación; datos intactos |
 
-### Etapa G — Validación y lanzamiento, D51–D60
+### INV — Inventario (36)
 
-| Día | Incremento | Prerrequisito | Criterio de cierre |
-|---|---|---|---|
-| D51 | Recorridos completos de regresión | D13–D50 | Registro, importación, movimientos, permisos, módulos y cancelación pasan end-to-end |
-| D52 | Revisión de seguridad de la versión candidata | D51 | Matriz ASVS actualizada; sin hallazgos críticos/altos abiertos para lanzamiento |
-| D53 | Carga, índices y límites por empresa | D51 | Escenarios de 100/1,000/10,000 SKU con ubicaciones/historial; objetivo p95 < 500 ms en lecturas comunes y 20 usuarios concurrentes, en entorno documentado |
-| D54 | Accesibilidad, móvil y pulido de errores | D51 | Recorridos principales con teclado y pantalla pequeña; mensajes de error accionables |
-| D55 | Restauración, rollback y simulacro de incidente | D11, D35, D52 | Restaurar y medir RPO/RTO; despliegue anterior recuperable sin migración destructiva |
-| D56 | Landing, demo, precios y ayuda | D03, D48–D50 | Oferta coincide con funciones disponibles; contacto y cancelación fáciles de encontrar |
-| D57 | Incorporar 3–5 pilotos y conciliar sus importaciones | D51–D56 | Totales comparados con origen y validación de cada negocio; continuar si requiere más jornadas |
-| D58 | Primer ciclo de observación y correcciones | D57 | Fricciones registradas y fallos prioritarios corregidos; repetir ciclos según evidencia |
-| D59 | Revisión final operativa, comercial y de cobro | D58 y período piloto suficiente | Responsable de soporte, alertas, contratos y cobro real controlado verificados |
-| D60 | Lanzamiento limitado y seguimiento | Todos los criterios de salida | Cohorte pequeña habilitada; monitoreo activo y siguiente iteración priorizada |
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| INV-01 | Esquema de producto: SKU, nombre, descripción, categoría, marca y código de barras | MOD-05 | SKU único por empresa |
+| INV-02 | Alta de producto con consumo de cupo | INV-01, MOD-07 | Todas las altas pasan por un servicio central; con 100/100 se rechaza |
+| INV-03 | Edición de ficha y atributos | INV-02 | Cambios auditados; la cantidad no se edita desde aquí |
+| INV-04 | Archivar y reactivar | INV-03 | Archivar libera cupo; reactivar consume cupo; historial conservado |
+| INV-05 | Catálogo de unidades y dimensiones | INV-01 | Pieza, par, docena, kg, g, m, cm, mm, L, mL y m² sembrados |
+| INV-06 | Precisión e incremento por producto | INV-05, BAS-06 | 0.5 piezas se rechaza; 2.75 m se acepta |
+| INV-07 | Presentaciones por producto | INV-06 | Caja = 100 piezas; factores cero, negativos o de otra empresa rechazados |
+| INV-08 | Versiones del factor de presentación | INV-07 | Cambiar de 100 a 120 crea una versión y conserva la anterior |
+| INV-09 | Servicio de conversión y vista previa en servidor | INV-08 | «3 cajas × 100 = 300 piezas»; dimensiones incompatibles rechazadas |
+| INV-10 | Lista de productos paginada en servidor | INV-02 | 10,000 productos de prueba paginan sin cargar todo |
+| INV-11 | Búsqueda por nombre, SKU y código de barras | INV-10 | Índices creados; búsqueda con 10,000 productos en tiempo aceptable |
+| INV-12 | Filtros por categoría y marca | INV-11 | Filtros combinables y persistentes en la URL |
+| INV-13 | Instalación y ubicación «General» automática | INV-01 | Toda empresa nueva tiene una instalación y la ubicación General |
+| INV-14 | Zonas, pasillos y estantes | INV-13 | Jerarquía sin ciclos; nombres definidos por el negocio |
+| INV-15 | Esquema de movimientos, líneas y saldos | INV-09, INV-13 | Línea guarda cantidad capturada, factor, versión y cantidad base |
+| INV-16 | Entrada simple en unidad base | INV-15 | Movimiento y saldo en la misma transacción |
+| INV-17 | Entrada con presentación | INV-16 | 3 cajas de 100 → 300 piezas (UNI-01) |
+| INV-18 | Saldo inicial guiado | INV-17 | Saldo inicial registrado como movimiento, nunca editado |
+| INV-19 | Salida y prevención de negativos | INV-17 | Salida mayor al saldo de la ubicación se rechaza (MOV-01) |
+| INV-19B | Bloquear archivo con existencias | INV-04, INV-19 | Producto con saldo en cualquier ubicación no se archiva (órdenes abiertas se agregan en CMP-11) |
+| INV-20 | Concurrencia en salidas | INV-19 | Dos salidas por la última unidad: solo una prospera |
+| INV-21 | Clave idempotente en confirmaciones | INV-20 | Reintentar no duplica el movimiento (MOV-02) |
+| INV-22 | Conexión perdida al confirmar | INV-21 | UI muestra «Verificando estado» y resuelve sin duplicar (NET-01) |
+| INV-23 | Reubicación atómica | INV-21, INV-14 | 120/80 → 100/100 con el total intacto (INV-02) |
+| INV-24 | Ajuste con motivo | INV-21 | Motivo obligatorio y auditado |
+| INV-25 | Reversa trazable | INV-24, INV-08 | Reversa usa el factor original; caso 300 → 275 → 395 pasa (UNI-02) |
+| INV-26 | Ficha de producto con total y desglose | INV-23 | Total y desglose por ubicación; equivalencia en presentaciones |
+| INV-27 | Historial de movimientos con filtros | INV-25 | Filtros por fecha, producto, usuario y tipo |
+| INV-28 | Salida rápida de varias líneas («salida por venta») | INV-21 | Varias líneas con presentaciones, motivo y referencia en una sola confirmación; sin cobro ni ticket |
+| INV-29 | Lector de códigos que escribe como teclado | INV-28 | Lector real en búsqueda, entrada y salida; 10 líneas de salida rápida en menos de 2 minutos |
+| INV-30 | Mínimos y existencias bajas | INV-26 | Lista derivada del saldo real, separada por empresa |
+| INV-31 | Conteo físico: captura | INV-26 | Cajas y piezas normalizadas con vista previa; referencia temporal |
+| INV-32 | Conteo: detectar movimientos posteriores | INV-31 | La diferencia considera los movimientos ocurridos durante el conteo |
+| INV-33 | Conteo: aplicar ajustes de forma idempotente | INV-32 | Aplicar dos veces no duplica ajustes |
+| INV-34 | Reconciliación de saldo contra historial | INV-33 | Tarea detecta diferencias; casos INV, UNI y MOV de la fase 1 pasan |
+| INV-35 | Panel de inicio | INV-30 | Productos bajos, últimos movimientos y uso del cupo |
 
-El piloto debe abarcar al menos 1–2 semanas de uso operativo, ampliables según riesgo y hallazgos. D57–D59 representan trabajo del equipo; no comprimen ese período en tres días. La revisión independiente de seguridad se agenda con anticipación y puede exigir más jornadas de corrección. Un hito fallido bloquea el lanzamiento, no se marca como terminado por calendario.
+### IMP — Migración y salidas importadas (13)
 
-## 8. Expansiones después del lanzamiento
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| IMP-01 | Worker y cola durable en MySQL | INV-34 | Tarea fallida reintenta con límite y conserva el contexto de empresa |
+| IMP-02 | Archivos privados por empresa | IMP-01 | Enlace temporal; archivo ajeno inaccesible |
+| IMP-03 | Plantilla CSV/XLSX descargable | IMP-02 | Plantilla con ejemplos de unidad y presentación |
+| IMP-04 | Lectura y mapeo de columnas | IMP-03 | Separador decimal explícito; sin ejecutar fórmulas ni macros |
+| IMP-05 | Validación por celda y vista previa | IMP-04 | Errores por fila y columna sin modificar datos (IMP-01) |
+| IMP-06 | Clasificar productos nuevos y actualizados | IMP-05 | SKU existente se marca como actualización; muestra cupos requeridos (IMP-02) |
+| IMP-07 | Reserva atómica de cupos | IMP-06, MOD-07 | Importación y alta manual simultáneas no exceden el cupo |
+| IMP-08 | Confirmación por lotes en el worker | IMP-07 | Reintentar el trabajo no duplica productos; factores fijados al confirmar |
+| IMP-08B | Liberar reservas no consumidas | IMP-08 | Cancelación, fallo o worker abandonado liberan solo lo no usado, sin competir con trabajos activos |
+| IMP-09 | Saldos iniciales por ubicación desde el archivo | IMP-08 | Saldos iguales al archivo, generados como movimientos; reintentar no duplica movimientos aunque cambie un factor durante la importación |
+| IMP-10 | Importar salidas diarias desde CSV | IMP-08, INV-28 | Identificador externo impide duplicados; indica hasta qué fecha está actualizado el stock |
+| IMP-11 | Exportación segura | IMP-02 | Celdas protegidas contra fórmulas; solo usuarios con permiso |
+| IMP-12 | Guía de primer uso | IMP-09 | Usuario nuevo llega de catálogo a importación y a su primer movimiento sin ayuda |
 
-Cada secuencia enumera incrementos objetivo de un día; se reestima con reglas y ejemplos del negocio. Se implementan según demanda demostrada, no todas a la vez.
+### CMP — Compras (19)
 
-| Módulo | Incrementos diarios propuestos | Dependencias y criterio final |
-|---|---|---|
-| Multi-almacén, 6 jornadas | M01 alcance/límites; M02 instalaciones; M03 permisos/filtros; M04 traspaso directo; M05 activación/baja; M06 pruebas | Base estable; sin stock duplicado entre instalaciones y baja sin pérdida de historial |
-| Compras, 6 jornadas | C01 proveedores; C02 órdenes; C03 recepción parcial; C04 devolución; C05 permisos y enlace de stock; C06 pruebas/ayuda | Base estable; recibir/reintentar/devolver concilia exactamente con inventario |
-| Ventas básicas, 7 jornadas | V01 cliente opcional/carrito; V02 confirmar venta; V03 salida idempotente; V04 descuentos/permisos; V05 devoluciones; V06 ticket; V07 revisión | Base estable; sin caja fiscal, offline ni crédito hasta definirlos |
-| Caja/POS, 6 jornadas adicionales | P01 apertura; P02 ingresos/egresos; P03 cierre; P04 diferencias; P05 lector/impresión; P06 validación con hardware real | Ventas; arqueo y devoluciones conciliados; pagos con tarjeta requieren integración adicional |
-| Lotes/caducidad, 6 jornadas | L01 modelo; L02 recepción; L03 selección de lote; L04 alertas; L05 trazabilidad/reversas; L06 migración/pruebas | Actualiza motor/importación/conteo/traspaso; ningún stock queda sin clasificación exigida |
-| Números de serie, 5 jornadas | S01 modelo; S02 alta; S03 movimientos; S04 devoluciones; S05 migración/pruebas | Una serie no puede existir simultáneamente en dos ubicaciones |
-| Traspaso en tránsito, 5 jornadas | T01 estados; T02 despacho; T03 recepción parcial; T04 faltantes/devolución; T05 concurrencia | Multi-almacén; stock de origen, tránsito y destino siempre conciliado |
-| Reportes avanzados, 5 jornadas | R01 definiciones; R02 consultas; R03 filtros; R04 exportación programada; R05 validación | Datos de módulos requeridos; resultados reproducibles. Valuación contable se estima aparte |
-| Facturación fiscal | F01 requisitos y proveedor; después plan específico | País confirmado, asesoría fiscal y sandbox. No estimar timbrado/cancelación como un solo día |
-| API/integraciones | I01 contrato y primer conector; después entregas por integración | Claves con alcance, cuotas, rotación, firmas, reintentos y aislamiento |
-| Sin conexión | O01 investigación de conflictos; después plan específico | Replantea almacenamiento local, sincronización y stock concurrente; no basta instalar una PWA |
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| CMP-01 | Contactos compartidos en el núcleo: esquema | MOD-05, IMP-12 | Contacto con tipo proveedor y/o cliente, aislado por empresa |
+| CMP-02 | Alta, edición y búsqueda de proveedores | CMP-01 | RFC opcional validado en formato; duplicados advertidos |
+| CMP-03 | Relación producto-proveedor | CMP-02, INV-07 | Código del proveedor, presentación de compra y último costo |
+| CMP-04 | Orden de compra: borrador y líneas | CMP-03 | Línea guarda presentación y versión de factor; conversión visible |
+| CMP-05 | Estados de la orden | CMP-04 | Borrador → enviada → parcial → recibida o cancelada; transiciones inválidas rechazadas |
+| CMP-06A | PDF de la orden | CMP-05 | PDF con datos del negocio y del proveedor |
+| CMP-06B | Envío por correo con reintentos | CMP-06A, IMP-01 | Envío desde el worker; fallo visible y reintentable |
+| CMP-07 | Recepción total | CMP-05, INV-21 | Recepción y entrada de inventario en la misma transacción |
+| CMP-08 | Recepción parcial y pendientes | CMP-07 | 60 de 100 → parcial con 40 pendientes |
+| CMP-09 | Ubicación destino y presentación al recibir | CMP-08, INV-14 | Recibir 2 cajas en A-01 → 200 piezas en A-01; si el factor cambió entre orden y recepción, se usa y muestra el vigente al recibir, con la diferencia visible |
+| CMP-10 | Idempotencia y concurrencia de recepciones | CMP-09 | Dos recepciones simultáneas no reciben de más |
+| CMP-11 | Cerrar orden con faltante | CMP-10, INV-19B | Faltante registrado; un producto con orden abierta no se archiva |
+| CMP-12 | Devolución a proveedor | CMP-10 | Límite acumulado por recepción; devoluciones concurrentes o repetidas no exceden lo recibido; documento y stock atómicos |
+| CMP-13 | Registro de costo de compra | CMP-07 | Último costo por producto; sin valuación contable |
+| CMP-14 | Sugerencia de compra desde mínimos | CMP-04, INV-30 | Genera un borrador por proveedor |
+| CMP-15 | Reportes de compras | CMP-11 | Pendientes por recibir y compras por proveedor; exportables |
+| CMP-16 | Permisos del Comprador y guard del módulo | CMP-15, USR-10 | Sin el módulo Compras: rechazo por API y menú oculto |
+| CMP-17 | Desactivar el módulo | CMP-16, MOD-06 | Órdenes abiertas advertidas; historial en solo lectura |
+| CMP-18 | Pruebas de extremo a extremo de compras con inventario | CMP-17 | Comprar, recibir parcialmente, devolver y conciliar saldo exacto |
 
-Cada expansión también actualiza precio, permisos, derechos contratados, documentación, pruebas de aislamiento, política de baja y soporte. No venderla hasta verificar el recorrido completo.
+### PIL — Piloto y lanzamiento limitado (19)
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| PIL-01 | Ambiente de producción separado y rollback | CMP-18, BAS-11 | Despliegue anterior recuperable sin migración destructiva |
+| PIL-02 | Respaldo continuo o recuperación a un punto en el tiempo | PIL-01 | Configurado y monitoreado |
+| PIL-03 | Simulacro de restauración | PIL-02 | RPO y RTO medidos y anotados |
+| PIL-04 | Alertas operativas | PIL-01 | Errores, cola detenida y respaldo fallido generan avisos |
+| PIL-05 | Revisión de seguridad de la versión candidata | PIL-01 | Matriz ASVS actualizada; sin hallazgos críticos ni altos abiertos |
+| PIL-05B | Regresión integral | PIL-05 | Permisos, aislamiento, jobs, cupos, derechos y recorridos de extremo a extremo pasan |
+| PIL-06 | Prueba de carga de 100, 1,000 y 10,000 SKU | PIL-01 | p95 < 500 ms en lecturas comunes con 20 usuarios; entorno documentado |
+| PIL-07 | Accesibilidad, móvil y mensajes de error | PIL-01 | Recorridos principales con teclado y pantalla pequeña |
+| PIL-08 | Términos del piloto y aviso de privacidad | FUN-08 | Revisados por un profesional externo (en paralelo desde FUN) |
+| PIL-09 | Aceptación versionada de documentos | PIL-08 | Versión, fecha y usuario guardados |
+| PIL-10 | Circuito fiscal de nuestra suscripción | FUN-08 | Datos fiscales del cliente; CFDI vía contador o servicio vinculado al pago |
+| PIL-11 | Registro de pago manual y vigencia en la consola | MOD-09, PIL-10 | Pago SPEI → vigencia → derechos, con auditoría |
+| PIL-12 | Soporte y acceso de soporte auditado | PIL-04 | Canal y horario definidos; acceso temporal y registrado |
+| PIL-13 | Incorporar el piloto 1 y conciliar su importación | PIL-01–PIL-12, PIL-05B | Totales iguales al origen, firmados por el negocio |
+| PIL-14A | Incorporar el piloto 2 | PIL-13 | Mismo criterio |
+| PIL-14B | Incorporar el piloto 3 | PIL-14A | Mismo criterio |
+| PIL-15 | Ciclo de observación y correcciones (repetible) | PIL-14B | Fricciones registradas; fallos prioritarios corregidos; salidas omitidas medidas |
+| PIL-16 | Revisión de primer cobro y renovación | PIL-15 y 1–2 semanas de uso | Al menos un piloto paga una mensualidad; decisión documentada de continuar |
+| PIL-17 | Lanzamiento limitado de Inventario + Compras con cobro asistido | PIL-16 | Página simple con oferta, contacto y cancelación; cohorte pequeña habilitada desde la consola; monitoreo activo |
+
+### BIL — Cobro automático y apertura (18)
+
+Se ejecuta cuando la carga administrativa o los impagos lo justifiquen; unos diez clientes es una referencia. No bloquea el lanzamiento limitado de PIL-17.
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| BIL-01 | Comparar Stripe, Conekta y Mercado Pago | PIL-17 | Matriz: suscripción con conceptos variables, prorrateo, métodos de pago, comisiones, webhooks y facturación. Decisión registrada |
+| BIL-02 | Cuenta de pasarela y sandbox | BIL-01 | Cuenta verificada; llaves por ambiente |
+| BIL-03 | Adaptador de pasarela | BIL-02 | Interfaz propia; la lógica de negocio no depende del SDK |
+| BIL-04 | Catálogo de precios sincronizado y versionado | BIL-03, MOD-03 | Nivel × módulo × usuario reflejado en la pasarela |
+| BIL-05 | Checkout alojado, solo para el titular | BIL-04, USR-03A | Volver del checkout no concede acceso por sí solo |
+| BIL-06A | Recepción de webhooks | BIL-05, IMP-01 | Firma verificada; evento persistido antes de responder; firma inválida rechazada |
+| BIL-06B | Procesamiento de webhooks | BIL-06A | Evento repetido sin efecto; eventos desordenados no retroceden el estado |
+| BIL-07 | Derechos desde el estado autoritativo y reconciliación periódica | BIL-06B | Un evento perdido se recupera consultando a la pasarela |
+| BIL-08 | Agregar o quitar un módulo con prorrateo visible | BIL-07, MOD-06 | Importe y fecha mostrados antes de confirmar |
+| BIL-09 | Subir de nivel | BIL-08 | Total recalculado de todos los módulos; nuevo cupo solo con pago confirmado |
+| BIL-10 | Bajar de nivel programado | BIL-09 | Excedentes sin borrado; nuevas altas bloqueadas |
+| BIL-11 | Usuarios adicionales como concepto de cobro | BIL-08, MOD-08 | Agregar un lugar actualiza el cargo y el cupo |
+| BIL-12 | Pago fallido, gracia y recuperación | BIL-07 | Fallo → gracia → solo lectura → recuperación sin perder datos |
+| BIL-13 | Cancelación y salida | BIL-12, IMP-11 | Exportación disponible; política de conservación aplicada |
+| BIL-14 | CFDI de suscripción automatizado o procedimiento definitivo | BIL-07, PIL-10 | Cada pago queda vinculado a su UUID, XML y PDF |
+| BIL-15 | Landing, precios, paquetes y ayuda | BIL-08 | Solo se ofrecen módulos existentes; contacto y cancelación visibles |
+| BIL-15B | Regresión integral con cobro automático | BIL-15 | Permisos, aislamiento, jobs, derechos y ciclo de cobro completo pasan |
+| BIL-16 | Apertura general con contratación en línea | BIL-15B | Alta y pago sin intervención manual; monitoreo de cobro activo |
+
+### VEN — Ventas: punto de venta (28)
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| VEN-01 | Definición con los pilotos | PIL-17 | Flujo de mostrador, métodos de pago, ticket y devoluciones; crédito/fiado y CFDI excluidos o reestimados |
+| VEN-02 | Registrar el módulo Ventas y el rol Cajero | VEN-01, MOD-02 | Contrato con dependencias y permisos |
+| VEN-03 | Precio de venta por producto y presentación | VEN-02 | Precio por pieza y por caja independientes |
+| VEN-04 | Cálculo de impuestos | VEN-03 | IVA incluido o desglosado con redondeo definido y pruebas |
+| VEN-05 | Esquema de venta, líneas y pagos | VEN-04 | Migración con relaciones por empresa |
+| VEN-06 | Pantalla POS: búsqueda, lector y carrito | VEN-05, INV-29 | Agregar por código en menos de 2 segundos |
+| VEN-07 | Carrito con presentaciones y decimales | VEN-06 | 2.75 m de cable y 1 caja calculados correctamente |
+| VEN-08 | Cliente opcional o público en general | VEN-06, CMP-01 | Usa Contactos compartidos |
+| VEN-09 | Confirmar venta → salida de inventario | VEN-07 | Misma transacción; sin stock suficiente la venta se rechaza |
+| VEN-10 | Idempotencia y concurrencia de la venta | VEN-09 | Doble clic no duplica; última unidad para un solo cliente |
+| VEN-11 | Pago en efectivo con cambio | VEN-09 | Cambio calculado y registrado |
+| VEN-12 | Pago con tarjeta (terminal externa) y transferencia | VEN-11 | Referencia capturada; sin procesar tarjetas en la aplicación |
+| VEN-13 | Pagos mixtos | VEN-12 | La suma debe igualar el total |
+| VEN-14 | Descuentos con permiso | VEN-09, USR-02 | Límite por rol; auditado |
+| VEN-15 | Ticket no fiscal | VEN-11 | Impresión de 80 mm y enlace o correo |
+| VEN-16 | Apertura de caja con fondo | VEN-11 | Sin caja abierta no se cobra |
+| VEN-17 | Ingresos y egresos de caja | VEN-16 | Con motivo y auditados |
+| VEN-18 | Corte de caja y diferencias | VEN-17 | Esperado contra contado por método de pago |
+| VEN-19 | Devolución total | VEN-09 | Reingresa a inventario y registra el reembolso |
+| VEN-20 | Devolución parcial | VEN-19 | No permite devolver más de lo vendido |
+| VEN-21 | Cancelación de venta | VEN-19 | Con permiso, motivo y reversa |
+| VEN-22 | Historial de ventas | VEN-21 | Filtros por fecha, cajero y cliente |
+| VEN-23 | Reportes de ventas | VEN-22 | Ventas por día, producto y cajero; exportables |
+| VEN-24 | Prueba con impresora térmica y lector reales | VEN-15 | Funciona con el hardware de un piloto |
+| VEN-25 | Coexistencia con salida rápida e importación de salidas | VEN-09, IMP-10 | Guía y advertencias para evitar descontar dos veces |
+| VEN-26 | Desactivar el módulo | VEN-18, MOD-06 | Cajas abiertas resueltas; historial en solo lectura |
+| VEN-27 | Precio del módulo en la pasarela y la landing | VEN-26, BIL-08 | Contratable por nivel |
+| VEN-28 | Pruebas de extremo a extremo y piloto POS | VEN-27 | Un día real de mostrador concilia caja e inventario |
+
+### COT — Ventas: cotizaciones y pedidos (12)
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| COT-01 | Esquema de cotización | VEN-05 | No depende de la caja |
+| COT-02 | Crear cotización con cliente y vigencia | COT-01 | Precios con presentaciones e impuestos |
+| COT-03 | PDF y envío | COT-02 | PDF con la marca del negocio; correo al cliente |
+| COT-04 | Estados de la cotización | COT-03 | Enviada, aceptada, rechazada y vencida automática |
+| COT-05 | Convertir a pedido | COT-04 | Copia precios vigentes al aceptar |
+| COT-06 | Decidir reserva de stock para pedidos | COT-05 | Decisión con pilotos; si se aprueba, no vende lo apartado |
+| COT-07 | Surtido parcial → salida | COT-06 | Salida transaccional por lo surtido |
+| COT-08 | Cobrar un pedido en POS | COT-07, VEN-13 | Pago vinculado al pedido |
+| COT-09 | Cancelar pedido | COT-07 | Libera la reserva; surtidos requieren devolución |
+| COT-10 | Permisos del Vendedor | COT-09 | Vendedor no abre caja ni ajusta inventario |
+| COT-11 | Reportes de cotizaciones | COT-10 | Tasa de conversión y pendientes |
+| COT-12 | Pruebas de extremo a extremo | COT-11 | Cotizar → pedir → surtir parcial → cobrar concilia |
+
+### CRM (18)
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| CRM-01 | Definición con clientes | PIL-17 | Problema real validado: cotizaciones olvidadas, recompra o contratistas |
+| CRM-02 | Registrar el módulo, sus permisos y el límite de contactos | CRM-01, MOD-02 | Funciona sin Ventas |
+| CRM-03 | Contactos ampliados: persona/empresa y etiquetas | CRM-02, CMP-01 | Sin duplicar los contactos del núcleo |
+| CRM-04 | Importar contactos con cupo | CRM-03, IMP-05 | Vista previa y duplicados detectados |
+| CRM-05 | Oportunidades: esquema y alta | CRM-03 | Monto estimado, etapa y responsable |
+| CRM-06 | Embudo tipo kanban | CRM-05 | Arrastrar cambia la etapa con auditoría |
+| CRM-07 | Etapas configurables | CRM-06 | Renombrar y ordenar sin perder historial |
+| CRM-08 | Actividades y tareas con fecha | CRM-05 | Llamada, visita y nota |
+| CRM-09 | Recordatorios | CRM-08, IMP-01 | Aviso en la aplicación y por correo vía worker |
+| CRM-10 | Línea de tiempo del contacto | CRM-08 | Notas, actividades y cambios |
+| CRM-11 | Vincular oportunidad con cotización | CRM-05, COT-02 | Solo si Ventas está contratado |
+| CRM-12 | Historial de compras del cliente | CRM-10, VEN-22 | Solo si Ventas está contratado |
+| CRM-13 | Asignación y «mis oportunidades» | CRM-06 | El Vendedor ve las suyas; el Administrador ve todas |
+| CRM-14 | Reporte del embudo | CRM-13 | Por etapa, responsable y periodo |
+| CRM-15 | Detectar y fusionar duplicados | CRM-04 | La fusión conserva el historial |
+| CRM-16 | Desactivar el módulo | CRM-15, MOD-06 | Historial en solo lectura; contactos del núcleo intactos |
+| CRM-17 | Precio del módulo en la pasarela y la landing | CRM-16, BIL-08 | Contratable por nivel |
+| CRM-18 | Pruebas de extremo a extremo | CRM-17 | Sin Ventas: prospecto → oportunidad → actividad → cierre. Con Ventas: además cotización → venta |
+
+## 8. Expansiones por demanda
+
+Se planean en pasos de medio día solo cuando haya demanda demostrada. Cada una actualiza precio, permisos, derechos contratados, pruebas de aislamiento, política de baja y soporte.
+
+| Módulo | Pasos estimados | Criterio final |
+| --- | ---: | --- |
+| Multi-sucursal | ~12 | Sin stock duplicado entre instalaciones; traspasos conciliados |
+| Traspasos en tránsito | ~10 | Origen, tránsito y destino siempre conciliados |
+| Lotes y caducidades | ~12 | Ningún stock sin lote cuando se exige |
+| Números de serie | ~10 | Una serie no puede estar en dos ubicaciones |
+| Reportes avanzados | ~10 | Resultados reproducibles; valuación contable aparte |
+| Roles personalizables | ~6 | Sin escalar privilegios |
+| CFDI de ventas del cliente | Plan específico | PAC, sandbox y asesoría fiscal; no estimar timbrado como un paso |
+| API e integraciones | Plan por integración | Claves con alcance, cuotas, firmas y aislamiento |
+| Sin conexión | Investigación previa | Replantea la concurrencia del stock; no basta una PWA |
 
 ## 9. Criterios para considerar la primera versión vendible
 
-- Tres ferreterías completan importación y operaciones principales; sus saldos por producto/ubicación cuadran con los ejemplos conciliados.
+- Tres ferreterías completan importación, operaciones principales y un ciclo de compra → recepción → devolución; sus saldos por producto/ubicación cuadran con los ejemplos conciliados.
 - Las pruebas de usabilidad miden encontrar producto, cantidad y ubicación, además de registrar movimientos; las fricciones principales se corrigen antes del lanzamiento.
-- Pruebas automatizadas de aislamiento, permisos, concurrencia e idempotencia aprobadas.
+- Pruebas automatizadas de aislamiento, permisos por rol, módulos contratados, concurrencia e idempotencia aprobadas. Las salidas diarias se registran sin depender de Ventas y se mide cuántas se omiten.
 - Conversiones de presentaciones, precisión decimal, cambio de factor, reversas e importaciones verificadas. Pérdida de conexión durante confirmación no produce falsa confirmación ni duplicados.
 - Restauración practicada; pérdida máxima y tiempo de recuperación medidos y compatibles con lo ofrecido.
-- Cobro, cambio de módulo, impago, cancelación y recuperación verificados con escenarios reales controlados/sandbox pertinentes.
+- Para el lanzamiento limitado basta el cobro asistido con CFDI. Para la apertura general: cobro, cambio de módulo, impago, cancelación y recuperación verificados con escenarios reales controlados/sandbox pertinentes.
 - Alta concurrente, importación, actualización, archivo y reactivación respetan cupos por empresa; ampliar/reducir plan conserva historial y ninguna operación genera cargos automáticos por excedente.
 - Términos y privacidad revisados para el mercado elegido; aceptación versionada y procedimiento de salida operativo.
 - Obligaciones fiscales de tu suscripción resueltas; soporte, monitoreo y respuesta a incidentes tienen responsable.
@@ -427,9 +676,9 @@ Cada expansión también actualiza precio, permisos, derechos contratados, docum
 
 Antes: confirmar objetivo, dependencias y ejemplo de aceptación. Durante: implementar el menor incremento completo y verificar los riesgos que cambia. Al cerrar: dejar evidencia, anotar pendientes, actualizar esta planificación y `MEMORY.md`, y elegir el siguiente paso. Una pantalla terminada sin reglas, permisos o persistencia no completa un incremento de negocio.
 
-Registrar para cada día: pendiente/en curso/verificado, archivos afectados, prueba o demostración, bloqueo y siguiente paso. Todas las jornadas D01–D60 y U01–U04 están pendientes a la fecha de esta versión.
+Registrar para cada paso: pendiente/en curso/verificado, archivos afectados, prueba o demostración, bloqueo y siguiente paso. D01–D06 dejaron documentación y prototipo; su validación externa continúa en FUN-01–FUN-08. Los pasos BAS–CRM siguen pendientes. Las pruebas del prototipo no completan por adelantado las jornadas de implementación de producción. Los identificadores antiguos D07–D60 y U01–U04 quedan reemplazados por los de la sección 7.
 
-Confirmados: México, ferreterías, facilidad de uso, SAP como referencia, inventario de una instalación con zonas/pasillos/estantes, unidades amplias con presentaciones configurables y operación con internet. El fundador estima 1,000 productos para el primer cliente y confirma capacidad por plan, desde unos 100 hasta miles. Pendientes prioritarios: niveles/precios definitivos, usuarios/movimientos diarios, equipo/experiencia/horas y presupuesto. Segunda ronda: precisión/presentaciones, atributos/variantes/lotes, dispositivos, roles, Excel, pilotos y soporte. Facturar ventas del cliente queda para después; resolver el circuito fiscal de nuestras suscripciones antes de cobrar.
+Confirmados: Inventario como base obligatoria, módulos con precio por nivel de capacidad, usuarios incluidos más adicionales, roles, Inventario + Compras en el primer lanzamiento, Ventas con punto de venta primero y equipo de fundador + IA a medio tiempo. También: México, ferreterías, facilidad de uso, SAP como referencia, inventario de una instalación con zonas/pasillos/estantes, unidades amplias con presentaciones configurables y operación con internet. El fundador estima 1,000 productos para el primer cliente y confirma capacidad por plan, desde unos 100 hasta miles. Pendientes prioritarios: niveles/precios definitivos, usuarios/movimientos diarios, equipo/experiencia/horas y presupuesto. Segunda ronda: precisión/presentaciones, atributos/variantes/lotes, dispositivos, roles, Excel, pilotos y soporte. Facturar ventas del cliente queda para después; resolver el circuito fiscal de nuestras suscripciones antes de cobrar.
 
 ## 11. Historial de cambios
 
@@ -437,3 +686,5 @@ Confirmados: México, ferreterías, facilidad de uso, SAP como referencia, inven
 - v0.2: México y ferreterías confirmados; alcance inicial exclusivamente inventario de una instalación. Se concreta producto/cantidad/descripción/ubicación, se añaden criterios de UX y se destinan D40–D42 a ubicaciones internas. Multi-almacén entre instalaciones pasa a expansión posterior. Se conservan 60 jornadas como estimación inicial sujeta a unidades y volumen.
 - v0.3: unidades amplias, factores por presentación configurados por el tendero y operación con internet confirmados. Se define unidad base, precisión, historial de factores y recuperación de confirmaciones interrumpidas. Se agregan U01–U04 después de D23: estimación base de 64 jornadas.
 - v0.4: capacidad de productos por plan confirmada y referencia de 1,000 productos para el primer cliente. Se proponen niveles 100/500/1,000/3,000/10,000, definición de cupos, cambios de capacidad sin pérdida de datos y validación concurrente/importaciones. Se precisan las jornadas existentes de límites/cobro/carga y se mantienen 64 como estimación, a revalidar en D06.
+- v0.5: único tipo de usuario confirmado e inicio de fase 1 autorizado. Se sustituyen roles diferenciados por autorización de cuenta/empresa y se preparan definición, guion de entrevistas, hipótesis comerciales, reglas, riesgos y prototipo navegable. No se simulan entrevistas ni validaciones externas; la fase sigue abierta hasta completarlas.
+- v0.6: modelo modular acordado con el fundador y revisado en tres rondas entre Claude y Codex. Inventario como base obligatoria por capacidad; módulos Compras, Ventas (punto de venta, luego cotizaciones/pedidos) y CRM con precio por nivel; usuarios incluidos y adicionales; roles predefinidos que reemplazan el perfil único. Primer lanzamiento: Inventario + Compras con cobro asistido; cobro automático cuando lo justifique la carga. El plan pasa de 64 jornadas a 224 pasos de unas 3 horas (148 hasta el lanzamiento limitado), con dependencias validadas automáticamente.

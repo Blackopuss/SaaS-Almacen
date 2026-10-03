@@ -1,6 +1,6 @@
 # Memoria del proyecto
 
-Actualizada: 2026-10-01, zona America/Mexico_City.
+Actualizada: 2026-10-02, zona America/Mexico_City.
 
 ## Requisitos confirmados por el usuario
 
@@ -21,6 +21,14 @@ Actualizada: 2026-10-01, zona America/Mexico_City.
 - El fundador estima aproximadamente 1,000 productos para la primera ferretería; es una estimación de ese cliente, no una cifra validada para todas las ferreterías.
 - El plan contratado debe limitar la cantidad de productos que se pueden agregar. El servicio debe atender desde negocios con unos 100 productos hasta negocios con miles.
 - Se conserva la modularidad funcional además de la capacidad por plan.
+- ~~Un solo tipo de usuario~~ (2026-10-02, reemplazado el mismo día): **varios usuarios con roles predefinidos**. Usuarios incluidos por plan + usuario adicional con costo.
+- Inventario es siempre la base obligatoria; los módulos (Compras, Ventas, CRM…) se contratan individualmente encima de ella. Ejemplo del fundador: tienda de 500 productos + Ventas + CRM.
+- El precio de los módulos escala con el nivel de capacidad.
+- Primer lanzamiento vendible: Inventario + Compras. Ventas = punto de venta primero, después cotizaciones/pedidos. Luego CRM.
+- Equipo: fundador + IA (Claude y Codex), medio tiempo (~3–4 h/día). Pasos de ~3 horas.
+- Pasarela de cobro: decidir con análisis comparativo (BIL-01), no por preferencia.
+- El usuario autorizó iniciar y continuar la primera fase del plan y permite preguntas si son necesarias.
+- El usuario pidió un cuestionario para personas de almacén que permita adaptar el proyecto a necesidades reales del sector.
 
 ## Propuestas, aún no confirmadas
 
@@ -37,15 +45,25 @@ Actualizada: 2026-10-01, zona America/Mexico_City.
 - Stripe Billing es candidato para cobro recurrente; depende del país, métodos de pago, requisitos fiscales y costos reales.
 - 64 jornadas de unas 6 horas efectivas para una persona con experiencia full-stack: las 60 originales más U01–U04 para unidades y conversiones después de D23. Reservar 25–35% adicional y tiempo de pilotos/revisiones externas. No es promesa de entrega.
 - Objetivo de verificación: controles aplicables de OWASP ASVS nivel 2, con evidencia. No afirmar certificación ni seguridad absoluta.
+- Interpretación propuesta del perfil único: acceso completo a funciones contratadas de su propia empresa. Empezar con la cuenta que crea el negocio y diferir invitaciones; número de cuentas por empresa pendiente, no asumir que «un tipo» confirma «una cuenta».
 
 ## Estado real
 
-- Carpeta inicialmente vacía; se crearon documentos de planeación, sin código ni servicios desplegados.
+- Fase 1 en ejecución: definición e investigación preparadas y prototipo local implementado. No hay aplicación de producción, backend, MySQL, login, cobro ni despliegue público.
 - Plan completo: `docs/PLAN_IMPLEMENTACION.md`.
 - Se consultaron fuentes oficiales de Next.js, shadcn/ui, Prisma, Better Auth, Stripe, OWASP y legislación mexicana; enlaces en el plan.
 - No se han contratado proveedores, fijado precios, redactado contratos finales ni validado cumplimiento legal.
-- Plan actualizado a v0.4: capacidad por plan separada de módulos; niveles propuestos, reglas de cupos, concurrencia/importaciones y cambios de plan. Se conservan las 64 jornadas porque el plan ya incluía capacidades, cobro y validación de límites; reestimar al concretar reglas en D06.
-- Próxima actividad: precisar usuarios, movimientos diarios, equipo y presupuesto; validar niveles/precios y ejecutar D01 si el usuario pide comenzar.
+- Plan actualizado a v0.6 (2026-10-02): modelo modular revisado en tres rondas Claude + Codex. 224 pasos de ~3 h con IDs por fase (FUN, BAS, PLT, USR, MOD, INV, IMP, CMP, PIL, BIL, VEN, COT, CRM); 148 hasta el lanzamiento limitado (PIL-17) con cobro asistido. Precios por nivel en la sección 4 son hipótesis para validar en FUN-06. Los IDs D07–D60/U01–U04 quedan reemplazados.
+- Entregables de D01–D06: `docs/FASE_01_DEFINICION.md` y `prototype/`. Cero entrevistas realizadas; cinco por agendar. No marcar D02 ni la validación de D05 como completadas.
+- Prototipo: HTML/CSS/JS, 8 productos ficticios, 4 ubicaciones y capacidad de ejemplo de 1,000; búsqueda, ficha, altas, entrada/salida/reubicación, conversiones, historial e importación mediante pegado desde Excel. Reinicia al recargar; no usar datos reales.
+- Ejecutar `python prototype/serve.py` para abrir `http://127.0.0.1:4173`; servidor ligado solo a loopback y tipos MIME de módulos corregidos para Windows.
+- Validación 2026-10-02: 10 pruebas de dominio aprobadas, comprobación de sintaxis y recorrido automatizado en Edge de escritorio/móvil aprobado; capturas en `prototype/qa/`. Se corrigió desbordamiento horizontal global en móvil. No equivalen a pruebas de seguridad/aislamiento de producción.
+- Próxima actividad: FUN-01 (actualizar hipótesis con Compras, salidas diarias y roles) y FUN-02 (ampliar cuestionario). Riesgo principal señalado por Codex: sin Ventas, las salidas diarias deben registrarse con salida rápida (INV-28) o importación (IMP-10) o el inventario pierde credibilidad. Preservar hipótesis comerciales pendientes.
+- Investigación: `docs/CUESTIONARIO_ALMACEN.md` contiene 24 preguntas operativas, 6 comerciales, profundizaciones y plantilla de síntesis. Preparado para D02; no enviado ni aplicado. Recoger respuestas sin orientar hacia el prototipo; contrastar por segmento y no asumir que cinco entrevistas representan toda la industria.
+
+- 2026-10-02: prototipo HTML eliminado por decisión del fundador (no estaba en git); se empieza de cero. Las referencias al prototipo en `docs/FASE_01_DEFINICION.md` son históricas.
+- Decisiones técnicas confirmadas: npm; MySQL 9.4 (la versión local del fundador, también objetivo); `motion` (Framer Motion) para animación; skills `ui-ux-pro-max` y `web-design-guidelines` instaladas en `.agents/skills` (enlazadas en `.claude/skills`). Implementar un paso a la vez con revisión breve de Codex por CLI.
+- BAS-01 verificado: Next.js 16.3 + React 19.2 + TS estricto, ESLint + Prettier, `npm run check` y `npm run build` pasan desde limpio. Siguiente: BAS-02.
 
 ## Preguntas prioritarias pendientes
 
@@ -60,12 +78,16 @@ Actualizada: 2026-10-01, zona America/Mexico_City.
 - 2026-10-01: confirmados México, ferreterías, UI/UX sencillo, SAP como referencia y una sola ferretería con zonas/pasillos/estantes. Se sustituye la implementación temprana de multi-almacén por ubicación interna y reubicaciones. La arquitectura modular y el modelo de suscripción se conservan.
 - 2026-10-01: confirmadas unidades amplias y presentaciones configurables por el tendero, así como conexión a internet obligatoria en v1. Se agregan cuatro jornadas específicas para conversiones; estimación base pasa de 60 a 64 jornadas.
 - 2026-10-01: el fundador estima 1,000 productos para la ferretería inicial y confirma planes por cantidad de productos, desde aproximadamente 100 hasta miles. Los umbrales exactos, precios y definición de producto facturable siguen como propuestas.
+- 2026-10-02: único tipo de usuario e inicio de fase 1 confirmados; seguimiento del usuario pide continuar. Se implementó prototipo y documentación de definición, con resultados técnicos y validación externa pendiente separados.
+- 2026-10-02: se crea cuestionario de investigación por solicitud del fundador; no cambia alcance ni completa validación. Los hallazgos futuros deben distinguir observación, cita e interpretación antes de modificar requisitos.
+
+- 2026-10-02: el fundador define modelo modular: Inventario base obligatorio, módulos individuales con precio por nivel, usuarios incluidos + extra, roles predefinidos (reemplaza perfil único), lanzamiento Inventario + Compras, Ventas con POS primero, equipo fundador + IA a medio tiempo. Plan v0.6 en 224 pasos revisado con Codex.
 
 ## Preguntas para la siguiente ronda
 
 - Número habitual de productos, usuarios, ubicaciones y movimientos diarios; unidades fraccionarias, lotes, caducidades, series o variantes.
 - Dispositivos y lectores de códigos; ejemplos anonimizados de los archivos actuales.
-- Si una persona administrará varias empresas; permisos para empleados y acceso de soporte.
+- Número de cuentas por empresa (solo hay un tipo de usuario), posible administración de varias empresas y acceso de soporte.
 - Posibilidad de conseguir 3–5 negocios piloto y principal problema que pagarían por resolver.
 - Nombre comercial, persona o empresa vendedora, alcance del soporte y responsable del mantenimiento.
 
