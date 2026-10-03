@@ -19,6 +19,12 @@ Better Auth 1.7.7 con el adaptador de Prisma sobre MySQL 9.4:
 
 Usar **Better Auth 1.7.7** (versión exacta) en `src/platform/auth`. Tablas `user`, `session`, `account`, `verification` (migración `auth_core`). Contraseñas de 12 a 128 caracteres.
 
+## Hash de contraseñas (PLT-02)
+
+El scrypt por defecto de Better Auth 1.7.7 usa `N=2^14, r=16, p=1` (32 MiB, una pasada), por debajo de las configuraciones mínimas de OWASP. Se reemplaza con `emailAndPassword.password.{hash,verify}` propios (`src/platform/auth/password.ts`): scrypt `N=2^15, r=8, p=3` (configuración listada por OWASP; 32 MiB por cálculo, adecuada para un servidor pequeño con inicios de sesión concurrentes), sal aleatoria de 16 bytes, comparación en tiempo constante, normalización Unicode NFKC y parámetros guardados en cada hash (`scrypt$N$r$p$sal$hash`) para poder subirlos sin invalidar contraseñas. Se rechazan hashes manipulados con parámetros excesivos.
+
+Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición, se permite pegar y usar administradores de contraseñas (ASVS 2.1, WCAG 2.2 «Accessible Authentication»).
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

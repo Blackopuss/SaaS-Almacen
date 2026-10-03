@@ -241,6 +241,40 @@ try {
     }
     await page.close();
   }
+
+  // Registration form (PLT-02): invalid submit, inline errors and focus.
+  // Only the invalid path runs here so no accounts are created.
+  for (const viewport of [
+    { name: "mobile", width: 375, height: 812 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    const page = await browser.newPage({ viewport });
+    await page.goto(`${BASE}/registro`, { waitUntil: "networkidle" });
+    await page.fill("#name", "A");
+    await page.fill("#email", "no-es-correo");
+    await page.fill("#password", "corta");
+    await page.getByRole("button", { name: "Crear cuenta" }).click();
+    await page.getByText("Escribe tu nombre").waitFor();
+    const errors = await page.locator("[id$='-error']").count();
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    const described = await page.getAttribute("#password", "aria-describedby");
+    const kept = await page.inputValue("#email");
+    const cleared = (await page.inputValue("#password")) === "";
+    check(
+      errors === 3 &&
+        focused === "name" &&
+        described?.includes("password-error") === true &&
+        kept === "no-es-correo" &&
+        cleared,
+      `${viewport.name}: registration shows inline errors and focuses the first`,
+    );
+    await page.getByRole("button", { name: "Mostrar contraseña" }).click();
+    check(
+      (await page.getAttribute("#password", "type")) === "text",
+      `${viewport.name}: password visibility toggle works`,
+    );
+    await page.close();
+  }
 } finally {
   await browser.close();
 }

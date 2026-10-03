@@ -7,8 +7,15 @@ import { nextCookies } from "better-auth/next-js";
 import { newId } from "@/lib";
 import { db } from "@/server";
 
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  hashPassword,
+  verifyPassword,
+} from "./password";
+
 /**
- * Authentication (BAS-04 technical spike). Email + password with
+ * Authentication (BAS-04, PLT-02). Email + password with
  * database sessions. Verification, rate limits, recovery and MFA are
  * completed in PLT-02..PLT-09.
  */
@@ -19,8 +26,10 @@ export const auth = betterAuth({
   database: prismaAdapter(db, { provider: "mysql", transaction: true }),
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 12,
-    maxPasswordLength: 128,
+    minPasswordLength: PASSWORD_MIN_LENGTH,
+    maxPasswordLength: PASSWORD_MAX_LENGTH,
+    // OWASP-recommended scrypt parameters (see ./password.ts).
+    password: { hash: hashPassword, verify: verifyPassword },
   },
   advanced: {
     database: { generateId: () => newId() },
