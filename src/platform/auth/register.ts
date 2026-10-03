@@ -39,7 +39,7 @@ export type RegisterInput = z.input<typeof registerSchema>;
 export type RegisterField = keyof RegisterInput;
 
 export type RegisterResult =
-  | { ok: true; userId: string }
+  | { ok: true }
   | {
       ok: false;
       fieldErrors: Partial<Record<RegisterField, string>>;
@@ -47,8 +47,8 @@ export type RegisterResult =
     };
 
 /**
- * Creates an account with email and password and starts a session
- * (cookies are set through Better Auth's nextCookies plugin).
+ * Creates an account with email and password and sends the verification
+ * email. No session starts until the email is confirmed (PLT-03).
  */
 export async function registerUser(
   input: RegisterInput,
@@ -65,20 +65,16 @@ export async function registerUser(
   }
 
   try {
-    const result = await auth.api.signUpEmail({ body: parsed.data, headers });
-    return { ok: true, userId: result.user.id };
+    // Email link lands on /correo-verificado, which explains the result.
+    await auth.api.signUpEmail({
+      body: { ...parsed.data, callbackURL: "/correo-verificado" },
+      headers,
+    });
+    // Same answer for new and existing emails (no account enumeration).
+    return { ok: true };
   } catch (error) {
     if (isAPIError(error)) {
       const code = String(error.body?.code ?? "");
-      if (code.startsWith("USER_ALREADY_EXISTS")) {
-        // PLT-03 replaces this with a neutral, email-based flow (no enumeration).
-        return {
-          ok: false,
-          fieldErrors: {
-            email: "Ya existe una cuenta con este correo.",
-          },
-        };
-      }
       if (code === "PASSWORD_TOO_SHORT" || code === "PASSWORD_TOO_LONG") {
         return {
           ok: false,
@@ -96,4 +92,39 @@ export async function registerUser(
         "No pudimos crear tu cuenta. Inténtalo de nuevo en un momento.",
     };
   }
+}
+
+const resendSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254)
+    .pipe(z.email("Escribe un correo válido, por ejemplo nombre@negocio.mx.")),
+});
+
+export type ResendResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Sends a new verification link. Answers the same whether or not the
+ * account exists or is already verified (no enumeration).
+ */
+export async function resendVerification(
+  input: { email: string },
+  headers: Headers,
+): Promise<ResendResult> {
+  const parsed = resendSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]!.message };
+  }
+  try {
+    await auth.api.sendVerificationEmail({
+      body: { email: parsed.data.email, callbackURL: "/correo-verificado" },
+      headers,
+    });
+  } catch (error) {
+    // Unknown or verified emails also end here; the answer stays the same.
+    if (!isAPIError(error)) console.error("resendVerification failed", error);
+  }
+  return { ok: true };
 }

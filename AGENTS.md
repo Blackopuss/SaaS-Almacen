@@ -86,4 +86,5 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
 - Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
+- Correo: `src/platform/email` (`sendEmail` + plantillas en español). `MAIL_DRIVER=memory` en pruebas (`memoryOutboxFor`), `log` en desarrollo (`/correos`). Nunca revelar si un correo tiene cuenta.
 - Versiones exactas (`.npmrc` con `save-exact`). Antes de actualizar una dependencia: `npm audit` y revisar su ADR.

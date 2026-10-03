@@ -30,5 +30,5 @@ export async function registerAction(
       values: { name: input.name, email: input.email },
     };
   }
-  redirect("/inventario");
+  redirect("/verifica-tu-correo");
 }
