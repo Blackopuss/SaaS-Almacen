@@ -3,6 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { twoFactor } from "better-auth/plugins";
 
 import { newId } from "@/lib";
 import {
@@ -25,6 +26,9 @@ import { clearAttempts, throttleKeys } from "./throttle";
 /** Verification links stay valid for 24 hours and work once. */
 export const VERIFICATION_HOURS = 24;
 
+/** Authenticator app codes: 6 digits that change every 30 seconds. */
+export const TOTP_DIGITS = 6;
+
 /** Password reset links stay valid for 60 minutes and work once (PLT-07). */
 export const RESET_PASSWORD_MINUTES = 60;
 
@@ -33,7 +37,7 @@ export const RESET_PASSWORD_MINUTES = 60;
  * sessions; no session until the email is verified. Cookies are HttpOnly,
  * SameSite=Lax and Secure in production; Better Auth rejects requests from
  * untrusted origins (CSRF). Attempt limits: PLT-06. Password recovery:
- * PLT-07. MFA: PLT-08..PLT-09.
+ * PLT-07. MFA with an authenticator app (TOTP): PLT-08A..PLT-09.
  */
 export const auth = betterAuth({
   appName: "Almacén",
@@ -144,8 +148,18 @@ export const auth = betterAuth({
   },
   // Never send usage data to third parties.
   telemetry: { enabled: false },
-  // Must be last: lets server actions set auth cookies.
-  plugins: [nextCookies()],
+  plugins: [
+    // MFA (PLT-08A). The secret and backup codes are stored encrypted; a
+    // password is required to start enrollment and the app is active only
+    // after its first code is confirmed. "Trust this device" is not offered.
+    twoFactor({
+      issuer: "Almacén",
+      totpOptions: { digits: TOTP_DIGITS, period: 30 },
+      backupCodeOptions: { amount: 10, length: 10 },
+    }),
+    // Must be last: lets server actions set auth cookies.
+    nextCookies(),
+  ],
 });
 
 export type Session = typeof auth.$Infer.Session;

@@ -389,6 +389,60 @@ try {
     await b.context().close();
   }
 
+  // MFA enrollment (PLT-08A): password step, QR + manual key, wrong code.
+  // Never confirms a real code, so the demo account keeps MFA off. Only one
+  // wrong code per run (the setup limit is 5 per 15 minutes).
+  for (const viewport of [
+    { name: "mobile", width: 375, height: 812 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    const page = await signedInPage(browser, viewport);
+    await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Activar" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator("#mfa-password").fill(DEMO.password);
+    await dialog.getByRole("button", { name: "Continuar" }).click();
+    await dialog
+      .getByRole("heading", { name: "Agrega tu cuenta a la app" })
+      .waitFor();
+    const qr = dialog.getByRole("img", { name: /Código QR/ });
+    const box = await qr.boundingBox();
+    const key = (await dialog.locator("code").textContent()) ?? "";
+    // Plain locator: the link is hidden (not in the accessibility tree) on desktop.
+    const openInApp = dialog.locator('a[href^="otpauth:"]');
+    const href = await openInApp.getAttribute("href");
+    const appLinkVisible = await openInApp.isVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/mfa-${viewport.name}.png` });
+    check(
+      (box?.width ?? 0) >= 160 &&
+        /^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(key.trim()) &&
+        href?.startsWith("otpauth://totp/") === true &&
+        appLinkVisible === (viewport.name === "mobile") &&
+        overflow <= 0,
+      `${viewport.name}: MFA setup shows QR, manual key and app link (mobile only)`,
+    );
+    if (viewport.name === "desktop") {
+      await dialog.locator("#mfa-code").fill("000000");
+      await dialog.getByRole("button", { name: "Activar" }).click();
+      await dialog.locator("#mfa-code-error").waitFor();
+      const focused = await page.evaluate(() => document.activeElement?.id);
+      check(
+        focused === "mfa-code",
+        "desktop: a wrong MFA code shows an error and refocuses the field",
+      );
+    }
+    await page.keyboard.press("Escape");
+    await page.reload({ waitUntil: "networkidle" });
+    check(
+      await page.getByText("Desactivada").isVisible(),
+      `${viewport.name}: MFA stays off until a code is confirmed`,
+    );
+    await page.context().close();
+  }
+
   // Attempt limits (PLT-06): an unknown email from a test IP is blocked
   // after 5 failures with the same message an existing account would get.
   // (Never the demo account or the local IP, so local work is not blocked.)

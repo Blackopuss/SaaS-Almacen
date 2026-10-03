@@ -55,6 +55,14 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Al restablecer: la contraseña nueva sigue la política del registro (`newPasswordSchema`) y se guarda con el scrypt propio; se cierran **todas** las sesiones de la cuenta (`revokeSessionsOnPasswordReset`), se limpia el bloqueo de inicio de sesión de la cuenta, se marca el correo como verificado (el enlace demostró control del buzón) y se avisa por correo del cambio.
 - La página del enlace usa `referrer: no-referrer` para que el token de la URL no viaje a otros sitios.
 
+## MFA con app de autenticación (PLT-08A)
+
+- Complemento `twoFactor` de Better Auth (tabla `twoFactor`, campo `user.twoFactorEnabled`). TOTP de 6 dígitos cada 30 s, emisor «Almacén». El secreto y los códigos de respaldo se guardan cifrados con `BETTER_AUTH_SECRET` (rotar ese secreto invalida los secretos de MFA existentes).
+- Alta en dos pasos (`src/platform/auth/mfa.ts`): (1) se pide la contraseña otra vez y se crea un secreto **inactivo** (`verified = false`); (2) la MFA se activa solo al confirmar el primer código de la app. Al activarla Better Auth crea una sesión nueva y borra la anterior (sin fijación de sesión) y se avisa por correo.
+- Límite por usuario: 5 contraseñas o códigos incorrectos en 15 min bloquean el alta 15 min; una contraseña correcta reinicia la cuenta (quien la sabe no gana nada adivinando el código del alta). Además el `rateLimit` del complemento para `/two-factor/*`.
+- No se ofrece «confiar en este dispositivo»: con MFA activa se pedirá el código en cada inicio de sesión (PLT-08B).
+- Hallazgo: tras una Server Action que cambia la cookie de sesión, `headers()` conserva la cookie original y la pantalla se re-renderizaba sin sesión. `getCurrentSession` arma la cabecera `cookie` desde `cookies()`, que sí refleja lo escrito en la acción.
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

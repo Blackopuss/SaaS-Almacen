@@ -18,6 +18,7 @@ export {
   PageContainer,
   PageHeader,
 } from "./states";
+export { QrCode } from "./qr-code";
 export { ThemeToggle } from "./theme-toggle";
 export { FormField } from "./form-field";
 export { PasswordInput } from "./password-input";

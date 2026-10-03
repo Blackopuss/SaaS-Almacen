@@ -1,7 +1,7 @@
 import "server-only";
 
 import { isAPIError } from "better-auth/api";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
@@ -21,9 +21,14 @@ import {
  * the database (never trust the cookie alone); `requireSession` is the
  * server-side guard for protected screens and actions.
  */
-export const getCurrentSession = cache(async () =>
-  auth.api.getSession({ headers: await headers() }),
-);
+export const getCurrentSession = cache(async () => {
+  // Cookies come from cookies(), not the raw request headers: a server
+  // action that rotates the session (e.g. enabling MFA) re-renders with the
+  // new cookie, which only cookies() reflects.
+  const requestHeaders = new Headers(await headers());
+  requestHeaders.set("cookie", (await cookies()).toString());
+  return auth.api.getSession({ headers: requestHeaders });
+});
 
 export type CurrentUser = { id: string; name: string; email: string };
 

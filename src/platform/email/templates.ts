@@ -86,3 +86,20 @@ export function passwordChangedEmail(input: {
     ].join("\n"),
   };
 }
+
+export function mfaEnabledEmail(input: {
+  to: string;
+  name: string;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: "Activaste la verificación en dos pasos",
+    text: [
+      `Hola, ${input.name}:`,
+      "",
+      "Tu cuenta de Almacén ahora pide un código de tu app de autenticación además de tu contraseña.",
+      "",
+      "Si no fuiste tú, cambia tu contraseña de inmediato y escríbenos.",
+    ].join("\n"),
+  };
+}

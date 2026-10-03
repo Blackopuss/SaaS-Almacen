@@ -1,6 +1,17 @@
 // Public API of platform/auth: identity, sessions and MFA (PLT).
-export { RESET_PASSWORD_MINUTES, VERIFICATION_HOURS, auth } from "./auth";
+export {
+  RESET_PASSWORD_MINUTES,
+  TOTP_DIGITS,
+  VERIFICATION_HOURS,
+  auth,
+} from "./auth";
 export type { Session } from "./auth";
+export {
+  confirmTotpEnrollment,
+  getMfaStatus,
+  startTotpEnrollment,
+} from "./mfa";
+export type { ConfirmTotpResult, MfaStatus, StartTotpResult } from "./mfa";
 export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
 export { requestPasswordReset, resetPassword } from "./recovery";
 export type {

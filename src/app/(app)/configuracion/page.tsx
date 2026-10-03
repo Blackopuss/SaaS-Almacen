@@ -1,15 +1,23 @@
 import type { Metadata } from "next";
 
 import { PageContainer, PageHeader } from "@/components";
-import { listActiveSessions, requireSession } from "@/platform/auth";
+import {
+  getMfaStatus,
+  listActiveSessions,
+  requireSession,
+} from "@/platform/auth";
 
+import { MfaPanel } from "./mfa-panel";
 import { SessionsPanel } from "./sessions-panel";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
   const { user, sessionId } = await requireSession();
-  const sessions = await listActiveSessions(user.id, sessionId);
+  const [sessions, mfa] = await Promise.all([
+    listActiveSessions(user.id, sessionId),
+    getMfaStatus(user.id),
+  ]);
 
   return (
     <PageContainer>
@@ -21,6 +29,7 @@ export default async function ConfiguracionPage() {
         <h2 id="seguridad" className="text-lg font-semibold">
           Seguridad
         </h2>
+        <MfaPanel enabled={mfa.enabled} />
         <SessionsPanel
           sessions={sessions.map((s) => ({
             ...s,

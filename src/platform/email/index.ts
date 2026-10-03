@@ -3,6 +3,7 @@ export { listDevOutbox, memoryOutboxFor, sendEmail } from "./send";
 export type { EmailMessage, StoredEmail } from "./send";
 export {
   existingAccountEmail,
+  mfaEnabledEmail,
   passwordChangedEmail,
   passwordResetEmail,
   verificationEmail,

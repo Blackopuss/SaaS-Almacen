@@ -29,6 +29,8 @@ export const RULES = {
   resendIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   resetEmail: { max: 3, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   resetIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  // Wrong passwords or codes while setting up MFA, per signed-in user.
+  mfaSetup: { max: 5, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
 } as const satisfies Record<string, ThrottleRule>;
 
 export type ThrottleKey = { key: string; rule: ThrottleRule };
@@ -64,6 +66,10 @@ export const throttleKeys = {
   resetIp: (ip: string): ThrottleKey => ({
     key: `reset:ip:${ip}`,
     rule: RULES.resetIp,
+  }),
+  mfaSetup: (userId: string): ThrottleKey => ({
+    key: `mfa:setup:${userId}`,
+    rule: RULES.mfaSetup,
   }),
 };
 

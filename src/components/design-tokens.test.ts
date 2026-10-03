@@ -61,6 +61,7 @@ const pairs: [string, string, number][] = [
   ["success", "card", TEXT],
   ["warning-foreground", "warning", TEXT],
   ["warning", "card", TEXT],
+  ["qr-foreground", "qr", 7], // scanners need strong contrast
   ["ring", "background", UI],
   ["ring", "card", UI],
   ["input", "card", UI],

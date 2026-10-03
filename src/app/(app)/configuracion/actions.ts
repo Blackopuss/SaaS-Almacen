@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 import {
+  confirmTotpEnrollment,
   requireSession,
   revokeOtherSessions,
   revokeSession,
+  startTotpEnrollment,
 } from "@/platform/auth";
 
 export type SessionActionResult = { ok: boolean; message: string };
@@ -32,4 +35,38 @@ export async function revokeOtherSessionsAction(): Promise<SessionActionResult> 
         ? "Se cerró 1 sesión en otro dispositivo."
         : `Se cerraron ${count} sesiones en otros dispositivos.`,
   };
+}
+
+export type MfaSetupState =
+  | { step: "password"; error?: string }
+  | { step: "scan"; totpUri: string; secret: string; error?: string }
+  | { step: "done" };
+
+/** Two-step MFA enrollment (PLT-08A): password, then the app's code. */
+export async function mfaSetupAction(
+  prev: MfaSetupState,
+  formData: FormData,
+): Promise<MfaSetupState> {
+  const { user } = await requireSession();
+  const requestHeaders = await headers();
+
+  if (prev.step === "scan") {
+    const result = await confirmTotpEnrollment(
+      user.id,
+      { code: String(formData.get("code") ?? "") },
+      requestHeaders,
+    );
+    if (!result.ok) return { ...prev, error: result.error };
+    revalidatePath("/configuracion");
+    return { step: "done" };
+  }
+
+  const result = await startTotpEnrollment(
+    user.id,
+    { password: String(formData.get("password") ?? "") },
+    requestHeaders,
+  );
+  return result.ok
+    ? { step: "scan", totpUri: result.totpUri, secret: result.secret }
+    : { step: "password", error: result.error };
 }
