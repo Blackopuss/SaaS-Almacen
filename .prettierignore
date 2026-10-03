@@ -5,3 +5,4 @@ package-lock.json
 .claude
 docs
 *.md
+src/server/generated

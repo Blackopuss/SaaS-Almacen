@@ -98,6 +98,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     ".agents/**",
     ".claude/**",
+    "src/server/generated/**",
   ]),
 ]);
 

@@ -11,13 +11,24 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run lint:boundaries && npm run format:check",
-    "lint:boundaries": "node scripts/verify-boundaries.mjs"
+    "lint:boundaries": "node scripts/verify-boundaries.mjs",
+    "postinstall": "prisma generate",
+    "db:setup": "node scripts/db-setup.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:check": "node scripts/db-check.mjs",
+    "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@prisma/adapter-mariadb": "7.10.0",
+    "@prisma/client": "7.10.0",
     "motion": "^14.0.0",
     "next": "16.3.8",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -31,10 +42,16 @@
     "eslint-plugin-boundaries": "^7.2.0",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "prisma": "7.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "mariadb": "3.4.7",
+    "mysql2": "3.24.5",
+    "deepmerge-ts": "8.0.2"
   }
 }

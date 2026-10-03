@@ -46,3 +46,6 @@ __pycache__/
 
 # local agent symlinks (recreated by `npx skills`)
 /.claude/skills/
+
+# prisma generated client
+/src/server/generated/

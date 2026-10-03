@@ -1,0 +1,12 @@
+// Database schema. Models are added step by step (PLT-01 onwards).
+// Every business table carries organization_id (see AGENTS.md).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/server/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "mysql"
+}
