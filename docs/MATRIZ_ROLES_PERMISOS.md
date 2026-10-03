@@ -1,6 +1,6 @@
 # Matriz de roles × permisos — Inventario y Compras
 
-**Estado: Propuesta en revisión por el fundador (FUN-07). Preguntas 1–5 respondidas el 2026-10-03; faltan 6–8.**  
+**Estado: Aprobada por el fundador el 2026-10-03 (FUN-07).** Fuente de verdad del catálogo en código (USR-01); `src/platform/authorization` se prueba contra estas tablas.  
 **Fecha: 2026-10-03**
 
 Este documento propone permisos y su asignación para el lanzamiento. No constituye aprobación, implementación ni cierre de FUN-07. Su criterio «Listo cuando» exige una tabla aprobada por el fundador; FUN-05 también es prerrequisito y esta propuesta no acredita entrevistas ni su validación.
@@ -199,13 +199,13 @@ Los demás pasos operativos de INV y CMP aparecen en las filas correspondientes 
 3. **El Comprador envía, cancela y cierra órdenes sin otra autorización: sí.** El Comprador es responsable de los gastos.
 4. **Consulta no ve precios ni costos**: son privados de Compras. Tampoco en PDF de órdenes, reportes ni exportaciones.
 5. **Consulta puede descargar**, solo los datos que ya puede ver (sin precios).
-6. Pendiente.
-7. Pendiente.
-8. Pendiente.
+6. **Solo el titular nombra, cambia o quita administradores.** El administrador gestiona únicamente Almacén, Comprador y Consulta y no cambia su propio rol.
+7. **La bitácora completa la ven solo el titular y los administradores.** Los demás ven el historial operativo que su rol permite.
+8. **Transferencia de titularidad:** los roles del titular anterior se eligen al transferir, con Consulta propuesto por defecto; nunca pasa a Administrador en automático. El nuevo titular acepta explícitamente y debe tener MFA activa.
 
 ## Preguntas para el fundador
 
-Todas las respuestas siguen pendientes. La matriz refleja las recomendaciones siguientes para que exista una propuesta concreta revisable; no las convierte en decisiones confirmadas.
+Preguntas originales de la propuesta; las respuestas están en «Decisiones del fundador».
 
 1. **¿Almacén puede ajustar, reversar movimientos propios de Inventario y aplicar conteos sin aprobación de Administrador?** Recomendación: sí en el lanzamiento, con motivo obligatorio, auditoría y límites de integridad; separar captura y aplicación mediante permisos permite restringirlo después si el piloto lo exige.
 2. **¿Quien solo tiene Almacén debe recibir órdenes y devolver mercancía al proveedor?** Recomendación: no; mantener «Almacén no compra» incluyendo recepciones/devoluciones de Compras y combinar Almacén + Comprador cuando esa persona deba realizar ambas funciones. Esa combinación también concede órdenes y proveedores; no simular un rol de recepción restringida que el plan no contempla.
@@ -251,6 +251,6 @@ Son casos propuestos, no pruebas implementadas ni ejecutadas. Ejecutar las llama
 
 Como controles positivos de estas pruebas negativas, comprobar que Almacén + Comprador obtiene la unión prevista, Consulta + Almacén escribe por Almacén, Administrador conserva operaciones de Inventario/Compras pero nunca cobro, y una exportación permitida a Consulta funciona sin alterar datos de negocio. No confundir denegación de una acción con bloqueo completo de la cuenta.
 
-## Revisión y aprobación pendiente
+## Aprobación
 
-El fundador debe resolver las preguntas, revisar los «Sí/No» y registrar expresamente qué versión aprueba antes de cerrar FUN-07 o tomar esta matriz como definitiva para USR-01. Esta entrega conserva el estado de propuesta; no actualiza el plan, la memoria, el código ni el avance del proyecto.
+El fundador respondió las ocho preguntas y aprobó esta matriz el 2026-10-03 (FUN-07). Cambiar un permiso o un rol requiere actualizar esta tabla y el catálogo en código a la vez; la prueba `src/platform/authorization/catalog.test.ts` falla si no coinciden.
