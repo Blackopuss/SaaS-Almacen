@@ -1,6 +1,6 @@
 # SaaS de inventario modular
 
-Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01.
+Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02.
 
 ```powershell
 npm install

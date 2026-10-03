@@ -63,7 +63,8 @@ Actualizada: 2026-10-02, zona America/Mexico_City.
 
 - 2026-10-02: prototipo HTML eliminado por decisión del fundador (no estaba en git); se empieza de cero. Las referencias al prototipo en `docs/FASE_01_DEFINICION.md` son históricas.
 - Decisiones técnicas confirmadas: npm; MySQL 9.4 (la versión local del fundador, también objetivo); `motion` (Framer Motion) para animación; skills `ui-ux-pro-max` y `web-design-guidelines` instaladas en `.agents/skills` (enlazadas en `.claude/skills`). Implementar un paso a la vez con revisión breve de Codex por CLI.
-- BAS-01 verificado: Next.js 16.3 + React 19.2 + TS estricto, ESLint + Prettier, `npm run check` y `npm run build` pasan desde limpio. Siguiente: BAS-02.
+- BAS-01 verificado: Next.js 16.3 + React 19.2 + TS estricto, ESLint + Prettier, `npm run check` y `npm run build` pasan desde limpio.
+- BAS-02 verificado: capas `app`, `components`, `lib`, `server`, `platform/*`, `modules/*` con eslint-plugin-boundaries v7 (solo `index.ts` entre módulos; plataforma nunca depende de módulos; también detecta `typeof import()` tras revisión de Codex). `npm run lint:boundaries` prueba 9 casos. Trabajo en rama `feature/bas-fundacion`. Siguiente: BAS-03 (MySQL + Prisma).
 
 ## Preguntas prioritarias pendientes
 

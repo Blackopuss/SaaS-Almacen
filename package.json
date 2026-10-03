@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run format:check"
+    "check": "npm run typecheck && npm run lint && npm run lint:boundaries && npm run format:check",
+    "lint:boundaries": "node scripts/verify-boundaries.mjs"
   },
   "dependencies": {
     "motion": "^14.0.0",
@@ -26,6 +27,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.2.0",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",

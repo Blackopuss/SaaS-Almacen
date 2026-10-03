@@ -31,3 +31,24 @@ Contexto compartido por Claude Code y Codex. Leer antes de trabajar:
 - Secretos solo en `.env.local` (ignorado por git). Plantilla sin secretos en `.env.example`.
 - Antes de cerrar un paso: `npm run check` y `npm run build` deben pasar.
 - Para UI usar las skills `ui-ux-pro-max` (diseño) y `web-design-guidelines` (revisión).
+
+## Arquitectura (BAS-02)
+
+```text
+src/
+  app/          Rutas y pantallas. Usa módulos y plataforma solo por su index.ts.
+  components/   Componentes visuales compartidos.
+  lib/          Utilidades sin reglas de negocio.
+  server/       Infraestructura: cliente de base de datos y transacciones.
+  platform/*    Núcleo compartido: auth, tenancy, authorization, billing, audit, jobs, contacts, catalog.
+  modules/*     Módulos contratables: inventory, purchasing (luego sales, crm).
+```
+
+| Desde | Puede importar |
+| --- | --- |
+| app | module, platform y lib (solo `index.ts`); components |
+| module | otros module, platform y lib (solo `index.ts`); server; components |
+| platform | otra platform y lib (solo `index.ts`); server. **Nunca** módulos |
+| server, components | lib (`index.ts`) |
+
+Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint-plugin-boundaries` lo impone y `npm run lint:boundaries` lo demuestra con casos temporales.
