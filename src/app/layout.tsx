@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 
-import { Providers } from "@/components";
+import { Providers, THEME_SCRIPT } from "@/components";
 
 import "./globals.css";
 
@@ -31,6 +32,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <Script id="almacen-tema" strategy="beforeInteractive">
+          {THEME_SCRIPT}
+        </Script>
+      </head>
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
       </body>

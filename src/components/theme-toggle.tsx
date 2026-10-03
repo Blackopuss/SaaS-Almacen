@@ -2,21 +2,10 @@
 
 import { Moon, Sun } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useTheme } from "next-themes";
-import { useSyncExternalStore } from "react";
 
 import { cn } from "cn";
 
-const subscribe = () => () => {};
-
-/** True only after hydration: the theme is unknown while rendering on the server. */
-function useMounted(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
-}
+import { useTheme } from "./theme";
 
 const STARS = [
   { top: "22%", left: "18%", size: 2 },
@@ -35,9 +24,9 @@ export function ThemeToggle({
   className?: string;
   showLabel?: boolean;
 }) {
-  const { resolvedTheme, setTheme } = useTheme();
-  const mounted = useMounted();
-  const dark = mounted && resolvedTheme === "dark";
+  const { theme, setTheme } = useTheme();
+  const mounted = theme !== undefined;
+  const dark = theme === "dark";
 
   return (
     <button

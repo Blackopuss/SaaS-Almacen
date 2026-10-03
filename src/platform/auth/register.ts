@@ -5,6 +5,13 @@ import { z } from "zod";
 
 import { auth } from "./auth";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
+import {
+  blockedFor,
+  clientIp,
+  recordAttempt,
+  throttleKeys,
+  tooManyAttemptsMessage,
+} from "./throttle";
 
 /** Registration input (PLT-02). Messages are shown to people in Spanish. */
 export const registerSchema = z.object({
@@ -64,6 +71,17 @@ export async function registerUser(
     return { ok: false, fieldErrors };
   }
 
+  const ipKey = throttleKeys.registerIp(clientIp(headers));
+  const wait = await blockedFor([ipKey]);
+  if (wait > 0) {
+    return {
+      ok: false,
+      fieldErrors: {},
+      formError: tooManyAttemptsMessage(wait),
+    };
+  }
+  await recordAttempt([ipKey]);
+
   try {
     // Email link lands on /correo-verificado, which explains the result.
     await auth.api.signUpEmail({
@@ -107,7 +125,8 @@ export type ResendResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Sends a new verification link. Answers the same whether or not the
- * account exists or is already verified (no enumeration).
+ * account exists or is already verified (no enumeration). Limited per
+ * email and per IP (PLT-06).
  */
 export async function resendVerification(
   input: { email: string },
@@ -117,6 +136,14 @@ export async function resendVerification(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]!.message };
   }
+  const keys = [
+    throttleKeys.resendEmail(parsed.data.email),
+    throttleKeys.resendIp(clientIp(headers)),
+  ];
+  const wait = await blockedFor(keys);
+  if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
+  await recordAttempt(keys);
+
   try {
     await auth.api.sendVerificationEmail({
       body: { email: parsed.data.email, callbackURL: "/correo-verificado" },

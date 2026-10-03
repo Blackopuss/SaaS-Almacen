@@ -38,6 +38,15 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - `session.cookieCache` desactivado explícitamente: toda petición valida la sesión en MySQL, así que cerrar una sesión surte efecto de inmediato. Activarlo exigiría aceptar hasta 5 minutos de sesiones revocadas aún válidas.
 - La lista y el cierre de sesiones usan consultas propias limitadas al usuario (`src/platform/auth/sessions.ts`) en lugar de los endpoints de Better Auth, para que los tokens nunca lleguen al navegador y nadie pueda cerrar sesiones ajenas.
 
+## Límite de intentos (PLT-06)
+
+- El limitador de Better Auth solo actúa en sus rutas HTTP y por defecto solo en producción y en memoria; las pantallas usan Server Actions que lo saltan. Por eso hay dos capas:
+  1. **Limitador propio** (`src/platform/auth/throttle.ts`, tabla `auth_throttle`): una sentencia SQL atómica por intento con el reloj de la base. Inicio de sesión: 5 fallos por cuenta y 20 por IP en 15 min bloquean 15 min (la IP tolera más porque una ferretería comparte conexión). Registro: 10 por IP por hora. Reenvío de verificación: 3 por correo y 10 por IP cada 15 min.
+  2. **Better Auth `rateLimit`** siempre activo con almacenamiento en MySQL (tabla `rateLimit`) para `/api/auth/*`.
+- Los fallos se cuentan por el correo escrito, exista o no; el bloqueo aplica aunque la contraseña sea correcta y nunca revela qué cuentas existen. Los correos se guardan como SHA-256.
+- **Requisito de despliegue:** la IP se toma de `X-Forwarded-For`. En producción la app debe estar detrás de un proxy que sobrescriba esa cabecera; si se expone directo, un atacante podría variar la IP y evadir el límite por IP (el límite por cuenta sigue aplicando).
+- Pendiente: limpieza periódica de contadores viejos con el worker (IMP-01).
+
 ## Alternativa anotada
 
 - **Auth.js (NextAuth)**: maduro, pero el flujo de credenciales y MFA es menos completo y requiere más código propio.

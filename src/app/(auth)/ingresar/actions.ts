@@ -24,5 +24,6 @@ export async function signInAction(
   if (result.ok) redirect(next);
   // A new verification link was sent automatically (sendOnSignIn).
   if (result.reason === "unverified") redirect("/verifica-tu-correo");
+  if (result.reason === "throttled") return { error: result.message, email };
   return { error: MESSAGES[result.reason], email };
 }

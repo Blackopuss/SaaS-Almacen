@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {/* config options here */};
+const nextConfig: NextConfig = {
+  // The floating "N" indicator covered the theme switch and the sidebar
+  // user menu. Compile and runtime errors are still shown when they happen.
+  devIndicators: false,
+};
 
 export default nextConfig;

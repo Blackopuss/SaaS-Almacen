@@ -389,6 +389,36 @@ try {
     await b.context().close();
   }
 
+  // Attempt limits (PLT-06): an unknown email from a test IP is blocked
+  // after 5 failures with the same message an existing account would get.
+  // (Never the demo account or the local IP, so local work is not blocked.)
+  {
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 20}`;
+    const context = await newContext(browser, {
+      viewport: { width: 375, height: 812 },
+      extraHTTPHeaders: { "x-forwarded-for": ip },
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
+    const ghost = `fantasma.${Date.now()}@example.test`;
+    for (let i = 0; i < 6; i++) {
+      await page.fill("#email", ghost);
+      await page.fill("#password", "contraseña-incorrecta");
+      await page.getByRole("button", { name: "Iniciar sesión" }).click();
+      // Wait until the submission finished (button label returns).
+      await page.getByRole("button", { name: "Entrando…" }).waitFor();
+      await page.getByRole("button", { name: "Iniciar sesión" }).waitFor();
+    }
+    const message =
+      (await page.locator("main [role=alert]").textContent()) ?? "";
+    await page.screenshot({ path: `${OUT}/ingresar-bloqueo-mobile.png` });
+    check(
+      /Demasiados intentos\. Espera 15 minutos/.test(message),
+      "attempt limit: 6th try is blocked with a neutral message",
+    );
+    await context.close();
+  }
+
   // Registration form (PLT-02): invalid submit, inline errors and focus.
   // Only the invalid path runs here so no accounts are created.
   for (const viewport of [

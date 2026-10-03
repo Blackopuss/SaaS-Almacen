@@ -25,9 +25,21 @@ function createClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-// Reuse one client across hot reloads in development.
-const globalForDb = globalThis as unknown as { db?: PrismaClient };
+// Reuse one client across hot reloads in development, but only while the
+// generated client is the same: after `prisma generate` (a new migration)
+// the class changes and a fresh client with the new models is created.
+const globalForDb = globalThis as unknown as {
+  db?: PrismaClient;
+  dbClass?: typeof PrismaClient;
+};
 
-export const db: PrismaClient = globalForDb.db ?? createClient();
+const cached =
+  globalForDb.dbClass === PrismaClient ? globalForDb.db : undefined;
+if (!cached && globalForDb.db) void globalForDb.db.$disconnect();
 
-if (process.env.NODE_ENV !== "production") globalForDb.db = db;
+export const db: PrismaClient = cached ?? createClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.db = db;
+  globalForDb.dbClass = PrismaClient;
+}

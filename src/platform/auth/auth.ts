@@ -26,7 +26,8 @@ export const VERIFICATION_HOURS = 24;
  * Authentication (BAS-04, PLT-02, PLT-03). Email + password with database
  * sessions; no session until the email is verified. Cookies are HttpOnly,
  * SameSite=Lax and Secure in production; Better Auth rejects requests from
- * untrusted origins (CSRF). Rate limits, recovery and MFA: PLT-06..PLT-09.
+ * untrusted origins (CSRF). Attempt limits: PLT-06. Recovery and MFA:
+ * PLT-07..PLT-09.
  */
 export const auth = betterAuth({
   appName: "Almacén",
@@ -85,6 +86,20 @@ export const auth = betterAuth({
     // Better Auth skips the origin (CSRF) check when NODE_ENV=test; keep it
     // on everywhere so tests exercise the same protection as production.
     disableOriginCheck: false,
+  },
+  // Limits for the /api/auth HTTP endpoints (server actions are limited in
+  // ./throttle.ts). Always on and stored in MySQL; Better Auth's default is
+  // production-only and in memory.
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 15 * 60, max: 20 },
+      "/sign-up/email": { window: 60 * 60, max: 10 },
+      "/send-verification-email": { window: 15 * 60, max: 10 },
+    },
   },
   // Never send usage data to third parties.
   telemetry: { enabled: false },

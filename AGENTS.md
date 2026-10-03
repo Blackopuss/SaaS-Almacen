@@ -69,7 +69,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Sistema visual (BAS-12)
 
 - Fuente de verdad: `design-system/almacen/MASTER.md` (generado con `ui-ux-pro-max`). Estilo Minimal & Swiss, claridad tipo Apple, modo claro por defecto. Tipografía Inter.
-- Modo oscuro gris neutro (zinc; azul solo en acciones) con `next-themes` (clase `dark` en `<html>`, clave `almacen-tema`, claro por defecto) y el interruptor `ThemeToggle` (barra lateral y encabezado móvil). Todo color nuevo necesita su valor en `:root` y `.dark`.
+- Modo oscuro gris neutro (zinc; azul solo en acciones): clase `dark` en `<html>` aplicada antes de pintar por `THEME_SCRIPT` (layout raíz) y cambiada con `useTheme`/`setTheme` de `src/components/theme.ts` (clave `almacen-tema`, claro por defecto) y el interruptor `ThemeToggle` (barra lateral y encabezado móvil). Todo color nuevo necesita su valor en `:root` y `.dark`.
 - Tokens en `src/app/globals.css` (`primary #2563EB`, `success`, `warning`, `destructive`…). Nunca colores sueltos en componentes. Cambiar un token exige que pase `src/components/design-tokens.test.ts` (contraste WCAG: texto ≥ 4.5:1, bordes/anillos ≥ 3:1).
 - shadcn/ui (base Radix, preset nova) en `src/components/ui`, ajustado: objetivos táctiles ≥ 44 px en móvil, textos en español, avisos con Sonner (`toast.success/error`).
 - Animaciones que dependen de «reducir movimiento» se eligen con CSS (`motion-reduce:`), no con `useReducedMotion`, para que servidor y cliente generen el mismo HTML.
@@ -88,5 +88,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
 - Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
+- Límite de intentos: todo flujo de autenticación nuevo (recuperación, MFA…) usa `blockedFor`/`recordAttempt` de `src/platform/auth/throttle.ts`.
+- Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
 - Correo: `src/platform/email` (`sendEmail` + plantillas en español). `MAIL_DRIVER=memory` en pruebas (`memoryOutboxFor`), `log` en desarrollo (`/correos`). Nunca revelar si un correo tiene cuenta.
 - Versiones exactas (`.npmrc` con `save-exact`). Antes de actualizar una dependencia: `npm audit` y revisar su ADR.

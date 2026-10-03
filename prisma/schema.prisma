@@ -117,3 +117,27 @@ model Membership {
   @@index([userId])
   @@map("membership")
 }
+
+// ── Brute-force protection (PLT-06) ──────────────────────────────────────
+
+/// Attempt counters for sign-in, registration and verification emails.
+/// Keys never contain raw emails (SHA-256 of the normalized address).
+model AuthThrottle {
+  key          String    @id @db.VarChar(191)
+  count        Int
+  windowStart  DateTime  @db.DateTime(3)
+  blockedUntil DateTime? @db.DateTime(3)
+
+  @@index([windowStart])
+  @@map("auth_throttle")
+}
+
+/// Better Auth's own limiter for the /api/auth HTTP endpoints.
+model RateLimit {
+  id          String @id @db.Char(36)
+  key         String @unique @db.VarChar(191)
+  count       Int
+  lastRequest BigInt
+
+  @@map("rateLimit")
+}
