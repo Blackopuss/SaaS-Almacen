@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { PageContainer, PageHeader } from "@/components";
 import { getMfaStatus, listActiveSessions } from "@/platform/auth";
-import { requireOrganizationMember } from "@/platform/tenancy";
+import { requireOrganizationContext } from "@/platform/tenancy";
 
 import { MfaPanel } from "./mfa-panel";
 import { SessionsPanel } from "./sessions-panel";
@@ -10,7 +10,7 @@ import { SessionsPanel } from "./sessions-panel";
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
-  const { user, sessionId } = await requireOrganizationMember();
+  const { user, sessionId } = await requireOrganizationContext();
   const [sessions, mfa] = await Promise.all([
     listActiveSessions(user.id, sessionId),
     getMfaStatus(user.id),

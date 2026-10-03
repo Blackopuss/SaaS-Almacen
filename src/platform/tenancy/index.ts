@@ -4,10 +4,21 @@ export {
   MEXICO_TIME_ZONES,
   createOrganization,
   hasOrganization,
-  requireOrganizationMember,
 } from "./organizations";
 export type {
   CreateOrganizationResult,
   OrganizationField,
   OrganizationInput,
 } from "./organizations";
+export {
+  listMyOrganizations,
+  requireOrganizationContext,
+  resolveActiveOrganization,
+  switchOrganization,
+} from "./context";
+export type {
+  ActiveOrganization,
+  MyOrganization,
+  OrganizationContext,
+  SwitchOrganizationResult,
+} from "./context";

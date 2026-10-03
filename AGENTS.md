@@ -97,8 +97,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-10. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 21 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-11** (contexto de empresa activa en servidor: cambiar de empresa revalida la membresía).
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-11. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 22 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-12** (capa de acceso a datos con `organization_id` obligatorio). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -124,7 +124,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Códigos de recuperación (PLT-09): generador y normalización en `backup-codes.ts`; `regenerateBackupCodes` y `disableMfa` en `mfa-recovery.ts`; `verifySignInCode({ method: "backup" })`. Se muestran una sola vez con `BackupCodesList`. Desactivar está prohibido si `isMfaRequired`.
 - Si una Server Action cambia la cookie de sesión, Next vuelve a pintar la pantalla: el aviso de éxito va en un componente que siga montado (ver `MfaPanel`).
 
-## Empresas (PLT-10)
+## Empresas (PLT-10/11)
 
-- `src/platform/tenancy`: `createOrganization` (empresa + membresía titular en una transacción, una empresa por cuenta), `hasOrganization`, `requireOrganizationMember()`. Toda pantalla de negocio en `src/app/(app)/` llama `requireOrganizationMember()` (incluye `requireSession`); sin empresa → `/crear-empresa`. Detalle en ADR 0005.
+- `src/platform/tenancy`: `createOrganization` (empresa + membresía titular en una transacción, una empresa por cuenta), `hasOrganization`, `requireOrganizationContext()` (PLT-11: sesión + empresa activa guardada en `session.activeOrganizationId` y revalidada en cada petición), `switchOrganization`, `listMyOrganizations`. Toda pantalla y acción de negocio en `src/app/(app)/` llama `requireOrganizationContext()` y toma `organization.id` solo de ahí; sin empresa → `/crear-empresa`. Detalle en ADR 0005.
+- Trabajo con Codex: tareas independientes en un worktree propio (`git worktree add ../SAAS-Almacen-codex -b codex/<tarea> pruebas`) o revisiones de solo lectura; Claude revisa e integra en `pruebas`.
 - Selects: `NativeSelect` de `src/components/ui/native-select.tsx` (selector nativo con estilo de `Input`).

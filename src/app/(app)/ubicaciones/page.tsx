@@ -2,13 +2,13 @@ import { MapPin } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
-import { requireOrganizationMember } from "@/platform/tenancy";
+import { requireOrganizationContext } from "@/platform/tenancy";
 
 export const metadata: Metadata = { title: "Ubicaciones" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
 export default async function UbicacionesPage() {
-  await requireOrganizationMember();
+  await requireOrganizationContext();
   return (
     <PageContainer>
       <PageHeader

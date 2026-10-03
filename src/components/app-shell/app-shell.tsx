@@ -16,23 +16,43 @@ import {
   SheetTrigger,
 } from "../ui/sheet";
 import { NAV_ITEMS, isActive, type NavItem } from "./nav";
+import {
+  OrganizationSwitcher,
+  type ShellOrganization,
+} from "./organization-switcher";
 
 export type ShellUser = { name: string; email: string };
+export type { ShellOrganization };
+
+type SwitchAction = (id: string) => Promise<{ error: string }>;
 
 /**
  * Application frame (BAS-13, PLT-04): sidebar on desktop, bottom bar on
- * mobile (4 sections + «Más»), skip link, landmarks and the signed-in user
- * with «Cerrar sesión».
+ * mobile (4 sections + «Más»), skip link, landmarks, the active company
+ * (PLT-11) and the signed-in user with «Cerrar sesión».
  */
 export function AppShell({
   children,
   user,
+  organization,
+  organizations,
   signOutAction,
+  switchOrganizationAction,
 }: {
   children: React.ReactNode;
   user: ShellUser;
+  organization: ShellOrganization;
+  organizations: ShellOrganization[];
   signOutAction: () => Promise<void>;
+  switchOrganizationAction: SwitchAction;
 }) {
+  const switcher = (
+    <OrganizationSwitcher
+      organization={organization}
+      organizations={organizations}
+      switchOrganizationAction={switchOrganizationAction}
+    />
+  );
   const pathname = usePathname();
   const primary = NAV_ITEMS.filter((item) => item.mobile);
   const secondary = NAV_ITEMS.filter((item) => !item.mobile);
@@ -49,6 +69,7 @@ export function AppShell({
 
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
         <Brand />
+        <div className="-mt-2 px-3 pb-2">{switcher}</div>
         <nav aria-label="Principal" className="flex-1 px-3 pb-4">
           <ul className="space-y-1">
             {NAV_ITEMS.map((item) => (
@@ -97,6 +118,7 @@ export function AppShell({
           ))}
           <li>
             <MoreMenu
+              switcher={switcher}
               user={user}
               signOutAction={signOutAction}
               items={secondary}
@@ -164,12 +186,14 @@ function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 function MoreMenu({
+  switcher,
   user,
   signOutAction,
   items,
   active,
   pathname,
 }: {
+  switcher: React.ReactNode;
   user: ShellUser;
   signOutAction: () => Promise<void>;
   items: NavItem[];
@@ -214,7 +238,8 @@ function MoreMenu({
             })}
           </ul>
         </nav>
-        <div className="mx-4 border-t pt-3">
+        <div className="mx-4 space-y-1 border-t pt-3">
+          {switcher}
           <UserBlock user={user} signOutAction={signOutAction} />
         </div>
       </SheetContent>

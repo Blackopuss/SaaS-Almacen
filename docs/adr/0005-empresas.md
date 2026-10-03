@@ -8,11 +8,18 @@ Cada dato de negocio pertenece a una empresa (`organization_id`). La persona que
 
 ## Decisión
 
-- Después de confirmar el correo, quien no pertenece a ninguna empresa llega a `/crear-empresa` (nombre del negocio y zona horaria de México). Las pantallas del negocio usan `requireOrganizationMember()` (`src/platform/tenancy`) y mandan ahí a quien no tiene empresa.
+- Después de confirmar el correo, quien no pertenece a ninguna empresa llega a `/crear-empresa` (nombre del negocio y zona horaria de México). Las pantallas del negocio usan `requireOrganizationContext()` (`src/platform/tenancy`, PLT-11) y mandan ahí a quien no tiene empresa.
 - La empresa y la membresía del titular se crean en **una transacción** (`createOrganization`): existen las dos o ninguna. Moneda fija MXN.
-- **Una empresa por cuenta por ahora**: el alta se rechaza si la persona ya pertenece a una empresa. Para que dos envíos simultáneos no creen dos empresas, la transacción bloquea la fila del usuario (`SELECT … FOR UPDATE`) antes de revisar.
+- **Una empresa por cuenta por ahora**: el alta se rechaza si la persona ya tiene una membresía activa (una membresía desactivada no lo impide). Para que dos envíos simultáneos no creen dos empresas, la transacción bloquea la fila del usuario (`SELECT … FOR UPDATE`) antes de revisar.
 - Zonas horarias: lista cerrada de identificadores IANA de México con nombres conocidos (Centro, Sureste, Pacífico, Sonora, Noroeste, Chihuahua, Ciudad Juárez); Centro por defecto.
 - Al crearla, la persona ya es titular: se le envía a activar la verificación en dos pasos antes de usar la app.
+
+## Empresa activa (PLT-11)
+
+- La empresa de trabajo se guarda en la **fila de la sesión** (`session.activeOrganizationId`, se pone en nulo si la empresa se borra), no en una cookie que el navegador pueda cambiar.
+- `requireOrganizationContext()` revisa en **cada petición** que la membresía siga activa. Si no, usa la membresía activa más antigua (y la guarda en la sesión); sin ninguna, manda a `/crear-empresa`. Devuelve `organization` (id, nombre, zona horaria, moneda, `isOwner`), la única fuente de `organization_id` para el código de negocio.
+- `switchOrganization` solo cambia a una empresa con membresía activa, y solo la sesión propia; «no existe» y «no eres miembro» reciben la misma respuesta. Al cambiar se vuelve a pintar todo (layout incluido) y se empieza en Inventario.
+- La interfaz muestra la empresa activa en la barra lateral y en «Más»; el selector aparece solo con dos o más empresas.
 
 ## Alternativas consideradas
 

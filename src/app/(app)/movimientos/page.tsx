@@ -2,13 +2,13 @@ import { ArrowLeftRight } from "lucide-react";
 import type { Metadata } from "next";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
-import { requireOrganizationMember } from "@/platform/tenancy";
+import { requireOrganizationContext } from "@/platform/tenancy";
 
 export const metadata: Metadata = { title: "Movimientos" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
 export default async function MovimientosPage() {
-  await requireOrganizationMember();
+  await requireOrganizationContext();
   return (
     <PageContainer>
       <PageHeader

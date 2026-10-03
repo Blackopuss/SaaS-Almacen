@@ -520,6 +520,14 @@ try {
       new URL(page.url()).pathname === "/inventario",
       "company: an account with a company skips /crear-empresa",
     );
+    // Active company (PLT-11): shown in «Más» on mobile.
+    await page.getByRole("button", { name: "Más" }).click();
+    const sheet = page.getByRole("dialog", { name: "Más opciones" });
+    check(
+      await sheet.getByText("Ferretería Demo").isVisible(),
+      "company: the active company is shown in the menu",
+    );
+    await page.keyboard.press("Escape");
     const anonymous = await newContext(browser, {
       viewport: { width: 375, height: 812 },
     });

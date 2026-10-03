@@ -34,17 +34,22 @@ model User {
 }
 
 model Session {
-  id        String   @id @db.Char(36)
-  expiresAt DateTime @db.DateTime(3)
-  token     String   @unique @db.VarChar(255)
-  createdAt DateTime @default(now()) @db.DateTime(3)
-  updatedAt DateTime @updatedAt @db.DateTime(3)
-  ipAddress String?  @db.VarChar(64)
-  userAgent String?  @db.Text
-  userId    String   @db.Char(36)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String        @id @db.Char(36)
+  expiresAt            DateTime      @db.DateTime(3)
+  token                String        @unique @db.VarChar(255)
+  createdAt            DateTime      @default(now()) @db.DateTime(3)
+  updatedAt            DateTime      @updatedAt @db.DateTime(3)
+  ipAddress            String?       @db.VarChar(64)
+  userAgent            String?       @db.Text
+  userId               String        @db.Char(36)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Company this session works in (PLT-11). Re-checked against an active
+  /// membership on every request; never trusted on its own.
+  activeOrganizationId String?       @db.Char(36)
+  activeOrganization   Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([activeOrganizationId])
   @@map("session")
 }
 
@@ -112,6 +117,7 @@ model Organization {
   createdAt   DateTime     @default(now()) @db.DateTime(3)
   updatedAt   DateTime     @updatedAt @db.DateTime(3)
   memberships Membership[]
+  sessions    Session[]
 
   @@index([ownerUserId])
   @@map("organization")

@@ -1,11 +1,9 @@
 import "server-only";
 
-import { redirect } from "next/navigation";
 import { cache } from "react";
 import { z } from "zod";
 
 import { DEFAULT_TIME_ZONE, newId } from "@/lib";
-import { requireSession } from "@/platform/auth";
 import { db } from "@/server";
 
 /**
@@ -87,7 +85,9 @@ export async function createOrganization(
   const created = await db.$transaction(async (tx) => {
     // Lock the person's row so two submissions cannot both pass the check.
     await tx.$queryRaw`SELECT id FROM user WHERE id = ${userId} FOR UPDATE`;
-    const memberships = await tx.membership.count({ where: { userId } });
+    const memberships = await tx.membership.count({
+      where: { userId, status: "ACTIVE" },
+    });
     if (memberships > 0) return false;
     await tx.organization.create({
       data: {
@@ -110,17 +110,4 @@ export async function createOrganization(
     };
   }
   return { ok: true, organizationId };
-}
-
-/**
- * Guard for the app's business screens: a valid session (and MFA when
- * required, see requireSession) plus a company; people without one are
- * sent to create it. PLT-11 turns this into the active-company context.
- */
-export async function requireOrganizationMember() {
-  const session = await requireSession();
-  if (!(await hasOrganization(session.user.id))) {
-    redirect(CREATE_ORGANIZATION_PATH);
-  }
-  return session;
 }
