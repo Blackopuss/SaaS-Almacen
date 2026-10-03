@@ -3,6 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { after } from "next/server";
 import { twoFactor } from "better-auth/plugins";
 
 import { newId } from "@/lib";
@@ -27,6 +28,20 @@ import { clearAttempts, clientIp, throttleKeys } from "./throttle";
 
 /** Verification links stay valid for 24 hours and work once. */
 export const VERIFICATION_HOURS = 24;
+
+/**
+ * Emails go out after the response is sent (PLT-16). Otherwise a request
+ * for an existing account (which sends an email) would take longer than
+ * one for an unknown email, revealing which accounts exist.
+ */
+function inBackground(task: Promise<unknown>): void {
+  try {
+    after(task);
+  } catch {
+    // Outside a request (tests, scripts): let it run on its own.
+    void task;
+  }
+}
 
 /** Authenticator app codes: 6 digits that change every 30 seconds. */
 export const TOTP_DIGITS = 6;
@@ -129,6 +144,7 @@ export const auth = betterAuth({
   },
   advanced: {
     database: { generateId: () => newId() },
+    backgroundTasks: { handler: inBackground },
     // Secure cookies (HTTPS only, __Secure- prefix) outside local development.
     useSecureCookies: process.env.NODE_ENV === "production",
     defaultCookieAttributes: { httpOnly: true, sameSite: "lax", path: "/" },

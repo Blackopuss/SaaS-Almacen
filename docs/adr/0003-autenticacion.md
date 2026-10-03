@@ -97,7 +97,9 @@ Lista única de lo que la autenticación necesita al salir de la máquina local:
 4. **HTTPS** (cookies `Secure` con prefijo `__Secure-` se activan solas con `NODE_ENV=production`) y **proxy que sobrescriba `X-Forwarded-For`** (límites por IP).
 5. **Respaldos de MySQL cifrados**: incluyen sesiones, contraseñas con hash y secretos MFA cifrados.
 6. **`log_bin_trust_function_creators = 1`** en el servidor MySQL (o privilegio equivalente) para que las migraciones creen los disparadores de la bitácora (ADR 0006); sin él la migración `audit_log` falla con el error 1419.
-7. **Sin cuenta demo**: `db:seed` solo corre en bases `*_dev`; `DEMO_PASSWORD` y `DEMO_TOTP_SECRET` no existen en producción.
+7. **Origen de Server Actions**: si la app queda detrás de un dominio o proxy distinto, configurar `serverActions.allowedOrigins`; Next rechaza las acciones de otro origen (falla cerrado).
+8. **Revisar `docs/seguridad/REVISION_PLT.md`**: hallazgos pendientes (CSP de scripts con nonce) antes del piloto.
+9. **Sin cuenta demo**: `db:seed` solo corre en bases `*_dev`; `DEMO_PASSWORD` y `DEMO_TOTP_SECRET` no existen en producción.
 
 ## Pendientes y decisiones abiertas
 

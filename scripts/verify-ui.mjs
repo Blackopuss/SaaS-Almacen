@@ -653,6 +653,22 @@ try {
     await context.close();
   }
 
+  // Security headers (PLT-16): no framing, no sniffing, no full referrer.
+  {
+    const context = await newContext(browser, {});
+    const response = await context.request.get(`${BASE}/ingresar`);
+    const headers = response.headers();
+    check(
+      /frame-ancestors 'none'/.test(headers["content-security-policy"] ?? "") &&
+        headers["x-frame-options"] === "DENY" &&
+        headers["x-content-type-options"] === "nosniff" &&
+        headers["referrer-policy"] === "strict-origin-when-cross-origin" &&
+        !("x-powered-by" in headers),
+      "security headers: no framing, nosniff, referrer policy, no X-Powered-By",
+    );
+    await context.close();
+  }
+
   // Registration form (PLT-02): invalid submit, inline errors and focus.
   // Only the invalid path runs here so no accounts are created.
   for (const viewport of [

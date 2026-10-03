@@ -87,6 +87,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Autenticación y decisiones (BAS-04/05)
 
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
+- Seguridad: `docs/seguridad/REVISION_PLT.md` (amenazas y hallazgos) y `docs/seguridad/ASVS.md` (matriz); actualizar ambas al cerrar cada etapa. Cabeceras de seguridad en `next.config.ts`.
 - Antes de desplegar (BAS-09..11, PIL-01): revisar «Requisitos de producción» y «Pendientes» de `docs/adr/0003-autenticacion.md`.
 - Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas, bitácora). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
@@ -98,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-15. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 26 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-16** (revisión de amenazas de la etapa; matriz ASVS). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa). Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 27 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-01**, bloqueado hasta que el fundador apruebe FUN-07 (`docs/MATRIZ_ROLES_PERMISOS.md`). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
