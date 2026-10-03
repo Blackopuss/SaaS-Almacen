@@ -92,3 +92,29 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
 - Correo: `src/platform/email` (`sendEmail` + plantillas en español). `MAIL_DRIVER=memory` en pruebas (`memoryOutboxFor`), `log` en desarrollo (`/correos`). Nunca revelar si un correo tiene cuenta.
 - Versiones exactas (`.npmrc` con `save-exact`). Antes de actualizar una dependencia: `npm audit` y revisar su ADR.
+
+## Estado actual (actualizar al cerrar cada paso)
+
+- Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-06. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 16 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-07** (recuperación de contraseña).
+- Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
+
+## Convenciones de código
+
+- **Servicios** en `src/platform/*` o `src/modules/*`, con `import "server-only"`. Reciben datos ya separados (`input`, `headers`) y devuelven uniones de resultado para fallos esperados (`{ ok: true } | { ok: false; reason/fieldErrors }`); lanzan solo ante lo inesperado (`AppError` y subclases de `src/lib/errors.ts`, o `console.error` + respuesta genérica).
+- **Validación** con Zod en el servicio; mensajes en español listos para mostrar.
+- **Pantallas**: Server Component que llama `requireSession()` + componente cliente con `useActionState`; acción en `actions.ts` con `"use server"` que solo traduce `FormData` ↔ servicio y hace `redirect`/`revalidatePath`.
+- **Pruebas**: unitarias junto al código (`*.test.ts`); integración en `tests/<área>/*.int.test.ts` contra `almacen_test`, con correos únicos por corrida (`algo.${Date.now()}@example.test`) y `afterAll(() => db.$disconnect())`. Pruebas lentas por scrypt: dar `timeout` explícito. Comportamiento visible: agregar casos a `scripts/verify-ui.mjs` (no crear datos persistentes salvo la cuenta demo; usar IPs de prueba con `X-Forwarded-For`).
+- **IDs** UUIDv7 (`newId`), fechas `DATETIME(3)` UTC, cantidades con `Decimal`.
+- **Datos de prueba creados en `almacen_dev`** durante verificaciones manuales: borrarlos al terminar.
+
+## Notas para PLT-07 (recuperación de contraseña)
+
+- Usar los endpoints de Better Auth desde el servidor (`auth.api.requestPasswordReset`, `auth.api.resetPassword`) con `emailAndPassword.sendResetPassword` → `sendEmail` + plantilla nueva en `src/platform/email/templates.ts`. El hash de la nueva contraseña ya pasa por `hashPassword` (scrypt OWASP) porque está configurado en `emailAndPassword.password`.
+- **Sin enumeración**: misma respuesta exista o no el correo (como `resendVerification`).
+- **Límites**: agregar reglas en `RULES`/`throttleKeys` de `src/platform/auth/throttle.ts` (por correo y por IP) y usar `blockedFor` + `recordAttempt` antes de pedir el enlace; agregar la ruta a `rateLimit.customRules` de `auth.ts`.
+- Token de un solo uso con expiración; al restablecer: `revokeSessionsOnPasswordReset: true` (cerrar las demás sesiones) y limpiar `throttleKeys.signInAccount(email)`.
+- Validar la nueva contraseña con `PASSWORD_MIN_LENGTH`/`PASSWORD_MAX_LENGTH` y mensajes como en `registerSchema`.
+- Pantallas en `src/app/(auth)/` dentro de `WarehouseCard`; enlace «¿Olvidaste tu contraseña?» en `/ingresar`; probar en `/correos`.
+
