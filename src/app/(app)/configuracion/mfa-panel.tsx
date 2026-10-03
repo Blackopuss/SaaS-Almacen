@@ -72,7 +72,7 @@ export function MfaPanel({
               {enabled
                 ? "Al entrar te pedimos tu contraseña y un código de tu app de autenticación."
                 : "Protege tu cuenta con un código de tu teléfono además de tu contraseña."}
-              {required && " Es obligatoria para el titular de la empresa."}
+              {required && " Es obligatoria para titulares y administradores."}
             </p>
           </div>
         </div>

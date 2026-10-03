@@ -284,7 +284,7 @@ describe("turning MFA off", () => {
     ).toEqual({
       ok: false,
       error:
-        "Como titular de la empresa, la verificación en dos pasos es obligatoria.",
+        "La verificación en dos pasos es obligatoria para titulares y administradores.",
     });
     const status = await getMfaStatus(owner.userId);
     expect(status).toEqual({

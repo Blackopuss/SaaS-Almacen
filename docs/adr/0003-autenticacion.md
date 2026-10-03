@@ -68,7 +68,7 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Con MFA activa, la contraseña correcta **no crea sesión**: Better Auth borra la que creó y deja una cookie firmada de desafío (10 min). La sesión nace solo al validar el código en `/verificar-codigo` (`verifySignInCode`).
 - Límites del código: 5 intentos por desafío y bloqueo de la cuenta 15 min tras 10 fallos seguidos (Better Auth), más 20 fallos por IP cada 15 min (propio).
 - **Un solo uso** (ASVS): Better Auth acepta el paso actual ± 1 y no impide repetir un código. Se registra cada código aceptado por usuario durante 90 s; si se repite, se borra la sesión recién creada y se pide iniciar sesión de nuevo.
-- **Obligatoria** para el titular de cualquier empresa (`isMfaRequired`, `src/platform/auth/mfa-policy.ts`). `requireSession()` envía a `/activa-dos-pasos` a quien la necesita y no la tiene; solo esa pantalla y su acción usan `allowMissingMfa`. Pendiente: administradores (USR-01) y personal de plataforma (MOD-09) se agregan en `isMfaRequired` cuando existan esos roles.
+- **Obligatoria** para el titular de cualquier empresa y, desde USR-01, para todo administrador con membresía activa (`isMfaRequired`, `src/platform/auth/mfa-policy.ts`). `requireSession()` envía a `/activa-dos-pasos` a quien la necesita y no la tiene; solo esa pantalla y su acción usan `allowMissingMfa`. Pendiente: personal de plataforma (MOD-09).
 - Restablecer la contraseña no desactiva la MFA (la recuperación no la elude).
 - Cuenta demo local: es titular, así que `db:seed` le activa MFA con `DEMO_TOTP_SECRET` (cifrado como lo hace Better Auth) y `npm run demo:codigo` muestra el código. `verify:ui` calcula códigos nuevos por paso de 30 s.
 
@@ -104,7 +104,7 @@ Lista única de lo que la autenticación necesita al salir de la máquina local:
 ## Pendientes y decisiones abiertas
 
 - **Persona que pierde teléfono y códigos de recuperación** (decisión del fundador): definir proceso de soporte con verificación de identidad, quién autoriza y cómo se registra; después, herramienta interna con bitácora (PLT-14).
-- **MFA obligatoria para administradores y personal de plataforma**: agregar en `isMfaRequired` al crear esos roles (USR-01, MOD-09).
+- **MFA obligatoria para personal de plataforma**: agregar en `isMfaRequired` al crear ese rol (MOD-09). Administradores: hecho en USR-01.
 - **Bitácora** (PLT-14): registrar activar/desactivar MFA, uso de código de recuperación y generación de códigos nuevos.
 - **Mejoras opcionales evaluadas**: llaves de acceso (passkeys/WebAuthn) recomendadas para una versión posterior; «confiar en este dispositivo» desactivado a propósito (menos seguridad); **SMS descartado** (costo y robo por duplicado de SIM).
 

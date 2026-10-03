@@ -22,14 +22,14 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V6 | Sin enumeración de cuentas (mensajes y tiempos) | Cumple | Respuestas neutrales; hash simulado; correos después de responder (PLT16-03). |
 | V6 | Recuperación segura | Cumple | Token de un solo uso con vencimiento; cierra sesiones; no quita MFA (`recovery.int.test.ts`). |
 | V6 | MFA (TOTP), un solo uso, recuperación | Cumple | `mfa*.int.test.ts`; obligatoria para titulares. |
-| V6 | MFA obligatoria para administradores y personal de plataforma | Pendiente | USR-01, MOD-09 (`isMfaRequired`). |
+| V6 | MFA obligatoria para administradores y personal de plataforma | Parcial | Titulares y administradores: `isMfaRequired` + `roles.int.test.ts`; personal de plataforma en MOD-09. |
 | V6 | Avisos de cambios de seguridad | Cumple | Correos de contraseña, MFA y códigos de recuperación. |
 | V7 Gestión de sesiones | Sesión en servidor, revocación inmediata | Cumple | `cookieCache` apagado; `sessions.int.test.ts`. |
 | V7 | Nueva sesión al autenticarse y al elevar (MFA) | Cumple | Better Auth + rotación al activar/desactivar MFA. |
 | V7 | Ver y cerrar sesiones propias | Cumple | Configuración → Seguridad. |
 | V7 | Cierre de sesiones al cambiar contraseña | Cumple | `revokeSessionsOnPasswordReset`. |
 | V8 Autorización | Denegar por defecto y aislamiento entre empresas | Cumple | `requireOrganizationContext`, `forOrganization`, llaves compuestas, `tests/isolation`. |
-| V8 | Permisos por rol | Pendiente | USR-01/02 (matriz FUN-07 pendiente de aprobación). |
+| V8 | Permisos por rol | Parcial | Catálogo aprobado en código (`platform/authorization`, USR-01); función central de autorización en USR-02. |
 | V9 Tokens autocontenidos | — | N/A | No se usan JWT de sesión. |
 | V10 OAuth/OIDC | — | N/A | Sin inicio de sesión con terceros. |
 | V11 Criptografía | Secretos MFA cifrados; aleatoriedad segura | Cumple | Cifrado de Better Auth con `BETTER_AUTH_SECRET`; `crypto.randomInt` para códigos de recuperación. |

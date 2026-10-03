@@ -449,7 +449,7 @@ try {
     check(
       (await page.getByText("Activada", { exact: true }).isVisible()) &&
         (await panel
-          .getByText("Es obligatoria para el titular de la empresa.")
+          .getByText("Es obligatoria para titulares y administradores.")
           .first()
           .isVisible()) &&
         (await page.getByRole("button", { name: "Activar" }).count()) === 0,

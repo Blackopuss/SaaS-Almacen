@@ -26,8 +26,8 @@ export default async function ActivaDosPasosPage() {
   return (
     <WarehouseCard>
       <p className="mb-6 rounded-lg bg-accent p-3 text-sm text-accent-foreground">
-        Como titular de la empresa, tu cuenta necesita verificación en dos pasos
-        antes de continuar.
+        Tu cuenta necesita verificación en dos pasos antes de continuar: es
+        obligatoria para titulares y administradores.
       </p>
       <RequiredMfaSetup next={DEFAULT_AFTER_SIGN_IN} />
     </WarehouseCard>

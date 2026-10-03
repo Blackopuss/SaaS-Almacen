@@ -103,7 +103,7 @@ export async function disableMfa(
     return {
       ok: false,
       error:
-        "Como titular de la empresa, la verificación en dos pasos es obligatoria.",
+        "La verificación en dos pasos es obligatoria para titulares y administradores.",
     };
   }
   const user = await owner(userId);
