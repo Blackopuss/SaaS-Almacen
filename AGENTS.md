@@ -98,8 +98,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-14. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 25 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-15** (batería de aislamiento con dos empresas). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-15. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 26 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: PLT-16** (revisión de amenazas de la etapa; matriz ASVS). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -110,6 +110,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Pruebas**: unitarias junto al código (`*.test.ts`); integración en `tests/<área>/*.int.test.ts` contra `almacen_test`, con correos únicos por corrida (`algo.${Date.now()}@example.test`) y `afterAll(() => db.$disconnect())`. Pruebas lentas por scrypt: dar `timeout` explícito. Comportamiento visible: agregar casos a `scripts/verify-ui.mjs` (no crear datos persistentes salvo la cuenta demo; usar IPs de prueba con `X-Forwarded-For`).
 - **IDs** UUIDv7 (`newId`), fechas `DATETIME(3)` UTC, cantidades con `Decimal`.
 - **Datos de prueba creados en `almacen_dev`** durante verificaciones manuales: borrarlos al terminar. Excepción: la bitácora es solo-agregar (ADR 0006), así que una empresa creada en dev ya no se puede borrar; evitar crear empresas en verificaciones manuales.
+- **Server Action nueva (PLT-15):** agregarla a `REVIEWED` en `tests/isolation/server-actions.int.test.ts` (qué recibe, de dónde sale la identidad, qué prueba cubre el caso entre empresas); la prueba falla si falta. Nunca tomar `userId` u `organizationId` del cliente: salen de `requireSession`/`requireOrganizationContext`.
+- **Better Auth por HTTP (PLT-15):** solo los enlaces de correo pasan por `/api/auth/*` (lista de permitidos en `src/platform/auth/http.ts`). Los flujos nuevos se hacen con Server Actions + `auth.api`; un enlace de correo nuevo se agrega a la lista con su prueba.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

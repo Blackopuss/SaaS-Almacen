@@ -1,5 +1,6 @@
-import { toNextJsHandler } from "better-auth/next-js";
+import { handleAuthRequest } from "@/platform/auth";
 
-import { auth } from "@/platform/auth";
-
-export const { GET, POST } = toNextJsHandler(auth);
+// Only the email links (verify email, reset password) reach Better Auth
+// over HTTP; see src/platform/auth/http.ts (PLT-15).
+export const GET = handleAuthRequest;
+export const POST = handleAuthRequest;

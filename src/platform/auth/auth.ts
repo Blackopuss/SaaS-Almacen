@@ -138,7 +138,8 @@ export const auth = betterAuth({
   },
   // Limits for the /api/auth HTTP endpoints (server actions are limited in
   // ./throttle.ts). Always on and stored in MySQL; Better Auth's default is
-  // production-only and in memory.
+  // production-only and in memory. Since PLT-15 only the email links are
+  // reachable over HTTP (./http.ts); the other rules stay as a second line.
   rateLimit: {
     enabled: true,
     storage: "database",

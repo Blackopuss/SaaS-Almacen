@@ -36,6 +36,11 @@ Cada dato de negocio pertenece a una empresa (`organization_id`). La persona que
 - `src/server/tenant-db.test.ts` revisa `schema.prisma` en cada corrida: registro en `TENANT_MODELS`, `@@unique([organizationId, id])` y relaciones compuestas que empiezan por `organizationId`.
 - Primera tabla con el patrón: `MembershipRole` (roles de un miembro; los valores llegan con USR-01 tras aprobar FUN-07).
 
+## Batería de aislamiento (PLT-15)
+
+- `tests/isolation/two-companies.int.test.ts`: con dos empresas con datos en cada tabla de `TENANT_MODELS`, la empresa A nunca ve filas ni bitácora de B; cambiar ids (empresa, sesión ajena) no cambia nada; una sesión manipulada que apunte a B se revalida y regresa a A.
+- `tests/isolation/server-actions.int.test.ts`: registro de **todas** las Server Actions con qué reciben, de dónde sale la identidad y qué prueba cubre el caso entre cuentas/empresas. Una acción nueva hace fallar la prueba hasta revisarla.
+
 ## Alternativas consideradas
 
 - **Crear la empresa dentro del registro**: un formulario más largo antes de confirmar el correo y empresas huérfanas de cuentas nunca verificadas.

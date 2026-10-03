@@ -81,6 +81,12 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - Si alguien pierde teléfono y códigos, no hay salida automática: la recuperación de la cuenta será un proceso de soporte con verificación de identidad (pendiente de definir con el fundador).
 - Hallazgo: cuando una acción cambia la cookie de sesión, Next vuelve a pintar la pantalla y desmonta el diálogo que la llamó; los avisos de éxito se muestran desde el panel que permanece montado.
 
+## Superficie HTTP de Better Auth (PLT-15)
+
+- **Hallazgo alto (corregido):** Better Auth publica sus endpoints en `/api/auth/*` aunque la app no los use. Un titular con sesión podía desactivar la MFA con solo la contraseña (`POST /two-factor/disable`), saltándose «obligatoria para titulares» y «contraseña + código»; también se podía iniciar sesión sin el límite por cuenta, listar sesiones o cambiar el perfil por HTTP.
+- Corrección: **lista de permitidos** en `src/platform/auth/http.ts` (`handleAuthRequest`). Por HTTP solo llegan los enlaces de correo (`GET /verify-email`, `GET /reset-password/<token>`); todo lo demás responde 404. Las Server Actions llaman `auth.api` directamente y no pasan por esa ruta. Endpoints nuevos de futuras versiones quedan cerrados hasta revisarlos.
+- Pruebas: `tests/isolation/http-surface.int.test.ts` (14 rutas sensibles cerradas, enlaces de correo funcionando) y `src/platform/auth/http.test.ts` (trucos de ruta).
+
 ## Requisitos de producción (revisar en BAS-09..BAS-11 y PIL-01)
 
 Lista única de lo que la autenticación necesita al salir de la máquina local:

@@ -50,3 +50,4 @@ export {
   revokeSession,
 } from "./sessions";
 export type { ActiveSession } from "./sessions";
+export { handleAuthRequest, isAllowedAuthRequest } from "./http";
