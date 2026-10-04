@@ -117,6 +117,50 @@ beforeAll(async () => {
       expiresAt: new Date(Date.now() + 3_600_000),
     })),
   });
+  // Commercial rows (MOD-03) in both companies.
+  const plan = await db.planVersion.create({
+    data: {
+      id: newId(),
+      tier: `iso${stamp % 100000}`,
+      version: 1,
+      name: "Aislamiento",
+      productLimit: 100,
+      includedUsers: 2,
+      extraUserPrice: "49.00",
+      effectiveFrom: new Date(),
+    },
+  });
+  for (const organizationId of [orgA, orgB]) {
+    const subscription = await db.subscription.create({
+      data: {
+        id: newId(),
+        organizationId,
+        planVersionId: plan.id,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 86_400_000),
+      },
+    });
+    await db.subscriptionItem.create({
+      data: {
+        id: newId(),
+        organizationId,
+        subscriptionId: subscription.id,
+        moduleId: "inventory",
+        monthlyPrice: "149.00",
+        activeFrom: new Date(),
+      },
+    });
+    await db.entitlement.create({
+      data: {
+        id: newId(),
+        organizationId,
+        kind: "MODULE",
+        key: "inventory",
+        validFrom: new Date(),
+        subscriptionId: subscription.id,
+      },
+    });
+  }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
 });

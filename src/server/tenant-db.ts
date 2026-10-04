@@ -25,10 +25,13 @@ import { db } from "./db";
  */
 export const TENANT_MODELS = [
   "AuditEvent",
+  "Entitlement",
   "Invitation",
   "Membership",
   "MembershipRole",
   "OwnershipTransfer",
+  "Subscription",
+  "SubscriptionItem",
 ] as const;
 
 const tenantModels = new Set<string>(TENANT_MODELS);

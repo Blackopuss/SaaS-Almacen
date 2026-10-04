@@ -122,6 +122,9 @@ model Organization {
   auditEvents        AuditEvent[]
   ownershipTransfers OwnershipTransfer[]
   invitations        Invitation[]
+  subscriptions      Subscription[]
+  subscriptionItems  SubscriptionItem[]
+  entitlements       Entitlement[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -293,4 +296,136 @@ model SecurityEvent {
 
   @@index([userId, createdAt])
   @@map("security_event")
+}
+
+// ── Commercial model (MOD-03) ────────────────────────────────────────────
+
+/// One published set of conditions for a capacity tier: product quota,
+/// included users and prices. Never edited once a company contracted it:
+/// a change of price or limit is a new version, so existing subscriptions
+/// keep the conditions they accepted.
+model PlanVersion {
+  id             String            @id @db.Char(36)
+  /// Capacity tier, e.g. "t1000" (1,000 active products).
+  tier           String            @db.VarChar(20)
+  version        Int
+  name           String            @db.VarChar(80)
+  productLimit   Int
+  includedUsers  Int
+  currency       String            @default("MXN") @db.Char(3)
+  /// Monthly price of each additional user, before taxes.
+  extraUserPrice Decimal           @db.Decimal(12, 2)
+  effectiveFrom  DateTime          @db.DateTime(3)
+  createdAt      DateTime          @default(now()) @db.DateTime(3)
+  modulePrices   PlanModulePrice[]
+  subscriptions  Subscription[]
+  offers         PlanOffer[]
+
+  @@unique([tier, version])
+  @@map("plan_version")
+}
+
+/// Which version of a tier is offered to new customers today. Publishing
+/// a new price moves this pointer; the versions themselves never change.
+model PlanOffer {
+  tier          String      @id @db.VarChar(20)
+  planVersionId String      @db.Char(36)
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  updatedAt     DateTime    @updatedAt @db.DateTime(3)
+
+  @@map("plan_offer")
+}
+
+/// Monthly price of a module in a plan version, before taxes.
+model PlanModulePrice {
+  id            String      @id @db.Char(36)
+  planVersionId String      @db.Char(36)
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  /// Module id from the registry (src/modules/registry).
+  moduleId      String      @db.VarChar(40)
+  monthlyPrice  Decimal     @db.Decimal(12, 2)
+
+  @@unique([planVersionId, moduleId])
+  @@map("plan_module_price")
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  GRACE
+  SUSPENDED
+  CANCELLED
+}
+
+/// What a company contracted: one plan version, its period and extra
+/// users. One per company.
+model Subscription {
+  id                 String             @id @db.Char(36)
+  organizationId     String             @unique @db.Char(36)
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  planVersionId      String             @db.Char(36)
+  planVersion        PlanVersion        @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  status             SubscriptionStatus @default(TRIAL)
+  extraUsers         Int                @default(0)
+  currentPeriodStart DateTime           @db.DateTime(3)
+  currentPeriodEnd   DateTime           @db.DateTime(3)
+  createdAt          DateTime           @default(now()) @db.DateTime(3)
+  updatedAt          DateTime           @updatedAt @db.DateTime(3)
+  items              SubscriptionItem[]
+  entitlements       Entitlement[]
+
+  @@unique([organizationId, id])
+  @@index([planVersionId])
+  @@map("subscription")
+}
+
+/// A module inside a subscription, with the price agreed when it was added.
+model SubscriptionItem {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscriptionId String       @db.Char(36)
+  subscription   Subscription @relation(fields: [organizationId, subscriptionId], references: [organizationId, id], onDelete: Cascade)
+  moduleId       String       @db.VarChar(40)
+  monthlyPrice   Decimal      @db.Decimal(12, 2)
+  activeFrom     DateTime     @db.DateTime(3)
+  /// Null while active; set when the module is removed.
+  activeUntil    DateTime?    @db.DateTime(3)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([subscriptionId, moduleId])
+  @@map("subscription_item")
+}
+
+enum EntitlementKind {
+  MODULE
+  LIMIT
+}
+
+/// What a company may use right now: a module, or a limit with its value.
+/// The server guard reads only this table (MOD-04/05); it is written from
+/// the subscription or by platform staff (MOD-09), never by the customer.
+model Entitlement {
+  id             String          @id @db.Char(36)
+  organizationId String          @db.Char(36)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  kind           EntitlementKind
+  /// Module id, or limit key such as "active_products" or "users".
+  key            String          @db.VarChar(40)
+  /// Value of a limit; null for modules.
+  value          Int?
+  validFrom      DateTime        @db.DateTime(3)
+  /// Null = no end date.
+  validUntil     DateTime?       @db.DateTime(3)
+  /// Subscription it comes from; null when granted by platform staff.
+  subscriptionId String?         @db.Char(36)
+  subscription   Subscription?   @relation(fields: [organizationId, subscriptionId], references: [organizationId, id], onDelete: Restrict)
+  createdAt      DateTime        @default(now()) @db.DateTime(3)
+  updatedAt      DateTime        @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, kind, key])
+  @@map("entitlement")
 }
