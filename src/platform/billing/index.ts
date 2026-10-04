@@ -27,3 +27,9 @@ export {
   requireModulePermission,
 } from "./guard";
 export type { ModuleAccess } from "./guard";
+export { activateModule, deactivateModule } from "./modules";
+export type {
+  ModuleChangeInput,
+  ModuleChangeReason,
+  ModuleChangeResult,
+} from "./modules";

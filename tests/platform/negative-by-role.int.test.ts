@@ -389,7 +389,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       tests: ["tests/platform/module-guard.int.test.ts"],
       waitsFor: "CMP-17 (historial de un módulo desactivado en solo lectura)",
     },
-    "NEG-17": { waitsFor: "MOD-06 (activar y desactivar módulos)" },
+    "NEG-17": { tests: ["tests/platform/module-activation.int.test.ts"] },
     "NEG-18": { waitsFor: "MOD-11 (estados de suscripción)" },
     "NEG-19": { waitsFor: "MOD-07 (cupo de productos)" },
     "NEG-20": { waitsFor: "IMP (trabajos en segundo plano)" },
