@@ -6,9 +6,11 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   archiveProduct,
+  createPresentation,
   createProduct,
   reactivateProduct,
   updateProduct,
+  type PresentationField,
   type ProductField,
   type ProductStatusResult,
 } from "@/platform/catalog";
@@ -151,4 +153,46 @@ export async function reactivateProductAction(
   );
   revalidatePath("/inventario");
   return result;
+}
+
+export type PresentationFormState = {
+  fieldErrors: Partial<Record<PresentationField, string>>;
+  formError?: string;
+  values: { name: string; factor: string };
+};
+
+/** Adds a presentation to a product. The product id is bound by the page
+ * and looked for only inside the company of the session. */
+export async function createPresentationAction(
+  productId: string,
+  _prev: PresentationFormState,
+  formData: FormData,
+): Promise<PresentationFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const values = {
+    name: String(formData.get("name") ?? ""),
+    factor: String(formData.get("factor") ?? ""),
+  };
+  let result;
+  try {
+    result = await createPresentation(
+      { organizationId: organization.id, userId: user.id },
+      String(productId),
+      values,
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { fieldErrors: {}, formError: error.message, values };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError,
+      values,
+    };
+  }
+  revalidatePath(`/inventario/${productId}/editar`);
+  return { fieldErrors: {}, values: { name: "", factor: "" } };
 }

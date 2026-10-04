@@ -29,7 +29,9 @@
     "setup": "npm run env:setup && npm run db:setup && npm run db:deploy",
     "db:seed": "tsx --conditions=react-server scripts/seed-dev.mts",
     "demo:codigo": "node scripts/demo-code.mjs",
-    "staff": "tsx --conditions=react-server scripts/staff.mts"
+    "staff": "tsx --conditions=react-server scripts/staff.mts",
+    "dev:test": "node scripts/dev-test.mjs",
+    "test:company": "tsx --conditions=react-server scripts/test-company.mts"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",

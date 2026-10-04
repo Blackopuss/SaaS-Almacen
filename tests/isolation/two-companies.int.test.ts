@@ -156,15 +156,29 @@ beforeAll(async () => {
     const brand = await db.productBrand.create({
       data: { id: newId(), organizationId, name: "Truper" },
     });
+    const productId = newId();
     await db.product.create({
       data: {
-        id: newId(),
+        id: productId,
         organizationId,
         sku: "TOR-001",
         name: "Tornillo 1/4",
         categoryId: category.id,
         brandId: brand.id,
         barcode: "7501234567890",
+      },
+    });
+    const presentation = await db.productPresentation.create({
+      data: { id: newId(), organizationId, productId, name: "Caja" },
+    });
+    await db.presentationVersion.create({
+      data: {
+        id: newId(),
+        organizationId,
+        presentationId: presentation.id,
+        version: 1,
+        factor: "100",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
     await db.quotaUsage.create({

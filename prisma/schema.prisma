@@ -108,28 +108,30 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id                 String              @id @db.Char(36)
-  name               String              @db.VarChar(120)
-  timeZone           String              @default("America/Mexico_City") @db.VarChar(64)
-  currency           String              @default("MXN") @db.Char(3)
+  id                   String                @id @db.Char(36)
+  name                 String                @db.VarChar(120)
+  timeZone             String                @default("America/Mexico_City") @db.VarChar(64)
+  currency             String                @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId        String              @db.Char(36)
-  owner              User                @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt          DateTime            @default(now()) @db.DateTime(3)
-  updatedAt          DateTime            @updatedAt @db.DateTime(3)
-  memberships        Membership[]
-  memberRoles        MembershipRole[]
-  sessions           Session[]
-  auditEvents        AuditEvent[]
-  ownershipTransfers OwnershipTransfer[]
-  invitations        Invitation[]
-  subscriptions      Subscription[]
-  subscriptionItems  SubscriptionItem[]
-  entitlements       Entitlement[]
-  quotaUsages        QuotaUsage[]
-  products           Product[]
-  productCategories  ProductCategory[]
-  productBrands      ProductBrand[]
+  ownerUserId          String                @db.Char(36)
+  owner                User                  @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt            DateTime              @default(now()) @db.DateTime(3)
+  updatedAt            DateTime              @updatedAt @db.DateTime(3)
+  memberships          Membership[]
+  memberRoles          MembershipRole[]
+  sessions             Session[]
+  auditEvents          AuditEvent[]
+  ownershipTransfers   OwnershipTransfer[]
+  invitations          Invitation[]
+  subscriptions        Subscription[]
+  subscriptionItems    SubscriptionItem[]
+  entitlements         Entitlement[]
+  quotaUsages          QuotaUsage[]
+  products             Product[]
+  productCategories    ProductCategory[]
+  productBrands        ProductBrand[]
+  productPresentations ProductPresentation[]
+  presentationVersions PresentationVersion[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -514,28 +516,29 @@ model ProductBrand {
 /// stock is the sum of movements (INV-15). An active product takes one
 /// place of the plan's quota; an archived one does not.
 model Product {
-  id             String           @id @db.Char(36)
-  organizationId String           @db.Char(36)
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id             String                @id @db.Char(36)
+  organizationId String                @db.Char(36)
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Code the business uses for the product; unique in the company.
-  sku            String           @db.VarChar(64)
-  name           String           @db.VarChar(160)
-  description    String?          @db.Text
-  categoryId     String?          @db.Char(36)
-  category       ProductCategory? @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
-  brandId        String?          @db.Char(36)
-  brand          ProductBrand?    @relation(fields: [organizationId, brandId], references: [organizationId, id], onDelete: Restrict)
+  sku            String                @db.VarChar(64)
+  name           String                @db.VarChar(160)
+  description    String?               @db.Text
+  categoryId     String?               @db.Char(36)
+  category       ProductCategory?      @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
+  brandId        String?               @db.Char(36)
+  brand          ProductBrand?         @relation(fields: [organizationId, brandId], references: [organizationId, id], onDelete: Restrict)
   /// Printed code read by a scanner; unique in the company when present.
-  barcode        String?          @db.VarChar(64)
+  barcode        String?               @db.VarChar(64)
   /// Unit in which the product is controlled (INV-06). Stock is always
   /// kept in this unit; presentations convert to it.
-  unitCode       String           @default("piece") @db.VarChar(12)
-  unit           Unit             @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  unitCode       String                @default("piece") @db.VarChar(12)
+  unit           Unit                  @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   /// Increment accepted for quantities: 1 = whole units, 0.01 = hundredths.
-  quantityStep   Decimal          @default(1) @db.Decimal(12, 3)
-  status         ProductStatus    @default(ACTIVE)
-  createdAt      DateTime         @default(now()) @db.DateTime(3)
-  updatedAt      DateTime         @updatedAt @db.DateTime(3)
+  quantityStep   Decimal               @default(1) @db.Decimal(12, 3)
+  presentations  ProductPresentation[]
+  status         ProductStatus         @default(ACTIVE)
+  createdAt      DateTime              @default(now()) @db.DateTime(3)
+  updatedAt      DateTime              @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@unique([organizationId, sku])
@@ -564,4 +567,44 @@ model Unit {
   products    Product[]
 
   @@map("unit")
+}
+
+// ── Presentations (INV-07, INV-08) ───────────────────────────────────────
+
+/// How a product is bought or handled besides its unit: "Caja", "Rollo",
+/// "Saco". Each company defines them per product; the name alone says
+/// nothing about the content.
+model ProductPresentation {
+  id             String                @id @db.Char(36)
+  organizationId String                @db.Char(36)
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId      String                @db.Char(36)
+  product        Product               @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  name           String                @db.VarChar(40)
+  createdAt      DateTime              @default(now()) @db.DateTime(3)
+  versions       PresentationVersion[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, productId, name])
+  @@map("product_presentation")
+}
+
+/// Content of a presentation in the product's unit ("100 piezas"), as it
+/// was from a moment on. A change of content is a new version; movements
+/// keep the version they used, so history never changes (INV-08).
+model PresentationVersion {
+  id              String              @id @db.Char(36)
+  organizationId  String              @db.Char(36)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  presentationId  String              @db.Char(36)
+  presentation    ProductPresentation @relation(fields: [organizationId, presentationId], references: [organizationId, id], onDelete: Restrict)
+  version         Int
+  /// Units of the product in one presentation.
+  factor          Decimal             @db.Decimal(18, 3)
+  createdByUserId String              @db.Char(36)
+  createdAt       DateTime            @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([presentationId, version])
+  @@map("presentation_version")
 }

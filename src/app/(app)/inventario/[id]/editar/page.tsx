@@ -11,9 +11,15 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { getModuleAccess } from "@/platform/billing";
-import { getProduct, listProductGroups } from "@/platform/catalog";
+import {
+  getProduct,
+  getUnit,
+  listPresentations,
+  listProductGroups,
+} from "@/platform/catalog";
 
-import { updateProductAction } from "../../actions";
+import { createPresentationAction, updateProductAction } from "../../actions";
+import { PresentationsPanel } from "../../presentations-panel";
 import { ProductForm } from "../../product-form";
 import { ArchiveProduct } from "../../product-status";
 import { stepOptions, unitGroups } from "../../unit-options";
@@ -61,9 +67,12 @@ export default async function EditarProductoPage({
     userId: access.user.id,
   };
   const { id } = await params;
-  const [product, groups] = await Promise.all([
+  const [product, groups, presentations] = await Promise.all([
     getProduct(actor, id),
     listProductGroups(actor),
+    access.can("inventory.presentation.read")
+      ? listPresentations(actor, id)
+      : Promise.resolve([]),
   ]);
   if (!product) notFound();
   // An archived product is changed only after bringing it back.
@@ -104,6 +113,17 @@ export default async function EditarProductoPage({
         unitGroups={unitGroups()}
         stepOptions={stepOptions()}
       />
+      {access.can("inventory.presentation.read") && (
+        <PresentationsPanel
+          action={createPresentationAction.bind(null, product.id)}
+          presentations={presentations.map((p) => ({
+            id: p.id,
+            label: p.label,
+          }))}
+          unitPlural={getUnit(product.unitCode).plural}
+          canAdd={access.allows("inventory.presentation.create")}
+        />
+      )}
       {access.allows("inventory.product.archive") && (
         <section
           aria-labelledby="archivar"
