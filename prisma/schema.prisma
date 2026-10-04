@@ -107,19 +107,20 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id          String           @id @db.Char(36)
-  name        String           @db.VarChar(120)
-  timeZone    String           @default("America/Mexico_City") @db.VarChar(64)
-  currency    String           @default("MXN") @db.Char(3)
+  id                 String              @id @db.Char(36)
+  name               String              @db.VarChar(120)
+  timeZone           String              @default("America/Mexico_City") @db.VarChar(64)
+  currency           String              @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId String           @db.Char(36)
-  owner       User             @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt   DateTime         @default(now()) @db.DateTime(3)
-  updatedAt   DateTime         @updatedAt @db.DateTime(3)
-  memberships Membership[]
-  memberRoles MembershipRole[]
-  sessions    Session[]
-  auditEvents AuditEvent[]
+  ownerUserId        String              @db.Char(36)
+  owner              User                @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now()) @db.DateTime(3)
+  updatedAt          DateTime            @updatedAt @db.DateTime(3)
+  memberships        Membership[]
+  memberRoles        MembershipRole[]
+  sessions           Session[]
+  auditEvents        AuditEvent[]
+  ownershipTransfers OwnershipTransfer[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -131,15 +132,16 @@ enum MembershipStatus {
 }
 
 model Membership {
-  id             String           @id @db.Char(36)
-  organizationId String           @db.Char(36)
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  userId         String           @db.Char(36)
-  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  status         MembershipStatus @default(ACTIVE)
-  createdAt      DateTime         @default(now()) @db.DateTime(3)
-  updatedAt      DateTime         @updatedAt @db.DateTime(3)
-  roles          MembershipRole[]
+  id              String              @id @db.Char(36)
+  organizationId  String              @db.Char(36)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userId          String              @db.Char(36)
+  user            User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status          MembershipStatus    @default(ACTIVE)
+  createdAt       DateTime            @default(now()) @db.DateTime(3)
+  updatedAt       DateTime            @updatedAt @db.DateTime(3)
+  roles           MembershipRole[]
+  ownershipOffers OwnershipTransfer[]
 
   @@unique([organizationId, userId])
   /// Target of company-scoped foreign keys (PLT-13).
@@ -165,6 +167,38 @@ model MembershipRole {
   @@unique([membershipId, role])
   @@index([organizationId, membershipId])
   @@map("membership_role")
+}
+
+enum OwnershipTransferStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+}
+
+/// Offer to hand the company over to another member (USR-03B). The titular
+/// offers, the recipient accepts; only then Organization.ownerUserId
+/// changes, in one transaction. At most one PENDING offer per company
+/// (checked under a lock on the organization row).
+model OwnershipTransfer {
+  id                 String                  @id @db.Char(36)
+  organizationId     String                  @db.Char(36)
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Titular who made the offer.
+  fromUserId         String                  @db.Char(36)
+  /// Membership of the person who would become titular.
+  toMembershipId     String                  @db.Char(36)
+  toMembership       Membership              @relation(fields: [organizationId, toMembershipId], references: [organizationId, id], onDelete: Cascade)
+  /// Roles the previous titular keeps afterwards (chosen by them).
+  previousOwnerRoles Json
+  status             OwnershipTransferStatus @default(PENDING)
+  expiresAt          DateTime                @db.DateTime(3)
+  createdAt          DateTime                @default(now()) @db.DateTime(3)
+  resolvedAt         DateTime?               @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, status])
+  @@index([organizationId, toMembershipId])
+  @@map("ownership_transfer")
 }
 
 // ── Brute-force protection (PLT-06) ──────────────────────────────────────

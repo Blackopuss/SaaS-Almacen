@@ -27,6 +27,7 @@ export const TENANT_MODELS = [
   "AuditEvent",
   "Membership",
   "MembershipRole",
+  "OwnershipTransfer",
 ] as const;
 
 const tenantModels = new Set<string>(TENANT_MODELS);

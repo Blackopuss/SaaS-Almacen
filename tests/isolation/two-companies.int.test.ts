@@ -86,6 +86,26 @@ beforeAll(async () => {
       },
     ],
   });
+  await db.ownershipTransfer.createMany({
+    data: [
+      {
+        id: newId(),
+        organizationId: orgA,
+        fromUserId: ids.ana,
+        toMembershipId: membership.id,
+        previousOwnerRoles: ["viewer"],
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+      {
+        id: newId(),
+        organizationId: orgB,
+        fromUserId: ids.beto,
+        toMembershipId: betoMembership.id,
+        previousOwnerRoles: ["viewer"],
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    ],
+  });
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
 });
