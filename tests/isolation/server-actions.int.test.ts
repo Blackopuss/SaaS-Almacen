@@ -18,6 +18,22 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  acceptInvitationAction: {
+    input: "token de la invitación",
+    identity:
+      "sesión (requireSession); el correo de la cuenta debe ser el invitado",
+    coveredBy: "tests/platform/invitation-accept.int.test.ts",
+  },
+  joinAsNewUserAction: {
+    input: "token de la invitación, nombre y contraseña",
+    identity: "el token (un solo uso, vence); el correo sale de la invitación",
+    coveredBy: "tests/platform/invitation-accept.int.test.ts",
+  },
+  invitationSignOutAction: {
+    input: "token (solo para volver a la misma pantalla)",
+    identity: "sesión propia",
+    coveredBy: "tests/platform/session.int.test.ts",
+  },
   signInAction: {
     input: "correo y contraseña",
     identity: "ninguna sesión previa",

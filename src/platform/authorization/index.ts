@@ -72,3 +72,15 @@ export type {
   InvitationField,
   PendingInvitation,
 } from "./invitations";
+export {
+  ACCEPT_INVITATION_MESSAGES,
+  acceptInvitation,
+  acceptInvitationAsNewUser,
+  previewInvitation,
+} from "./invitation-accept";
+export type {
+  AcceptAsNewUserResult,
+  AcceptInvitationReason,
+  AcceptInvitationResult,
+  InvitationPreview,
+} from "./invitation-accept";

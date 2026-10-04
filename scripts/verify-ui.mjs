@@ -650,6 +650,24 @@ try {
       .getByRole("heading", { name: "El enlace no es válido" })
       .waitFor();
     check(true, `${viewport.name}: a made-up token is refused`);
+
+    // Invitation link (USR-05): a made-up token shows the same screen as an
+    // expired or used one, and the token never leaks through the referrer.
+    await page.goto(`${BASE}/invitacion?token=inventado`, {
+      waitUntil: "networkidle",
+    });
+    const invitationOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    check(
+      (await page
+        .getByRole("heading", { name: "La invitación no es válida" })
+        .isVisible()) &&
+        (await page.getAttribute("meta[name=referrer]", "content")) ===
+          "no-referrer" &&
+        invitationOverflow <= 0,
+      `${viewport.name}: an invalid invitation link is explained without overflow`,
+    );
     await context.close();
   }
 
