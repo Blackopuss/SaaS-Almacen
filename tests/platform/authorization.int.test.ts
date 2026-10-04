@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newId } from "@/lib";
 import {
   assertAllowed,
+  assertOwnerAction,
   isAllowed,
   loadSubject,
   type Role,
@@ -204,5 +205,71 @@ describe("assertAllowed", () => {
       code: "permission_denied",
       message: "No tienes permiso para hacer esto.",
     });
+  });
+});
+
+// USR-03A: contracting, cancelling and the payment method belong to the
+// titular alone, checked against the database.
+describe("assertOwnerAction", () => {
+  const RESERVED = [
+    "platform.subscription.create",
+    "platform.subscription.cancel",
+    "platform.billing.manage",
+  ] as const;
+
+  it("lets the titular contract, cancel and change the payment method", async () => {
+    for (const permission of RESERVED) {
+      await expect(
+        assertOwnerAction(esperanza, ana, permission),
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it("rejects an administrator with every role", async () => {
+    const userId = await newUser("admin-total");
+    await addMember(esperanza, userId, [
+      "administrator",
+      "warehouse",
+      "buyer",
+      "viewer",
+    ]);
+    for (const permission of RESERVED) {
+      await expect(
+        assertOwnerAction(esperanza, userId, permission),
+      ).rejects.toMatchObject({
+        kind: "forbidden",
+        code: "owner_only",
+        message: "Solo el titular de la empresa puede hacer esto.",
+      });
+    }
+  });
+
+  it("rejects the titular of another company and outsiders", async () => {
+    for (const permission of RESERVED) {
+      await expect(
+        assertOwnerAction(esperanza, beto, permission),
+      ).rejects.toMatchObject({ code: "owner_only" });
+      await expect(
+        assertOwnerAction(newId(), ana, permission),
+      ).rejects.toMatchObject({ code: "owner_only" });
+    }
+  });
+
+  it("rejects a titular whose membership is disabled", async () => {
+    const owner = await newUser("titular-sin-acceso");
+    const company = await newCompany(owner, "Ferretería En Pausa");
+    await db.membership.updateMany({
+      where: { organizationId: company, userId: owner },
+      data: { status: "DISABLED" },
+    });
+    await expect(
+      assertOwnerAction(company, owner, "platform.subscription.cancel"),
+    ).rejects.toMatchObject({ code: "owner_only" });
+  });
+
+  it("refuses to guard an action that a role could do", async () => {
+    await expect(
+      assertOwnerAction(esperanza, ana, "platform.team.invite"),
+    ).rejects.toThrow(/not reserved/);
   });
 });

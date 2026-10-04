@@ -8,7 +8,15 @@ import {
   type Permission,
   type Role,
 } from "./catalog";
-import { can, canAll, canAny, knownRoles, permissionsOf } from "./policy";
+import {
+  OWNER_ONLY_PERMISSIONS,
+  can,
+  canAll,
+  canAny,
+  isOwnerOnly,
+  knownRoles,
+  permissionsOf,
+} from "./policy";
 
 // USR-02: one decision function, tested for every role and every action,
 // denying by default.
@@ -169,5 +177,36 @@ describe("rules of the approved matrix", () => {
       canAny(buyer, ["inventory.entry.create", "purchasing.order.create"]),
     ).toBe(true);
     expect(canAny(buyer, ["inventory.entry.create"])).toBe(false);
+  });
+});
+
+// USR-03A: only the titular contracts, cancels and changes the payment method.
+describe("actions reserved to the titular", () => {
+  it("are exactly the commercial ones and the transfer", () => {
+    expect([...OWNER_ONLY_PERMISSIONS].sort()).toEqual([
+      "platform.billing.manage",
+      "platform.billing.read",
+      "platform.module.activate",
+      "platform.module.deactivate",
+      "platform.ownership.transfer",
+      "platform.plan.change",
+      "platform.subscription.cancel",
+      "platform.subscription.create",
+    ]);
+  });
+
+  it("no combination of roles reaches them", () => {
+    const everyRole = member(...ROLES);
+    for (const permission of OWNER_ONLY_PERMISSIONS) {
+      expect(isOwnerOnly(permission)).toBe(true);
+      expect(can(everyRole, permission), permission).toBe(false);
+      expect(can(owner(), permission), permission).toBe(true);
+    }
+  });
+
+  it("what a role can do is not reserved", () => {
+    expect(isOwnerOnly("platform.team.invite")).toBe(false);
+    expect(isOwnerOnly("inventory.product.read")).toBe(false);
+    expect(isOwnerOnly("platform.provisioning.manage")).toBe(false);
   });
 });

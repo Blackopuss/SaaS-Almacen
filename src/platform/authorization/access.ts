@@ -10,7 +10,13 @@ import {
 import { db, forOrganization } from "@/server";
 
 import type { Permission, Role } from "./catalog";
-import { can, knownRoles, permissionsOf, type Subject } from "./policy";
+import {
+  can,
+  isOwnerOnly,
+  knownRoles,
+  permissionsOf,
+  type Subject,
+} from "./policy";
 
 /**
  * Authorization against the database (USR-02). The subject is read on every
@@ -20,6 +26,8 @@ import { can, knownRoles, permissionsOf, type Subject } from "./policy";
  */
 
 export const FORBIDDEN_MESSAGE = "No tienes permiso para hacer esto.";
+export const OWNER_ONLY_MESSAGE =
+  "Solo el titular de la empresa puede hacer esto.";
 
 const NOBODY: Subject = { isOwner: false, roles: [] };
 
@@ -99,5 +107,34 @@ export async function requirePermission(
       permission,
     });
   }
+  return access;
+}
+
+/**
+ * Guard for actions reserved to the titular (USR-03A): contracting,
+ * cancelling, payment method, transfer. Checks the titular in the database
+ * (not a role, not the session) and that the permission is a reserved one,
+ * so it cannot be used by mistake for something a role could do.
+ */
+export async function assertOwnerAction(
+  organizationId: string,
+  userId: string,
+  permission: Permission,
+): Promise<void> {
+  if (!isOwnerOnly(permission)) {
+    throw new Error(`"${permission}" is not reserved to the titular`);
+  }
+  const subject = await loadSubject(organizationId, userId);
+  if (subject.isOwner !== true || !can(subject, permission)) {
+    throw new ForbiddenError("owner_only", OWNER_ONLY_MESSAGE, { permission });
+  }
+}
+
+/** Same as assertOwnerAction for the current request. */
+export async function requireOwnerAction(
+  permission: Permission,
+): Promise<Access> {
+  const access = await getAccess();
+  await assertOwnerAction(access.organization.id, access.user.id, permission);
   return access;
 }

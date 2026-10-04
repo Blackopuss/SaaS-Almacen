@@ -62,3 +62,17 @@ export function canAny(
   const granted = permissionsOf(subject);
   return permissions.some((p) => isPermission(p) && granted.has(p));
 }
+
+/**
+ * Actions reserved to the titular (USR-03A): what the titular can do and no
+ * role grants, alone or combined. Contracting, cancelling and the payment
+ * method are here; a test fails if a role ever receives one of them.
+ */
+export const OWNER_ONLY_PERMISSIONS: readonly Permission[] =
+  OWNER_PERMISSIONS.filter((permission) =>
+    Object.values(ROLE_PERMISSIONS).every((list) => !list.includes(permission)),
+  );
+
+export function isOwnerOnly(permission: Permission): boolean {
+  return OWNER_ONLY_PERMISSIONS.includes(permission);
+}

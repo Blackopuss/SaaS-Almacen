@@ -9,14 +9,25 @@ export {
   isRole,
 } from "./catalog";
 export type { Permission, Role } from "./catalog";
-export { can, canAll, canAny, knownRoles, permissionsOf } from "./policy";
+export {
+  OWNER_ONLY_PERMISSIONS,
+  can,
+  canAll,
+  canAny,
+  isOwnerOnly,
+  knownRoles,
+  permissionsOf,
+} from "./policy";
 export type { Subject } from "./policy";
 export {
   FORBIDDEN_MESSAGE,
+  OWNER_ONLY_MESSAGE,
   assertAllowed,
+  assertOwnerAction,
   getAccess,
   isAllowed,
   loadSubject,
+  requireOwnerAction,
   requirePermission,
 } from "./access";
 export type { Access } from "./access";
