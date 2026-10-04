@@ -25,3 +25,18 @@ export type {
   ModuleChangeReason,
   ModuleChangeResult,
 } from "./modules";
+export {
+  PROPOSED_TIERS,
+  getCompanyPlan,
+  isPlatformStaff,
+  listCompaniesForStaff,
+  provisionCompany,
+  requirePlatformStaff,
+} from "./provisioning";
+export type {
+  CompanyPlan,
+  CompanySummary,
+  ProvisionField,
+  ProvisionInput,
+  ProvisionResult,
+} from "./provisioning";

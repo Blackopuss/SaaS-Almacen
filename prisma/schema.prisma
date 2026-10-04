@@ -29,6 +29,7 @@ model User {
   twoFactor        TwoFactor?
   memberships      Membership[]
   ownedOrgs        Organization[] @relation("OrganizationOwner")
+  platformStaff    PlatformStaff?
 
   @@map("user")
 }
@@ -450,4 +451,20 @@ model QuotaUsage {
   @@unique([organizationId, id])
   @@unique([organizationId, key])
   @@map("quota_usage")
+}
+
+// ── Platform staff (MOD-09) ──────────────────────────────────────────────
+
+/// People of our own team who may use the internal console (assign plans
+/// and modules to any company). Rows are written only with
+/// `npm run staff -- add <correo>` by someone with database access; there
+/// is no screen to grant it. MFA is mandatory for them.
+model PlatformStaff {
+  userId     String    @id @db.Char(36)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @db.DateTime(3)
+  /// Set when access is withdrawn; the row stays as a record.
+  disabledAt DateTime? @db.DateTime(3)
+
+  @@map("platform_staff")
 }

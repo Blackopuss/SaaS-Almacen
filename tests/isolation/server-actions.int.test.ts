@@ -18,6 +18,13 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  provisionAction: {
+    input:
+      "id de empresa (cualquiera: es personal de plataforma), cupos, módulos, vigencia y motivo",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/provisioning.int.test.ts",
+  },
   inviteAction: {
     input: "correo y roles",
     identity: "sesión y empresa activa (requireOrganizationContext)",

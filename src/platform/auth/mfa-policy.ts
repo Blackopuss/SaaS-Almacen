@@ -6,11 +6,10 @@ import { db } from "@/server";
 
 /**
  * Who must use MFA (PLT-08B, USR-01): the titular of any company and every
- * administrator with an active membership. Platform staff (MOD-09) is
- * added here when that role exists.
+ * administrator with an active membership, and platform staff (MOD-09).
  */
 export const isMfaRequired = cache(async (userId: string) => {
-  const [owned, administrator] = await Promise.all([
+  const [owned, administrator, staff] = await Promise.all([
     db.organization.count({ where: { ownerUserId: userId } }),
     db.membershipRole.count({
       where: {
@@ -18,6 +17,7 @@ export const isMfaRequired = cache(async (userId: string) => {
         membership: { userId, status: "ACTIVE" },
       },
     }),
+    db.platformStaff.count({ where: { userId, disabledAt: null } }),
   ]);
-  return owned > 0 || administrator > 0;
+  return owned > 0 || administrator > 0 || staff > 0;
 });

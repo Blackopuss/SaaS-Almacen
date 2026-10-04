@@ -301,6 +301,16 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // Internal console (MOD-09): a titular is not platform staff, so the
+    // console answers "not found" instead of announcing itself.
+    const consoleResponse = await page.goto(`${BASE}/interno`, {
+      waitUntil: "networkidle",
+    });
+    check(
+      process.env.DEMO_IS_STAFF === "1" || consoleResponse?.status() === 404,
+      `${viewport.name}: the internal console does not exist for a customer account`,
+    );
+
     // Audit trail (USR-11): the titular reads who changed what.
     await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
     await page.getByRole("link", { name: /Bitácora/ }).click();

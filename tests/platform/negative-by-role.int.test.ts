@@ -374,8 +374,10 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
     },
     "NEG-09": { tests: ["tests/platform/invitations.int.test.ts"] },
     "NEG-10": {
-      tests: ["tests/platform/negative-by-role.int.test.ts"],
-      waitsFor: "MOD-09 (consola interna de aprovisionamiento)",
+      tests: [
+        "tests/platform/negative-by-role.int.test.ts",
+        "tests/platform/provisioning.int.test.ts",
+      ],
     },
     "NEG-11": {
       tests: [

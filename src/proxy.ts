@@ -16,6 +16,7 @@ const PROTECTED = [
   "/configuracion",
   "/activa-dos-pasos",
   "/crear-empresa",
+  "/interno",
 ];
 
 export default function proxy(request: NextRequest) {
@@ -41,5 +42,6 @@ export const config = {
     "/configuracion/:path*",
     "/activa-dos-pasos",
     "/crear-empresa",
+    "/interno/:path*",
   ],
 };
