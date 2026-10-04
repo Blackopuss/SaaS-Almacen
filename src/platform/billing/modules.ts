@@ -4,7 +4,7 @@ import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { db } from "@/server";
 
-import { invalidateEntitlements } from "./entitlements";
+import { invalidateEntitlements } from "@/platform/entitlements";
 import type { ModuleRegistry } from "./registry";
 
 /**

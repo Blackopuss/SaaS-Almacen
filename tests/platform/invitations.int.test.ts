@@ -14,6 +14,8 @@ import { memoryOutboxFor } from "@/platform/email";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
+import { grantSeats } from "../setup/plan";
+
 // USR-04: an invitation carries a single-use token that expires and the
 // roles chosen by someone allowed to hand them out.
 
@@ -54,6 +56,7 @@ async function newCompany(name: string) {
   const owner = await newUser("titular");
   const created = await createOrganization(owner.id, { name, timeZone: "" });
   if (!created.ok) throw new Error("company setup failed");
+  await grantSeats(created.organizationId);
   return { org: created.organizationId, owner: owner.id };
 }
 

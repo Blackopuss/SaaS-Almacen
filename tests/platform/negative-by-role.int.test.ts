@@ -22,6 +22,8 @@ import {
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
+import { grantSeats } from "../setup/plan";
+
 // USR-10: negative tests by role, through the same guards the screens and
 // services use, with real members in the database. Consulta does not
 // write; Almacén does not buy; Administrador does not charge.
@@ -63,6 +65,7 @@ async function newCompany(name: string) {
   const owner = await newUser("titular");
   const created = await createOrganization(owner, { name, timeZone: "" });
   if (!created.ok) throw new Error("company setup failed");
+  await grantSeats(created.organizationId);
   return { org: created.organizationId, owner };
 }
 
@@ -384,7 +387,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
     "NEG-12": { tests: ["tests/isolation/two-companies.int.test.ts"] },
     "NEG-13": { tests: ["tests/platform/negative-by-role.int.test.ts"] },
     "NEG-14": { tests: ["tests/platform/invitation-accept.int.test.ts"] },
-    "NEG-15": { waitsFor: "MOD-08 (cupo de usuarios por plan)" },
+    "NEG-15": { tests: ["tests/platform/seats.int.test.ts"] },
     "NEG-16": {
       tests: ["tests/platform/module-guard.int.test.ts"],
       waitsFor: "CMP-17 (historial de un módulo desactivado en solo lectura)",

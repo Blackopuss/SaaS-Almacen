@@ -46,12 +46,34 @@ export type MemberRow = {
 
 type Editing = { kind: "roles" | "disable"; member: MemberRow } | null;
 
+/** Seats of the plan: active people plus pending invitations (MOD-08). */
+export type SeatSummary = {
+  limit: number | null;
+  taken: number;
+  pending: number;
+};
+
+function seatText({ limit, taken, pending }: SeatSummary): string {
+  if (limit === null) {
+    return "Tu empresa todavía no tiene un plan con usuarios asignados.";
+  }
+  const invitations =
+    pending === 0
+      ? ""
+      : pending === 1
+        ? " (incluye 1 invitación pendiente)"
+        : ` (incluye ${pending} invitaciones pendientes)`;
+  return `${taken} de ${limit} usuarios de tu plan${invitations}.`;
+}
+
 export function MembersPanel({
   members,
   roleOptions,
+  seats,
 }: {
   members: MemberRow[];
   roleOptions: RoleOption[];
+  seats: SeatSummary;
 }) {
   const [editing, setEditing] = useState<Editing>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -73,9 +95,7 @@ export function MembersPanel({
         <h2 id="personas" className="font-medium">
           Personas
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {members.filter((m) => !m.disabled).length} con acceso activo.
-        </p>
+        <p className="text-sm text-muted-foreground">{seatText(seats)}</p>
       </div>
       <ul className="divide-y">
         {members.map((member) => (

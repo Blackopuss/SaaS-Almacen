@@ -8,6 +8,7 @@ import {
   assignableRoles,
   checkTeamChange,
   getAccess,
+  getSeatUsage,
   listPendingInvitations,
   listTeamMembers,
 } from "@/platform/authorization";
@@ -46,8 +47,9 @@ export default async function EquipoPage() {
   }
 
   const organizationId = access.organization.id;
-  const [members, invitations] = await Promise.all([
+  const [members, seats, invitations] = await Promise.all([
     listTeamMembers(organizationId),
+    getSeatUsage(organizationId),
     access.can("platform.team.invite")
       ? listPendingInvitations(organizationId)
       : Promise.resolve([]),
@@ -92,6 +94,11 @@ export default async function EquipoPage() {
 
       <MembersPanel
         roleOptions={roleOptions}
+        seats={{
+          limit: seats.limit,
+          taken: seats.members + seats.pendingInvitations,
+          pending: seats.pendingInvitations,
+        }}
         members={members.map((member) => ({
           userId: member.userId,
           name: member.name,

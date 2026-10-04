@@ -6,11 +6,13 @@ import {
   assertModulePermission,
   assertWithinLimit,
   entitles,
+  moduleOfPermission,
+} from "@/platform/billing";
+import {
   getEntitlements,
   getFreshEntitlements,
   invalidateEntitlements,
-  moduleOfPermission,
-} from "@/platform/billing";
+} from "@/platform/entitlements";
 import { createOrganization } from "@/platform/tenancy";
 import { db, forOrganization } from "@/server";
 

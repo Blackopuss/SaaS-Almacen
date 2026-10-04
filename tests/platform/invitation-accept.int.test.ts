@@ -16,6 +16,8 @@ import { memoryOutboxFor } from "@/platform/email";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
+import { grantSeats } from "../setup/plan";
+
 // USR-05: accepting creates the membership with the invited roles, for a
 // new or an existing account; a reused or expired token is rejected.
 
@@ -57,6 +59,7 @@ beforeAll(async () => {
     timeZone: "",
   });
   if (!created.ok) throw new Error("company setup failed");
+  await grantSeats(created.organizationId);
   org = created.organizationId;
 });
 

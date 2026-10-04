@@ -8,10 +8,12 @@ import {
   assertModulePermission,
   createModuleRegistry,
   deactivateModule,
-  getEntitlements,
-  invalidateEntitlements,
   type ModuleContract,
 } from "@/platform/billing";
+import {
+  getEntitlements,
+  invalidateEntitlements,
+} from "@/platform/entitlements";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 

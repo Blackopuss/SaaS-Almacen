@@ -6,6 +6,7 @@ import { db, forOrganization } from "@/server";
 
 import { isRole, type Role } from "./catalog";
 import { knownRoles } from "./policy";
+import { SeatLimitError, assertSeatAvailable } from "./seats";
 import {
   TEAM_RULE_MESSAGES,
   checkTeamChange,
@@ -22,7 +23,8 @@ import {
  * roles join their permissions and take one seat.
  */
 
-export type TeamActionReason = TeamRuleReason | "not_found" | "unchanged";
+export type TeamActionReason =
+  TeamRuleReason | "not_found" | "unchanged" | "no_seats";
 
 export type TeamActionResult =
   { ok: true } | { ok: false; reason: TeamActionReason; error: string };
@@ -31,6 +33,7 @@ const MESSAGES: Record<TeamActionReason, string> = {
   ...TEAM_RULE_MESSAGES,
   not_found: "Esta persona no está en tu equipo.",
   unchanged: "No hay cambios que guardar.",
+  no_seats: "Tu plan no tiene lugares disponibles.",
 };
 
 const fail = (reason: TeamActionReason) =>
@@ -205,6 +208,15 @@ export async function reactivateMember(
     { kind: "disable" },
     async (tx, target) => {
       if (target.status === "ACTIVE") return fail("unchanged");
+      // Coming back takes a seat of the plan again (MOD-08).
+      try {
+        await assertSeatAvailable(tx, organizationId);
+      } catch (error) {
+        if (error instanceof SeatLimitError) {
+          return { ok: false, reason: "no_seats", error: error.message };
+        }
+        throw error;
+      }
       await tx.membership.update({
         where: { id: target.membershipId },
         data: { status: "ACTIVE" },

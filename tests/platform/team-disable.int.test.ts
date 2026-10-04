@@ -21,6 +21,8 @@ import {
 } from "@/platform/tenancy";
 import { db, forOrganization } from "@/server";
 
+import { grantSeats } from "../setup/plan";
+
 // USR-07: disabling a member revokes their sessions and keeps their
 // authorship in the history.
 
@@ -70,6 +72,7 @@ async function newCompany(name: string) {
   const owner = await newUser("titular");
   const created = await createOrganization(owner, { name, timeZone: "" });
   if (!created.ok) throw new Error("company setup failed");
+  await grantSeats(created.organizationId);
   return { org: created.organizationId, owner };
 }
 

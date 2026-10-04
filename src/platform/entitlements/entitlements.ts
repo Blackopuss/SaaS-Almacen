@@ -106,3 +106,37 @@ export function setEntitlementClock(clock: () => number): () => void {
     now = previous;
   };
 }
+
+/** Anything that can read entitlements: a client or one of its transactions. */
+export type LimitReader = {
+  entitlement: {
+    findFirst(args: {
+      where: object;
+      select: { value: true };
+    }): PromiseLike<{ value: number | null } | null>;
+  };
+};
+
+/**
+ * Value of a limit in force now, read with the caller's own client. Use it
+ * inside transactions: asking through another connection while holding a
+ * lock can leave every connection waiting for the next one.
+ */
+export async function readLimit(
+  client: LimitReader,
+  organizationId: string,
+  key: string,
+): Promise<number | null> {
+  const at = new Date();
+  const row = await client.entitlement.findFirst({
+    where: {
+      organizationId,
+      kind: "LIMIT",
+      key,
+      validFrom: { lte: at },
+      OR: [{ validUntil: null }, { validUntil: { gt: at } }],
+    },
+    select: { value: true },
+  });
+  return row?.value ?? null;
+}

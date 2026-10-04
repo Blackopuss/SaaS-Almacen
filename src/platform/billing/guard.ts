@@ -12,7 +12,7 @@ import {
   type Permission,
 } from "@/platform/authorization";
 
-import { getEntitlements, type Entitlements } from "./entitlements";
+import { getEntitlements, type Entitlements } from "@/platform/entitlements";
 
 /**
  * Server guard (MOD-05). An operation of a module is allowed only when all

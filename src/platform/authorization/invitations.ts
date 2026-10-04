@@ -18,6 +18,7 @@ import { db, forOrganization } from "@/server";
 import { loadSubject } from "./access";
 import { ROLE_LABELS, isRole, type Role } from "./catalog";
 import { can } from "./policy";
+import { SeatLimitError, assertSeatAvailable, lockOrganization } from "./seats";
 import { TEAM_RULE_MESSAGES, checkInvitationRoles } from "./team-rules";
 
 /**
@@ -73,6 +74,7 @@ async function issue(
   },
 ) {
   const now = new Date();
+  await lockOrganization(tx, input.organizationId);
   // One live invitation per address: a new one replaces the previous link.
   await tx.invitation.updateMany({
     where: {
@@ -82,6 +84,9 @@ async function issue(
     },
     data: { status: "CANCELLED", resolvedAt: now },
   });
+  // A pending invitation takes a seat of the plan (MOD-08). Throws
+  // SeatLimitError, which also undoes the cancellation above.
+  await assertSeatAvailable(tx, input.organizationId);
   const token = randomBytes(32).toString("base64url");
   const invitationId = newId();
   const expiresAt = new Date(
@@ -176,14 +181,20 @@ export async function createInvitation(
   }
   await recordAttempt(key);
 
-  const issued = await db.$transaction((tx) =>
-    issue(tx, {
-      organizationId,
-      actorUserId,
-      email: email.data,
-      roles,
-    }),
-  );
+  let issued: Awaited<ReturnType<typeof issue>>;
+  try {
+    issued = await db.$transaction((tx) =>
+      issue(tx, {
+        organizationId,
+        actorUserId,
+        email: email.data,
+        roles,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof SeatLimitError) return invalid({}, error.message);
+    throw error;
+  }
   await deliver(organizationId, actorUserId, email.data, roles, issued.token);
   return {
     ok: true,
@@ -229,10 +240,22 @@ export async function resendInvitation(
   // Same invitation, new token: the old link stops working and the row
   // keeps its id (the screen may still be showing it).
   const token = randomBytes(32).toString("base64url");
-  const renewed = await forOrganization(organizationId).$transaction(
-    async (tx) => {
+  let renewed: boolean;
+  try {
+    renewed = await db.$transaction(async (tx) => {
+      await lockOrganization(tx, organizationId);
+      const current = await tx.invitation.findFirst({
+        where: { id: String(invitationId), organizationId, status: "PENDING" },
+        select: { expiresAt: true },
+      });
+      if (!current) return false;
+      // An expired invitation stopped holding its seat: renewing it needs
+      // one again (MOD-08).
+      if (current.expiresAt.getTime() <= Date.now()) {
+        await assertSeatAvailable(tx, organizationId);
+      }
       const updated = await tx.invitation.updateMany({
-        where: { id: String(invitationId), status: "PENDING" },
+        where: { id: String(invitationId), organizationId, status: "PENDING" },
         data: {
           tokenHash: hashInvitationToken(token),
           expiresAt: new Date(
@@ -249,8 +272,13 @@ export async function resendInvitation(
         metadata: { email: invitation.email, roles },
       });
       return true;
-    },
-  );
+    });
+  } catch (error) {
+    if (error instanceof SeatLimitError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
   if (!renewed) return { ok: false, error: GONE };
   await deliver(organizationId, actorUserId, invitation.email, roles, token);
   return { ok: true };

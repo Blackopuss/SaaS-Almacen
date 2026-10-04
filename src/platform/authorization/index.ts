@@ -92,3 +92,11 @@ export {
   reactivateMember,
 } from "./team";
 export type { TeamActionReason, TeamActionResult, TeamMember } from "./team";
+export {
+  SeatLimitError,
+  assertSeatAvailable,
+  getSeatUsage,
+  lockOrganization,
+  seatLimitMessage,
+} from "./seats";
+export type { SeatUsage } from "./seats";

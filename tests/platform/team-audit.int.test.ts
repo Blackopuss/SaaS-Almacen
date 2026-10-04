@@ -20,6 +20,8 @@ import { memoryOutboxFor } from "@/platform/email";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
+import { grantSeats } from "../setup/plan";
+
 // USR-11: inviting, changing roles and disabling leave a record that the
 // titular and administrators can read, and that nobody can change.
 
@@ -42,6 +44,7 @@ async function newCompany(name: string) {
   const owner = await newUser("Doña Esperanza");
   const created = await createOrganization(owner.id, { name, timeZone: "" });
   if (!created.ok) throw new Error("company setup failed");
+  await grantSeats(created.organizationId);
   return { org: created.organizationId, owner: owner.id };
 }
 

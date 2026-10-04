@@ -3,7 +3,7 @@ import "server-only";
 import { newId } from "@/lib";
 import { forOrganization, type TenantDb } from "@/server";
 
-import { getFreshEntitlements } from "./entitlements";
+import { getFreshEntitlements, readLimit } from "./entitlements";
 
 /**
  * Quota counters (MOD-07). One row per company and limit keeps how much is
@@ -26,7 +26,7 @@ export const QUOTA_KEYS = ["active_products", "users"] as const;
 export type QuotaKey = (typeof QUOTA_KEYS)[number];
 
 /** A company client or one of its transactions. */
-export type QuotaClient = Pick<TenantDb, "quotaUsage">;
+export type QuotaClient = Pick<TenantDb, "quotaUsage" | "entitlement">;
 
 export type QuotaResult =
   | { ok: true }
@@ -72,7 +72,9 @@ async function take(
   reserve: boolean,
 ): Promise<QuotaResult> {
   checkAmount(amount);
-  const limit = (await getFreshEntitlements(organizationId)).limit(key);
+  // Read with the client of the caller: inside a transaction, no second
+  // connection is needed.
+  const limit = await readLimit(client, organizationId, key);
   if (limit === null) {
     return { ok: false, reason: "limit_reached", limit, taken: 0 };
   }
