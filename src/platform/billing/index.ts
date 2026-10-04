@@ -11,10 +11,12 @@ export type { ModuleRegistry } from "./registry";
 export {
   LIMIT_REACHED_MESSAGE,
   MODULE_NOT_CONTRACTED_MESSAGE,
+  MODULE_READ_ONLY_MESSAGE,
   assertModulePermission,
   assertWithinLimit,
   entitles,
   getModuleAccess,
+  isReadOrExport,
   moduleOfPermission,
   requireModulePermission,
 } from "./guard";

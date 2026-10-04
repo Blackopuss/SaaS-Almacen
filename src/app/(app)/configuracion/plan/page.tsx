@@ -94,6 +94,9 @@ function Quota({
 function moduleNote(module: PlanModule): string {
   if (module.state === "unavailable") return "Próximamente.";
   if (module.state === "available") return "No incluido en tu plan.";
+  if (module.state === "read_only") {
+    return "Solo lectura: puedes consultar y exportar su información.";
+  }
   if (module.validUntil) {
     return `Activo hasta el ${formatDate(module.validUntil)}.`;
   }
@@ -141,6 +144,37 @@ export default async function PlanPage() {
         description="Lo que tu empresa tiene contratado y cuánto está usando."
       />
 
+      {plan.status === "read_only" && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border bg-card p-4 text-sm sm:p-5"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-destructive"
+          />
+          <p>
+            <span className="font-medium">Tu plan ya no está vigente.</span> Tu
+            información sigue intacta: puedes consultarla y exportarla, pero no
+            registrar cambios. Escríbenos para renovarlo.
+          </p>
+        </div>
+      )}
+      {plan.paymentNotice && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border bg-card p-4 text-sm sm:p-5"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-warning"
+          />
+          <p>
+            Tenemos un pago pendiente de tu plan. Todo sigue funcionando; ponte
+            al corriente para evitar que pase a solo lectura.
+          </p>
+        </div>
+      )}
       {!plan.hasPlan && (
         <div
           role="status"
@@ -165,9 +199,11 @@ export default async function PlanPage() {
         <p className="rounded-xl border bg-card p-4 font-medium sm:p-5">
           {!plan.hasPlan
             ? "Sin plan activo"
-            : plan.validUntil
-              ? `Vigente hasta el ${formatDate(plan.validUntil)}`
-              : "Sin fecha de término"}
+            : plan.status === "read_only"
+              ? "Venció: solo lectura y exportación"
+              : plan.validUntil
+                ? `Vigente hasta el ${formatDate(plan.validUntil)}`
+                : "Sin fecha de término"}
         </p>
       </section>
 
@@ -217,6 +253,8 @@ export default async function PlanPage() {
               </div>
               {module.state === "active" ? (
                 <Badge variant="success">Activo</Badge>
+              ) : module.state === "read_only" ? (
+                <Badge variant="warning">Solo lectura</Badge>
               ) : module.state === "available" ? (
                 <Badge variant="outline">Disponible</Badge>
               ) : (

@@ -202,14 +202,15 @@ describe("assertModulePermission", () => {
       ),
     ).resolves.toBeUndefined();
     await new Promise((resolve) => setTimeout(resolve, 1700));
-    // No invalidation: the cached right simply stopped counting.
+    // No invalidation: the cached right simply stopped counting. What was
+    // granted and ended stays readable, but nothing can be written.
     await expect(
       assertModulePermission(
         company.org,
         company.owner,
-        "inventory.product.read",
+        "inventory.product.create",
       ),
-    ).rejects.toMatchObject({ code: "module_not_contracted" });
+    ).rejects.toMatchObject({ code: "module_read_only" });
   });
 
   it("contracting the module opens it after invalidating", async () => {

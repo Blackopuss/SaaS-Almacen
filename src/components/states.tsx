@@ -1,5 +1,6 @@
 import {
   CircleAlert,
+  Lock,
   PackagePlus,
   ShieldAlert,
   type LucideIcon,
@@ -140,6 +141,26 @@ export function NoModuleState({ module }: { module: string }) {
       <p className="mt-1 max-w-sm text-muted-foreground">
         Tu plan actual no incluye este módulo. El titular de la empresa puede
         solicitarlo.
+      </p>
+    </div>
+  );
+}
+
+/** Notice above a screen whose module can only be consulted and exported (MOD-11). */
+export function ReadOnlyNotice({ module }: { module: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2 rounded-xl border bg-card p-4 text-sm sm:p-5"
+    >
+      <Lock
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-warning"
+      />
+      <p>
+        <span className="font-medium">{module} está en solo lectura.</span> Tu
+        información sigue aquí y puedes consultarla y exportarla, pero no
+        registrar cambios hasta renovar tu plan.
       </p>
     </div>
   );

@@ -43,6 +43,8 @@ export default defineConfig({
           // worker sometimes died at start (exit 0xC0000409) with no test
           // failing. Nothing here needs a separate process.
           pool: "threads",
+          // Loops of 20–30 real database calls take a few seconds under load.
+          testTimeout: 20_000,
         },
       },
     ],

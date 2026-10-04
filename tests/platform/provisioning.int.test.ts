@@ -209,8 +209,8 @@ describe("provisionCompany", () => {
       validUntil: null,
     });
     await expect(
-      assertModulePermission(org, owner.id, "purchasing.order.read"),
-    ).rejects.toMatchObject({ code: "module_not_contracted" });
+      assertModulePermission(org, owner.id, "purchasing.order.create"),
+    ).rejects.toMatchObject({ code: "module_read_only" });
     const purchasing = await db.entitlement.findFirstOrThrow({
       where: { organizationId: org, key: "purchasing" },
     });

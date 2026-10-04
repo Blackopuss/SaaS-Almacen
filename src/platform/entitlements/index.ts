@@ -9,7 +9,12 @@ export {
   readLimit,
   setEntitlementClock,
 } from "./entitlements";
-export type { Entitlements, LimitReader } from "./entitlements";
+export type {
+  Entitlements,
+  LimitReader,
+  ModuleState,
+  SubscriptionStatus,
+} from "./entitlements";
 export {
   QUOTA_KEYS,
   confirmReservation,

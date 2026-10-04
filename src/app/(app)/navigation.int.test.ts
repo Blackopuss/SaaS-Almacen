@@ -111,7 +111,7 @@ describe("screens check on the server", () => {
       expect(source, item.href).toContain("<NoAccessState");
       // …and for the module the company must have (MOD-05).
       expect(source, item.href).toContain(
-        `if (!access.hasModule("${item.module}"))`,
+        `access.moduleState("${item.module}")`,
       );
       expect(item.permission.startsWith(`${item.module}.`), item.href).toBe(
         true,

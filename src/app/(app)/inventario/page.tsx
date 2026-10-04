@@ -7,6 +7,7 @@ import {
   NoModuleState,
   PageContainer,
   PageHeader,
+  ReadOnlyNotice,
 } from "@/components";
 import { getModuleAccess } from "@/platform/billing";
 
@@ -22,7 +23,8 @@ export default async function InventarioPage() {
       </PageContainer>
     );
   }
-  if (!access.hasModule("inventory")) {
+  const moduleState = access.moduleState("inventory");
+  if (moduleState === "none") {
     return (
       <PageContainer>
         <NoModuleState module="Inventario" />
@@ -31,6 +33,7 @@ export default async function InventarioPage() {
   }
   return (
     <PageContainer>
+      {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
       <PageHeader
         title="Inventario"
         description="Qué hay, cuánto y dónde está."

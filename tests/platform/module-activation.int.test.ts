@@ -177,7 +177,11 @@ describe("deactivateModule", () => {
     expect(await activeModules(org)).toEqual(["inventory"]);
     await expect(
       assertModulePermission(org, owner, "purchasing.order.create"),
-    ).rejects.toMatchObject({ code: "module_not_contracted" });
+    ).rejects.toMatchObject({ code: "module_read_only" });
+    // Its history stays readable (MOD-11).
+    await expect(
+      assertModulePermission(org, owner, "purchasing.order.read"),
+    ).resolves.toBeUndefined();
     await expect(
       assertModulePermission(org, owner, "inventory.product.read"),
     ).resolves.toBeUndefined();

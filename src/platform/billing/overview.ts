@@ -1,7 +1,11 @@
 import "server-only";
 
 import { getSeatUsage, type SeatUsage } from "@/platform/authorization";
-import { getQuotaUsage, type QuotaUsageSummary } from "@/platform/entitlements";
+import {
+  getFreshEntitlements,
+  getQuotaUsage,
+  type QuotaUsageSummary,
+} from "@/platform/entitlements";
 import { forOrganization } from "@/server";
 
 import type { ModuleRegistry } from "./registry";
@@ -15,10 +19,11 @@ export type PlanModule = {
   id: string;
   name: string;
   /**
-   * active: the company has it. available: it could be added.
+   * active: the company has it. read_only: it had it; its data can be
+   * consulted and exported (MOD-11). available: it could be added.
    * unavailable: announced, not sold yet.
    */
-  state: "active" | "available" | "unavailable";
+  state: "active" | "read_only" | "available" | "unavailable";
   required: boolean;
   /** End of the right when active and it has one. */
   validUntil: Date | null;
@@ -27,6 +32,13 @@ export type PlanModule = {
 export type PlanOverview = {
   /** False when nothing has been assigned to the company yet. */
   hasPlan: boolean;
+  /**
+   * active: at least one module in full use. read_only: everything the
+   * company had ended or its subscription stopped. none: never had a plan.
+   */
+  status: "active" | "read_only" | "none";
+  /** The subscription needs payment but still works. */
+  paymentNotice: boolean;
   products: QuotaUsageSummary;
   seats: SeatUsage;
   modules: PlanModule[];
@@ -58,7 +70,8 @@ export async function getPlanOverview(
   organizationId: string,
 ): Promise<PlanOverview> {
   const now = new Date();
-  const [products, seats, rows] = await Promise.all([
+  const [entitlements, products, seats, rows] = await Promise.all([
+    getFreshEntitlements(organizationId),
     getQuotaUsage(organizationId, "active_products"),
     getSeatUsage(organizationId),
     forOrganization(organizationId).entitlement.findMany({
@@ -77,21 +90,34 @@ export async function getPlanOverview(
     .filter((date): date is Date => date !== null)
     .sort((a, b) => a.getTime() - b.getTime());
 
+  const status =
+    entitlements.modules.size > 0
+      ? "active"
+      : entitlements.readOnlyModules.size > 0
+        ? "read_only"
+        : "none";
   return {
-    hasPlan: rows.length > 0,
+    hasPlan: status !== "none",
+    status,
+    paymentNotice: entitlements.paymentNotice,
     products,
     seats,
-    modules: registry.all.map((contract) => ({
-      id: contract.id,
-      name: contract.name,
-      required: contract.required,
-      state: active.has(contract.id)
-        ? "active"
-        : contract.availability === "available"
-          ? "available"
-          : "unavailable",
-      validUntil: active.get(contract.id) ?? null,
-    })),
-    validUntil: ends[0] ?? null,
+    modules: registry.all.map((contract) => {
+      const state = entitlements.moduleState(contract.id);
+      return {
+        id: contract.id,
+        name: contract.name,
+        required: contract.required,
+        state:
+          state !== "none"
+            ? state
+            : contract.availability === "available"
+              ? "available"
+              : "unavailable",
+        validUntil:
+          state === "active" ? (active.get(contract.id) ?? null) : null,
+      };
+    }),
+    validUntil: status === "active" ? (ends[0] ?? null) : null,
   };
 }

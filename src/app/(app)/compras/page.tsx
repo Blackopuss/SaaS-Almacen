@@ -7,6 +7,7 @@ import {
   NoModuleState,
   PageContainer,
   PageHeader,
+  ReadOnlyNotice,
 } from "@/components";
 import { getModuleAccess } from "@/platform/billing";
 
@@ -22,7 +23,8 @@ export default async function ComprasPage() {
       </PageContainer>
     );
   }
-  if (!access.hasModule("purchasing")) {
+  const moduleState = access.moduleState("purchasing");
+  if (moduleState === "none") {
     return (
       <PageContainer>
         <NoModuleState module="Compras" />
@@ -31,6 +33,7 @@ export default async function ComprasPage() {
   }
   return (
     <PageContainer>
+      {moduleState === "read_only" && <ReadOnlyNotice module="Compras" />}
       <PageHeader
         title="Compras"
         description="Órdenes a proveedores y recepciones."

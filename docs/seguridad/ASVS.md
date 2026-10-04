@@ -31,6 +31,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V8 Autorización | Denegar por defecto y aislamiento entre empresas | Cumple | `requireOrganizationContext`, `forOrganization`, llaves compuestas, `tests/isolation`. |
 | V8 | Permisos por rol | Cumple | Decisión central `can` (denegar por defecto), guardas `requirePermission`/`assertOwnerAction`, reglas de equipo y pantallas que comprueban en servidor (USR-02 a USR-10); `policy.test.ts`, `negative-by-role.int.test.ts`, `navigation.int.test.ts`. Revisión en `REVISION_USR.md`. |
 | V8 | Reautenticación en operaciones críticas (transferir titularidad) | Pendiente | Hallazgo USR-S01. |
+| V8 | Derechos contratados y límites en servidor | Cumple | Guard rol → módulo → límite (`assertModulePermission`, `assertWithinLimit`), cupos con control de concurrencia y consola interna solo para personal con MFA (MOD-05 a MOD-09); `module-guard`, `quota`, `seats`, `provisioning` y `subscription-states` (`*.int.test.ts`). Revisión en `REVISION_MOD.md`. |
 | V9 Tokens autocontenidos | — | N/A | No se usan JWT de sesión. |
 | V10 OAuth/OIDC | — | N/A | Sin inicio de sesión con terceros. |
 | V11 Criptografía | Secretos MFA cifrados; aleatoriedad segura | Cumple | Cifrado de Better Auth con `BETTER_AUTH_SECRET`; `crypto.randomInt` para códigos de recuperación. |
