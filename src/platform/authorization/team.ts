@@ -143,6 +143,84 @@ export async function assignRoles(
   );
 }
 
+/**
+ * Disables a member (USR-07): they lose access at once and every session
+ * of theirs is closed. The membership and the account stay, so whatever
+ * they did keeps their name in the history.
+ */
+export async function disableMember(
+  organizationId: string,
+  actorUserId: string,
+  input: { userId: string; reason?: string },
+): Promise<TeamActionResult> {
+  return withTeamChange(
+    organizationId,
+    actorUserId,
+    input.userId,
+    { kind: "disable" },
+    async (tx, target) => {
+      if (target.status === "DISABLED") return fail("unchanged");
+      await tx.membership.update({
+        where: { id: target.membershipId },
+        data: { status: "DISABLED" },
+      });
+      // An offer to hand them the company dies with their access.
+      await tx.ownershipTransfer.updateMany({
+        where: {
+          organizationId,
+          toMembershipId: target.membershipId,
+          status: "PENDING",
+        },
+        data: { status: "CANCELLED", resolvedAt: new Date() },
+      });
+      const closed = await tx.session.deleteMany({
+        where: { userId: target.userId },
+      });
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId,
+        action: "team.member_disabled",
+        target: { type: "user", id: target.userId },
+        reason: input.reason,
+        metadata: {
+          roles: knownRoles(target.roles),
+          sessionsClosed: closed.count,
+        },
+      });
+      return undefined;
+    },
+  );
+}
+
+/** Gives a disabled member their access back, with the roles they had. */
+export async function reactivateMember(
+  organizationId: string,
+  actorUserId: string,
+  input: { userId: string },
+): Promise<TeamActionResult> {
+  return withTeamChange(
+    organizationId,
+    actorUserId,
+    input.userId,
+    { kind: "disable" },
+    async (tx, target) => {
+      if (target.status === "ACTIVE") return fail("unchanged");
+      await tx.membership.update({
+        where: { id: target.membershipId },
+        data: { status: "ACTIVE" },
+      });
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId,
+        action: "team.member_reactivated",
+        target: { type: "user", id: target.userId },
+        metadata: { roles: knownRoles(target.roles) },
+      });
+      return undefined;
+    },
+  );
+}
+
 export type TeamMember = {
   userId: string;
   name: string;
