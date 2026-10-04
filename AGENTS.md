@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 40 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-02 (registrar Inventario y Compras; Ventas y CRM como no disponibles)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 41 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-03 (esquema comercial con precios versionados)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -124,6 +124,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Pantalla nueva (USR-09):** empieza con `const access = await getAccess(); if (!access.can("…")) return <PageContainer><NoAccessState /></PageContainer>;` y, si va en el menú, lleva el mismo permiso en `nav.ts`. Botones y enlaces de una acción se pintan solo si `access.can(...)`; la Server Action lo comprueba otra vez en su servicio.
 - **Casos negativos (USR-10):** al construir algo que menciona un caso `NEG-xx` de la matriz, escribir su prueba y actualizar `NEGATIVE_CASES` en `tests/platform/negative-by-role.int.test.ts` (quitar `waitsFor`, agregar el archivo).
 - **Acción de bitácora nueva (USR-11):** agregar su frase en español a `AUDIT_ACTION_LABELS` (`src/platform/audit/trail.ts`); `team-audit.int.test.ts` falla si falta.
+- **Módulos (MOD-01/02, ADR 0007):** cada módulo declara su contrato en `src/modules/<módulo>/contract.ts` con `defineModule` y se agrega a `src/modules/registry`; la plataforma nunca importa módulos, recibe ids o contratos.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

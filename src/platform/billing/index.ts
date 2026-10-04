@@ -6,3 +6,5 @@ export {
   validateModuleContract,
 } from "./contract";
 export type { ModuleContract, ModuleLimit, PlatformFeature } from "./contract";
+export { createModuleRegistry, validateModuleRegistry } from "./registry";
+export type { ModuleRegistry } from "./registry";
