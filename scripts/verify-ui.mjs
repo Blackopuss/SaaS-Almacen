@@ -301,6 +301,25 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // New product (INV-02): the form explains what is missing and creates
+    // nothing when it is incomplete.
+    await page.goto(`${BASE}/inventario`, { waitUntil: "networkidle" });
+    await page.getByRole("link", { name: "Agregar producto" }).first().click();
+    await page.waitForURL("**/inventario/nuevo");
+    await page.getByRole("button", { name: "Guardar producto" }).click();
+    await page.locator("#sku-error").waitFor();
+    const productFocus = await page.evaluate(() => document.activeElement?.id);
+    const productOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/producto-${viewport.name}.png` });
+    check(
+      productFocus === "sku" &&
+        (await page.locator("#name-error").isVisible()) &&
+        productOverflow <= 0,
+      `${viewport.name}: the new product form shows what is missing and focuses the first field`,
+    );
+
     // «Mi plan» (MOD-10): quotas with their bars, modules and validity.
     await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
     await page.getByRole("link", { name: /Mi plan/ }).click();

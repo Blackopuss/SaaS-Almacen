@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  createProductAction: {
+    input: "clave, nombre, descripción, categoría, marca y código de barras",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el servicio comprueba rol, módulo y cupo",
+    coveredBy: "tests/platform/products.int.test.ts",
+  },
   provisionAction: {
     input:
       "id de empresa (cualquiera: es personal de plataforma), cupos, módulos, vigencia y motivo",
