@@ -2,13 +2,15 @@
 
 import { CircleAlert, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormField } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 
 import type { ProductFormState } from "./actions";
+import type { UnitGroup } from "./unit-options";
 
 export const EMPTY_PRODUCT: ProductFormState["values"] = {
   sku: "",
@@ -17,11 +19,15 @@ export const EMPTY_PRODUCT: ProductFormState["values"] = {
   category: "",
   brand: "",
   barcode: "",
+  unit: "piece",
+  step: "",
 };
 
 const FIELD_ORDER = [
   "sku",
   "name",
+  "unit",
+  "step",
   "category",
   "brand",
   "barcode",
@@ -35,6 +41,8 @@ export function ProductForm({
   submitLabel,
   categories,
   brands,
+  unitGroups,
+  stepOptions,
 }: {
   action: (
     prev: ProductFormState,
@@ -44,6 +52,8 @@ export function ProductForm({
   submitLabel: string;
   categories: string[];
   brands: string[];
+  unitGroups: UnitGroup[];
+  stepOptions: { value: string; label: string }[];
 }) {
   const [state, formAction, pending] = useActionState(action, {
     fieldErrors: {},
@@ -62,6 +72,17 @@ export function ProductForm({
   }, [state]);
 
   const attempt = JSON.stringify(state.values);
+  // The precision offered depends on the unit: things that are counted go
+  // in whole units.
+  const [unit, setUnit] = useState(state.values.unit || "piece");
+  const [seen, setSeen] = useState(attempt);
+  if (seen !== attempt) {
+    setSeen(attempt);
+    setUnit(state.values.unit || "piece");
+  }
+  const fractional = unitGroups
+    .flatMap((group) => group.units)
+    .find((option) => option.code === unit)?.fractional;
 
   return (
     <form
@@ -140,6 +161,72 @@ export function ProductForm({
           />
         )}
       </FormField>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <FormField
+          id="unit"
+          label="¿En qué unidad lo controlas?"
+          hint="Sus existencias se llevan siempre en esta unidad. Cajas, rollos o sacos se configuran después como presentaciones."
+          error={state.fieldErrors.unit}
+        >
+          {(control) => (
+            <NativeSelect
+              {...control}
+              name="unit"
+              value={unit}
+              onChange={(event) => setUnit(event.target.value)}
+            >
+              {unitGroups.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.units.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </NativeSelect>
+          )}
+        </FormField>
+        {fractional ? (
+          <FormField
+            id="step"
+            label="Precisión de las cantidades"
+            hint="La fracción más pequeña que registras. Por ejemplo, 0.01 permite 2.75."
+            error={state.fieldErrors.step}
+          >
+            {(control) => (
+              <NativeSelect
+                {...control}
+                name="step"
+                key={`step-${attempt}-${unit}`}
+                defaultValue={
+                  // Keep the chosen precision only for the unit it was
+                  // chosen for; another unit starts at the usual 0.01.
+                  unit === state.values.unit &&
+                  stepOptions.some((o) => o.value === state.values.step)
+                    ? state.values.step
+                    : "0.01"
+                }
+              >
+                {stepOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Precisión de las cantidades</p>
+            <p className="text-sm text-muted-foreground">
+              Se maneja en enteros: no admite fracciones.
+            </p>
+            <input type="hidden" name="step" value="1" />
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField

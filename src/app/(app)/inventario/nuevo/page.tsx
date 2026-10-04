@@ -14,6 +14,7 @@ import { listProductGroups } from "@/platform/catalog";
 
 import { createProductAction } from "../actions";
 import { EMPTY_PRODUCT, ProductForm } from "../product-form";
+import { stepOptions, unitGroups } from "../unit-options";
 
 export const metadata: Metadata = { title: "Nuevo producto" };
 
@@ -68,6 +69,8 @@ export default async function NuevoProductoPage() {
         submitLabel="Guardar producto"
         categories={groups.categories}
         brands={groups.brands}
+        unitGroups={unitGroups()}
+        stepOptions={stepOptions()}
       />
     </PageContainer>
   );

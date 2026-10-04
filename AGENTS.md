@@ -100,8 +100,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 55 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-06 (precisión e incremento por producto)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 56 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-07 (presentaciones por producto)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -136,6 +136,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Solo lectura (MOD-11):** un permiso nuevo que no modifica nada debe terminar en `.read` o `.export` (o ser `*.export.create`) para seguir disponible con el plan vencido; cualquier otro se trata como escritura. Pantallas de módulo: `access.moduleState(...)` → `none` muestra `NoModuleState`, `read_only` muestra `ReadOnlyNotice` y oculta las acciones de escritura.
 - **Productos (INV-02):** las altas solo por `createProduct`; el actor (`{ organizationId, userId }`) sale siempre de la sesión. Un fallo esperado dentro de una transacción se saca con una excepción propia (ver `Rejected`) para que todo se revierta, cupo incluido.
 - **Unidades (INV-05):** agregar o cambiar una unidad = `UNITS` en código + migración que actualice la tabla `unit`. Una tabla sembrada por migración se agrega a `REFERENCE_TABLES` en `tests/setup/global-db.ts`.
+- **Cantidades (INV-06):** toda cantidad capturada pasa por `parseQuantity` con la regla del producto (`unitCode`, `quantityStep`); nunca `Number()` ni redondeos. Componentes cliente no importan `@/platform/*`: las opciones (unidades, precisiones) se arman en el servidor y se pasan como props (ver `unit-options.ts`).
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

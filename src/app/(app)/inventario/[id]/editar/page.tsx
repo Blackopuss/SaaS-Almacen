@@ -16,6 +16,7 @@ import { getProduct, listProductGroups } from "@/platform/catalog";
 import { updateProductAction } from "../../actions";
 import { ProductForm } from "../../product-form";
 import { ArchiveProduct } from "../../product-status";
+import { stepOptions, unitGroups } from "../../unit-options";
 
 export const metadata: Metadata = { title: "Editar producto" };
 
@@ -94,10 +95,14 @@ export default async function EditarProductoPage({
           category: product.category ?? "",
           brand: product.brand ?? "",
           barcode: product.barcode ?? "",
+          unit: product.unitCode,
+          step: String(Number(product.quantityStep)),
         }}
         submitLabel="Guardar cambios"
         categories={groups.categories}
         brands={groups.brands}
+        unitGroups={unitGroups()}
+        stepOptions={stepOptions()}
       />
       {access.allows("inventory.product.archive") && (
         <section

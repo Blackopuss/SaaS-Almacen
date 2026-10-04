@@ -8,6 +8,9 @@ import { assertModulePermission } from "@/platform/billing";
 import { consumeQuota, releaseQuota } from "@/platform/entitlements";
 import { forOrganization } from "@/server";
 
+import { defaultStep, stepProblem } from "./quantity";
+import { getUnit, isUnitCode } from "./units";
+
 /**
  * Products of the catalog (INV-02). Every new product goes through
  * `createProduct`: it checks the role and the contracted module, takes one
@@ -47,7 +50,29 @@ export const productSchema = z.object({
   /** Name of the brand; created if the company does not have it yet. */
   brand: optionalText(80),
   barcode: optionalText(64),
+  /** Code of the unit in which the product is controlled (INV-06). */
+  unit: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || "piece")
+    .refine(isUnitCode, "Elige una unidad de la lista."),
+  /** Increment for its quantities; empty = the usual one for the unit. */
+  step: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || ""),
 });
+
+/** Unit and increment of a parsed card, or the problem with them. */
+function quantityRule(data: { unit: string; step: string }) {
+  const step = data.step || defaultStep(data.unit);
+  const problem = stepProblem(data.unit, step);
+  return problem
+    ? ({ ok: false, problem } as const)
+    : ({ ok: true, unitCode: data.unit, quantityStep: step } as const);
+}
 
 export type ProductInput = z.input<typeof productSchema>;
 export type ProductField = keyof ProductInput;
@@ -112,6 +137,14 @@ export async function createProduct(
     return { ok: false, reason: "invalid", fieldErrors };
   }
   const data = parsed.data;
+  const rule = quantityRule(data);
+  if (!rule.ok) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: { step: rule.problem },
+    };
+  }
   const productId = newId();
 
   try {
@@ -170,6 +203,8 @@ export async function createProduct(
           categoryId: category?.id ?? null,
           brandId: brand?.id ?? null,
           barcode: data.barcode,
+          unitCode: rule.unitCode,
+          quantityStep: rule.quantityStep,
         },
       });
       await recordAuditEvent(tx, {
@@ -199,6 +234,9 @@ export type ProductSummary = {
   category: string | null;
   brand: string | null;
   barcode: string | null;
+  /** Unit in which it is controlled and the increment of its quantities. */
+  unitCode: string;
+  quantityStep: string;
   createdAt: Date;
 };
 
@@ -222,6 +260,8 @@ export async function listRecentProducts(
       sku: true,
       name: true,
       barcode: true,
+      unitCode: true,
+      quantityStep: true,
       createdAt: true,
       category: { select: { name: true } },
       brand: { select: { name: true } },
@@ -234,6 +274,8 @@ export async function listRecentProducts(
     category: row.category?.name ?? null,
     brand: row.brand?.name ?? null,
     barcode: row.barcode,
+    unitCode: row.unitCode,
+    quantityStep: row.quantityStep.toString(),
     createdAt: row.createdAt,
   }));
 }
@@ -290,6 +332,8 @@ export async function getProduct(
       name: true,
       description: true,
       barcode: true,
+      unitCode: true,
+      quantityStep: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -306,6 +350,8 @@ export async function getProduct(
     category: row.category?.name ?? null,
     brand: row.brand?.name ?? null,
     barcode: row.barcode,
+    unitCode: row.unitCode,
+    quantityStep: row.quantityStep.toString(),
     status: row.status,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -322,6 +368,8 @@ const FIELD_LABELS: Record<ProductField, string> = {
   category: "Categoría",
   brand: "Marca",
   barcode: "Código de barras",
+  unit: "Unidad",
+  step: "Precisión",
 };
 
 /**
@@ -351,6 +399,14 @@ export async function updateProduct(
     return { ok: false, reason: "invalid", fieldErrors };
   }
   const data = parsed.data;
+  const rule = quantityRule(data);
+  if (!rule.ok) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: { step: rule.problem },
+    };
+  }
   const id = String(productId);
 
   try {
@@ -362,6 +418,8 @@ export async function updateProduct(
           name: true,
           description: true,
           barcode: true,
+          unitCode: true,
+          quantityStep: true,
           category: { select: { name: true } },
           brand: { select: { name: true } },
         },
@@ -381,8 +439,14 @@ export async function updateProduct(
         category: current.category?.name ?? null,
         brand: current.brand?.name ?? null,
         barcode: current.barcode,
+        unit: current.unitCode,
+        step: Number(current.quantityStep.toString()).toString(),
       };
-      const after: Record<ProductField, string | null> = { ...data };
+      const after: Record<ProductField, string | null> = {
+        ...data,
+        unit: rule.unitCode,
+        step: Number(rule.quantityStep).toString(),
+      };
       const changed = (Object.keys(before) as ProductField[]).filter(
         (field) => before[field] !== after[field],
       );
@@ -438,6 +502,8 @@ export async function updateProduct(
           categoryId: category?.id ?? null,
           brandId: brand?.id ?? null,
           barcode: data.barcode,
+          unitCode: rule.unitCode,
+          quantityStep: rule.quantityStep,
         },
       });
       await recordAuditEvent(tx, {
@@ -450,7 +516,12 @@ export async function updateProduct(
           changes: Object.fromEntries(
             changed.map((field) => [
               FIELD_LABELS[field],
-              { antes: before[field], ahora: after[field] },
+              field === "unit"
+                ? {
+                    antes: getUnit(before.unit!).name,
+                    ahora: getUnit(after.unit!).name,
+                  }
+                : { antes: before[field], ahora: after[field] },
             ]),
           ),
         },

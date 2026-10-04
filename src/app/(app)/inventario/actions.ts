@@ -34,6 +34,8 @@ export async function createProductAction(
     category: value("category"),
     brand: value("brand"),
     barcode: value("barcode"),
+    unit: value("unit"),
+    step: value("step"),
   };
 
   let result;
@@ -76,6 +78,8 @@ export async function updateProductAction(
     category: value("category"),
     brand: value("brand"),
     barcode: value("barcode"),
+    unit: value("unit"),
+    step: value("step"),
   };
 
   let result;

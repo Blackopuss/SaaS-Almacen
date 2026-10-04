@@ -32,3 +32,14 @@ export {
   unitsOfDimension,
 } from "./units";
 export type { Dimension, Unit, UnitCode } from "./units";
+export {
+  MAX_QUANTITY,
+  QUANTITY_SCALE,
+  QUANTITY_STEPS,
+  STEP_LABELS,
+  defaultStep,
+  parseQuantity,
+  stepProblem,
+  stepsForUnit,
+} from "./quantity";
+export type { ParsedQuantity, QuantityRule, QuantityStep } from "./quantity";

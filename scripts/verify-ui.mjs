@@ -312,6 +312,21 @@ try {
     const productOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );
+    // Unit and precision (INV-06): things counted go in whole units; a
+    // measure lets the person choose how fine its quantities are.
+    const wholeOnly = await page
+      .getByText("Se maneja en enteros: no admite fracciones.")
+      .isVisible();
+    await page.selectOption("#unit", "m");
+    await page.locator("#step").waitFor();
+    const precisions = await page.locator("#step option").count();
+    const defaultPrecision = await page.inputValue("#step");
+    await page.selectOption("#unit", "dozen");
+    await page.locator("#step").waitFor({ state: "detached" });
+    check(
+      wholeOnly && precisions === 4 && defaultPrecision === "0.01",
+      `${viewport.name}: the product form offers units by dimension and a precision only for measures`,
+    );
     await page.screenshot({ path: `${OUT}/producto-${viewport.name}.png` });
     check(
       productFocus === "sku" &&

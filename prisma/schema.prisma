@@ -527,6 +527,12 @@ model Product {
   brand          ProductBrand?    @relation(fields: [organizationId, brandId], references: [organizationId, id], onDelete: Restrict)
   /// Printed code read by a scanner; unique in the company when present.
   barcode        String?          @db.VarChar(64)
+  /// Unit in which the product is controlled (INV-06). Stock is always
+  /// kept in this unit; presentations convert to it.
+  unitCode       String           @default("piece") @db.VarChar(12)
+  unit           Unit             @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  /// Increment accepted for quantities: 1 = whole units, 0.01 = hundredths.
+  quantityStep   Decimal          @default(1) @db.Decimal(12, 3)
   status         ProductStatus    @default(ACTIVE)
   createdAt      DateTime         @default(now()) @db.DateTime(3)
   updatedAt      DateTime         @updatedAt @db.DateTime(3)
@@ -546,15 +552,16 @@ model Product {
 /// src/platform/catalog/units.ts (a test keeps both equal). Reference
 /// data: it has no company and is never emptied by the test setup.
 model Unit {
-  code        String  @id @db.VarChar(12)
+  code        String    @id @db.VarChar(12)
   /// count, mass, length, volume or area.
-  dimension   String  @db.VarChar(12)
-  name        String  @db.VarChar(40)
-  plural      String  @db.VarChar(40)
-  symbol      String  @db.VarChar(8)
+  dimension   String    @db.VarChar(12)
+  name        String    @db.VarChar(40)
+  plural      String    @db.VarChar(40)
+  symbol      String    @db.VarChar(8)
   /// Reference units of its dimension in one of this unit.
-  toReference Decimal @db.Decimal(18, 9)
+  toReference Decimal   @db.Decimal(18, 9)
   fractional  Boolean
+  products    Product[]
 
   @@map("unit")
 }

@@ -175,8 +175,10 @@ describe("product", () => {
       "id",
       "name",
       "organizationId",
+      "quantityStep",
       "sku",
       "status",
+      "unitCode",
       "updatedAt",
     ]);
   });
