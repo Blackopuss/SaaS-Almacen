@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  updateProductAction: {
+    input: "id de producto y los campos de la ficha (sin cantidades)",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el producto se busca solo en esa empresa",
+    coveredBy: "tests/platform/product-update.int.test.ts",
+  },
   createProductAction: {
     input: "clave, nombre, descripción, categoría, marca y código de barras",
     identity:

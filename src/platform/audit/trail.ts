@@ -17,6 +17,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "ownership.transfer_cancelled": "Canceló la transferencia de titularidad",
   "ownership.transferred": "Aceptó la titularidad de la empresa",
   "product.created": "Creó un producto",
+  "product.updated": "Cambió la ficha de un producto",
   "plan.provisioned": "Se asignó el plan de la empresa",
   "module.activated": "Se activó un módulo",
   "module.deactivated": "Se desactivó un módulo",

@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
-import { createProduct, type ProductField } from "@/platform/catalog";
+import {
+  createProduct,
+  updateProduct,
+  type ProductField,
+} from "@/platform/catalog";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
 export type ProductFormState = {
@@ -51,4 +55,46 @@ export async function createProductAction(
   }
   revalidatePath("/inventario");
   redirect(`/inventario?creado=${encodeURIComponent(values.sku.trim())}`);
+}
+
+/** Saves the card of a product. The id is bound by the page; the service
+ * looks for it only inside the company of the session. */
+export async function updateProductAction(
+  productId: string,
+  _prev: ProductFormState,
+  formData: FormData,
+): Promise<ProductFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const value = (name: ProductField) => String(formData.get(name) ?? "");
+  const values = {
+    sku: value("sku"),
+    name: value("name"),
+    description: value("description"),
+    category: value("category"),
+    brand: value("brand"),
+    barcode: value("barcode"),
+  };
+
+  let result;
+  try {
+    result = await updateProduct(
+      { organizationId: organization.id, userId: user.id },
+      String(productId),
+      values,
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { fieldErrors: {}, formError: error.message, values };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError,
+      values,
+    };
+  }
+  revalidatePath("/inventario");
+  redirect(`/inventario?guardado=${encodeURIComponent(values.sku.trim())}`);
 }

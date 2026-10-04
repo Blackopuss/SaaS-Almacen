@@ -56,7 +56,8 @@ export type CreateProductResult =
   | { ok: true; productId: string }
   | {
       ok: false;
-      reason: "invalid" | "duplicate" | "limit_reached";
+      reason:
+        "invalid" | "duplicate" | "limit_reached" | "not_found" | "unchanged";
       fieldErrors: Partial<Record<ProductField, string>>;
       formError?: string;
     };
@@ -262,4 +263,205 @@ export async function listProductGroups(
     categories: categories.map((c) => c.name),
     brands: brands.map((b) => b.name),
   };
+}
+
+export type ProductCard = ProductSummary & {
+  description: string | null;
+  status: "ACTIVE" | "ARCHIVED";
+  updatedAt: Date;
+};
+
+/** One product of the company, or null when it is not there. */
+export async function getProduct(
+  actor: CatalogActor,
+  productId: string,
+): Promise<ProductCard | null> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.product.read",
+  );
+  const row = await forOrganization(actor.organizationId).product.findFirst({
+    where: { id: String(productId) },
+    select: {
+      id: true,
+      sku: true,
+      name: true,
+      description: true,
+      barcode: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      category: { select: { name: true } },
+      brand: { select: { name: true } },
+    },
+  });
+  if (!row) return null;
+  return {
+    id: row.id,
+    sku: row.sku,
+    name: row.name,
+    description: row.description,
+    category: row.category?.name ?? null,
+    brand: row.brand?.name ?? null,
+    barcode: row.barcode,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export type UpdateProductResult = CreateProductResult;
+
+/** Fields of the card as people see them, for the audit log. */
+const FIELD_LABELS: Record<ProductField, string> = {
+  sku: "Clave",
+  name: "Nombre",
+  description: "Descripción",
+  category: "Categoría",
+  brand: "Marca",
+  barcode: "Código de barras",
+};
+
+/**
+ * Changes the card of a product (INV-03): its descriptive fields only.
+ * Quantities are not part of the card; stock changes only through
+ * movements. Every change is recorded with the previous and new values.
+ */
+export async function updateProduct(
+  actor: CatalogActor,
+  productId: string,
+  input: ProductInput,
+): Promise<UpdateProductResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.product.update",
+  );
+
+  const parsed = productSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<ProductField, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0] as ProductField;
+      fieldErrors[field] ??= issue.message;
+    }
+    return { ok: false, reason: "invalid", fieldErrors };
+  }
+  const data = parsed.data;
+  const id = String(productId);
+
+  try {
+    await forOrganization(organizationId).$transaction(async (tx) => {
+      const current = await tx.product.findFirst({
+        where: { id },
+        select: {
+          sku: true,
+          name: true,
+          description: true,
+          barcode: true,
+          category: { select: { name: true } },
+          brand: { select: { name: true } },
+        },
+      });
+      if (!current) {
+        throw new Rejected({
+          ok: false,
+          reason: "not_found",
+          fieldErrors: {},
+          formError: "Este producto ya no existe.",
+        });
+      }
+      const before: Record<ProductField, string | null> = {
+        sku: current.sku,
+        name: current.name,
+        description: current.description,
+        category: current.category?.name ?? null,
+        brand: current.brand?.name ?? null,
+        barcode: current.barcode,
+      };
+      const after: Record<ProductField, string | null> = { ...data };
+      const changed = (Object.keys(before) as ProductField[]).filter(
+        (field) => before[field] !== after[field],
+      );
+      if (changed.length === 0) {
+        throw new Rejected({
+          ok: false,
+          reason: "unchanged",
+          fieldErrors: {},
+          formError: "No hay cambios que guardar.",
+        });
+      }
+
+      const sameSku = await tx.product.findFirst({
+        where: { sku: data.sku, NOT: { id } },
+        select: { id: true },
+      });
+      if (sameSku) throw new Rejected(duplicate("sku"));
+      if (data.barcode) {
+        const sameBarcode = await tx.product.findFirst({
+          where: { barcode: data.barcode, NOT: { id } },
+          select: { id: true },
+        });
+        if (sameBarcode) throw new Rejected(duplicate("barcode"));
+      }
+
+      const category = data.category
+        ? await tx.productCategory.upsert({
+            where: {
+              organizationId_name: { organizationId, name: data.category },
+            },
+            update: {},
+            create: { id: newId(), organizationId, name: data.category },
+            select: { id: true },
+          })
+        : null;
+      const brand = data.brand
+        ? await tx.productBrand.upsert({
+            where: {
+              organizationId_name: { organizationId, name: data.brand },
+            },
+            update: {},
+            create: { id: newId(), organizationId, name: data.brand },
+            select: { id: true },
+          })
+        : null;
+
+      await tx.product.update({
+        where: { id },
+        data: {
+          sku: data.sku,
+          name: data.name,
+          description: data.description,
+          categoryId: category?.id ?? null,
+          brandId: brand?.id ?? null,
+          barcode: data.barcode,
+        },
+      });
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "product.updated",
+        target: { type: "product", id },
+        metadata: {
+          sku: data.sku,
+          changes: Object.fromEntries(
+            changed.map((field) => [
+              FIELD_LABELS[field],
+              { antes: before[field], ahora: after[field] },
+            ]),
+          ),
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof Rejected) return error.result;
+    if ((error as { code?: string }).code === "P2002") {
+      const target = JSON.stringify((error as { meta?: unknown }).meta ?? "");
+      return duplicate(target.includes("barcode") ? "barcode" : "sku");
+    }
+    throw error;
+  }
+  return { ok: true, productId: id };
 }

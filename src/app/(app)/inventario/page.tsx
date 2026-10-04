@@ -1,4 +1,4 @@
-import { CircleCheck, Package, Plus } from "lucide-react";
+import { CircleCheck, Package, Pencil, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -37,8 +37,10 @@ export default async function InventarioPage({
     );
   }
 
-  const { creado } = await searchParams;
+  const { creado, guardado } = await searchParams;
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
+  const saved = typeof guardado === "string" ? guardado.slice(0, 64) : "";
+  const canEdit = access.allows("inventory.product.update");
   const products = await listRecentProducts({
     organizationId: access.organization.id,
     userId: access.user.id,
@@ -76,6 +78,20 @@ export default async function InventarioPage({
           </p>
         </div>
       )}
+      {saved && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-success/30 bg-success/10 p-4 text-sm"
+        >
+          <CircleCheck
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-success"
+          />
+          <p>
+            Cambios de <span className="font-medium">{saved}</span> guardados.
+          </p>
+        </div>
+      )}
       {products.length === 0 ? (
         <EmptyState
           icon={Package}
@@ -93,13 +109,29 @@ export default async function InventarioPage({
           </h2>
           <ul className="divide-y">
             {products.map((product) => (
-              <li key={product.id} className="p-4 sm:px-5">
-                <p className="font-medium">{product.name}</p>
-                <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                  {[product.sku, product.category, product.brand]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+              <li
+                key={product.id}
+                className="flex items-center gap-3 p-4 sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{product.name}</p>
+                  <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                    {[product.sku, product.category, product.brand]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                {canEdit && (
+                  <Button asChild variant="ghost">
+                    <Link
+                      href={`/inventario/${product.id}/editar`}
+                      aria-label={`Editar ${product.name}`}
+                    >
+                      <Pencil aria-hidden="true" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </Link>
+                  </Button>
+                )}
               </li>
             ))}
           </ul>

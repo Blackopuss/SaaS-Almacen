@@ -8,18 +8,15 @@ import { FormField } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { createProductAction, type ProductFormState } from "../actions";
+import type { ProductFormState } from "./actions";
 
-const initialState: ProductFormState = {
-  fieldErrors: {},
-  values: {
-    sku: "",
-    name: "",
-    description: "",
-    category: "",
-    brand: "",
-    barcode: "",
-  },
+export const EMPTY_PRODUCT: ProductFormState["values"] = {
+  sku: "",
+  name: "",
+  description: "",
+  category: "",
+  brand: "",
+  barcode: "",
 };
 
 const FIELD_ORDER = [
@@ -31,17 +28,27 @@ const FIELD_ORDER = [
   "description",
 ] as const;
 
+/** Card of a product: used to create it and to edit it (INV-02, INV-03). */
 export function ProductForm({
+  action,
+  initial,
+  submitLabel,
   categories,
   brands,
 }: {
+  action: (
+    prev: ProductFormState,
+    formData: FormData,
+  ) => Promise<ProductFormState>;
+  initial: ProductFormState["values"];
+  submitLabel: string;
   categories: string[];
   brands: string[];
 }) {
-  const [state, formAction, pending] = useActionState(
-    createProductAction,
-    initialState,
-  );
+  const [state, formAction, pending] = useActionState(action, {
+    fieldErrors: {},
+    values: initial,
+  });
   const formRef = useRef<HTMLFormElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
 
@@ -207,7 +214,7 @@ export function ProductForm({
         </Button>
         <Button type="submit" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
-          {pending ? "Guardando…" : "Guardar producto"}
+          {pending ? "Guardando…" : submitLabel}
         </Button>
       </div>
     </form>

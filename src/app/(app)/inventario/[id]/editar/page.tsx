@@ -1,6 +1,7 @@
 import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import {
   NoAccessState,
@@ -10,15 +11,17 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { getModuleAccess } from "@/platform/billing";
-import { listProductGroups } from "@/platform/catalog";
+import { getProduct, listProductGroups } from "@/platform/catalog";
 
-import { createProductAction } from "../actions";
-import { EMPTY_PRODUCT, ProductForm } from "../product-form";
+import { updateProductAction } from "../../actions";
+import { ProductForm } from "../../product-form";
 
-export const metadata: Metadata = { title: "Nuevo producto" };
+export const metadata: Metadata = { title: "Editar producto" };
 
-/** New product (INV-02). */
-export default async function NuevoProductoPage() {
+/** Card of a product (INV-03). Quantities are never edited here. */
+export default async function EditarProductoPage({
+  params,
+}: PageProps<"/inventario/[id]/editar">) {
   const access = await getModuleAccess();
   const back = (
     <Link
@@ -29,7 +32,7 @@ export default async function NuevoProductoPage() {
       Inventario
     </Link>
   );
-  if (!access.can("inventory.product.create")) {
+  if (!access.can("inventory.product.update")) {
     return (
       <PageContainer>
         {back}
@@ -51,21 +54,35 @@ export default async function NuevoProductoPage() {
     );
   }
 
-  const groups = await listProductGroups({
+  const actor = {
     organizationId: access.organization.id,
     userId: access.user.id,
-  });
+  };
+  const { id } = await params;
+  const [product, groups] = await Promise.all([
+    getProduct(actor, id),
+    listProductGroups(actor),
+  ]);
+  if (!product) notFound();
+
   return (
     <PageContainer>
       {back}
       <PageHeader
-        title="Nuevo producto"
-        description="Solo la clave y el nombre son obligatorios. Las existencias se registran después con una entrada."
+        title="Editar producto"
+        description="Cambia los datos de la ficha. Las existencias no se editan aquí: se mueven con entradas, salidas y ajustes."
       />
       <ProductForm
-        action={createProductAction}
-        initial={EMPTY_PRODUCT}
-        submitLabel="Guardar producto"
+        action={updateProductAction.bind(null, product.id)}
+        initial={{
+          sku: product.sku,
+          name: product.name,
+          description: product.description ?? "",
+          category: product.category ?? "",
+          brand: product.brand ?? "",
+          barcode: product.barcode ?? "",
+        }}
+        submitLabel="Guardar cambios"
         categories={groups.categories}
         brands={groups.brands}
       />
