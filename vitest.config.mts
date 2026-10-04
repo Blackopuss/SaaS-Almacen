@@ -39,6 +39,10 @@ export default defineConfig({
           globalSetup: ["./tests/setup/global-db.ts"],
           // Tests share one database: run files one at a time.
           fileParallelism: false,
+          // Worker threads instead of child processes: on Windows a forked
+          // worker sometimes died at start (exit 0xC0000409) with no test
+          // failing. Nothing here needs a separate process.
+          pool: "threads",
         },
       },
     ],

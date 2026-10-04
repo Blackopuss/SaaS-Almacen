@@ -29,7 +29,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V7 | Ver y cerrar sesiones propias | Cumple | Configuración → Seguridad. |
 | V7 | Cierre de sesiones al cambiar contraseña | Cumple | `revokeSessionsOnPasswordReset`. |
 | V8 Autorización | Denegar por defecto y aislamiento entre empresas | Cumple | `requireOrganizationContext`, `forOrganization`, llaves compuestas, `tests/isolation`. |
-| V8 | Permisos por rol | Cumple | Decisión central `can` (denegar por defecto), guardas `requirePermission`/`assertOwnerAction`, reglas de equipo y pantallas que comprueban en servidor (USR-02 a USR-10); `policy.test.ts`, `negative-by-role.int.test.ts`, `navigation.test.ts`. Revisión en `REVISION_USR.md`. |
+| V8 | Permisos por rol | Cumple | Decisión central `can` (denegar por defecto), guardas `requirePermission`/`assertOwnerAction`, reglas de equipo y pantallas que comprueban en servidor (USR-02 a USR-10); `policy.test.ts`, `negative-by-role.int.test.ts`, `navigation.int.test.ts`. Revisión en `REVISION_USR.md`. |
 | V8 | Reautenticación en operaciones críticas (transferir titularidad) | Pendiente | Hallazgo USR-S01. |
 | V9 Tokens autocontenidos | — | N/A | No se usan JWT de sesión. |
 | V10 OAuth/OIDC | — | N/A | Sin inicio de sesión con terceros. |

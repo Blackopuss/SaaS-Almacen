@@ -65,6 +65,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Pruebas (BAS-07)
 
 - `npm test` corre `unit` (`src/**/*.test.ts`) e `integration` (`*.int.test.ts`). Requiere MySQL local corriendo.
+- Una prueba que importe `@/platform/*`, `@/modules/*` o `@/server` (aunque no consulte la base) se llama `*.int.test.ts`: carga el cliente de base de datos y debe correr en el proyecto secuencial. `unit` queda para código puro (`src/lib`, catálogos, reglas). Integración corre en hilos (`pool: "threads"`).
 - La integración usa siempre `almacen_test` (nunca dev): migra y vacía tablas al iniciar. Fixtures con DDL usan `migratorConnection()` de `tests/setup/test-db.ts`; el código bajo prueba usa `db` (usuario de la app).
 
 ## Sistema visual (BAS-12)

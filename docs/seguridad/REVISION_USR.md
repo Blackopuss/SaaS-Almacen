@@ -22,7 +22,7 @@ Fecha: 2026-10-04. Complementa `REVISION_PLT.md`. Hecha por la misma IA que impl
 | Secuestro de cuenta existente mediante «crear cuenta» desde la invitación | Si el correo ya tiene cuenta se exige iniciar sesión; no se cambia ninguna contraseña | `invitation-accept.int.test.ts` |
 | Spam de invitaciones desde una empresa | 20 por empresa por hora; 30 intentos de aceptación por IP cada 15 min | `invitations.int.test.ts`, `invitation-accept.int.test.ts` |
 | Persona desactivada que conserva acceso por una sesión abierta | Se borran sus sesiones en la misma transacción y cada petición revalida la membresía | `team-disable.int.test.ts` |
-| Llamar la acción o la URL aunque el botón esté oculto | Cada pantalla y cada servicio comprueba el permiso en servidor | `navigation.test.ts`, `server-actions.int.test.ts` |
+| Llamar la acción o la URL aunque el botón esté oculto | Cada pantalla y cada servicio comprueba el permiso en servidor | `navigation.int.test.ts`, `server-actions.int.test.ts` |
 | Acciones de equipo sobre otra empresa cambiando ids | Persona y empresa salen de la sesión; consultas con `forOrganization` | `two-companies.int.test.ts`, pruebas de cada servicio |
 | Borrar el rastro de un cambio de equipo | Bitácora solo-agregar en la misma transacción del cambio | `team-audit.int.test.ts`, `audit.int.test.ts` |
 
