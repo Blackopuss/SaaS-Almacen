@@ -87,7 +87,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Autenticación y decisiones (BAS-04/05)
 
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
-- Seguridad: `docs/seguridad/REVISION_PLT.md` (amenazas y hallazgos) y `docs/seguridad/ASVS.md` (matriz); actualizar ambas al cerrar cada etapa. Cabeceras de seguridad en `next.config.ts`.
+- Seguridad: `docs/seguridad/REVISION_PLT.md` y `REVISION_USR.md` (amenazas y hallazgos por etapa) y `docs/seguridad/ASVS.md` (matriz); actualizar ambas al cerrar cada etapa. Cabeceras de seguridad en `next.config.ts`.
 - Antes de desplegar (BAS-09..11, PIL-01): revisar «Requisitos de producción» y «Pendientes» de `docs/adr/0003-autenticacion.md`.
 - Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas, bitácora). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 38 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-11 (auditoría de cambios de equipo)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 39 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-01 (contrato de módulo)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -123,6 +123,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Pantalla de equipo (USR-08):** acciones en `src/app/(app)/configuracion/equipo/actions.ts`; persona y empresa salen de `requireOrganizationContext()`. Un diálogo que se cierra tras una Server Action lo hace dentro de la acción envuelta en `useActionState` (no con `setState` en un efecto: lo prohíbe ESLint).
 - **Pantalla nueva (USR-09):** empieza con `const access = await getAccess(); if (!access.can("…")) return <PageContainer><NoAccessState /></PageContainer>;` y, si va en el menú, lleva el mismo permiso en `nav.ts`. Botones y enlaces de una acción se pintan solo si `access.can(...)`; la Server Action lo comprueba otra vez en su servicio.
 - **Casos negativos (USR-10):** al construir algo que menciona un caso `NEG-xx` de la matriz, escribir su prueba y actualizar `NEGATIVE_CASES` en `tests/platform/negative-by-role.int.test.ts` (quitar `waitsFor`, agregar el archivo).
+- **Acción de bitácora nueva (USR-11):** agregar su frase en español a `AUDIT_ACTION_LABELS` (`src/platform/audit/trail.ts`); `team-audit.int.test.ts` falla si falta.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

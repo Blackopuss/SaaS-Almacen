@@ -301,6 +301,23 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // Audit trail (USR-11): the titular reads who changed what.
+    await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    await page.getByRole("link", { name: /Bitácora/ }).click();
+    await page.waitForURL("**/configuracion/bitacora");
+    await page.getByRole("heading", { name: "Bitácora", level: 1 }).waitFor();
+    const trailOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/bitacora-${viewport.name}.png` });
+    check(
+      (await page
+        .getByRole("region", { name: "Registros" })
+        .getByRole("listitem")
+        .count()) > 0 && trailOverflow <= 0,
+      `${viewport.name}: the audit trail lists the company's changes without overflow`,
+    );
+
     await page.goto(`${BASE}/inventario`, { waitUntil: "networkidle" });
     await page.screenshot({ path: `${OUT}/shell-${viewport.name}.png` });
 

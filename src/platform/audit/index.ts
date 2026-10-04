@@ -12,3 +12,9 @@ export type {
 } from "./events";
 export { sanitizeMetadata } from "./sanitize";
 export type { AuditMetadata } from "./sanitize";
+export {
+  AUDIT_ACTION_LABELS,
+  describeAuditAction,
+  listAuditTrail,
+} from "./trail";
+export type { AuditTrailEntry } from "./trail";
