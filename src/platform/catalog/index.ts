@@ -55,3 +55,19 @@ export type {
   PresentationResult,
   PresentationVersionInfo,
 } from "./presentations";
+export {
+  convertCapture,
+  describeInPresentation,
+  pluralizeName,
+} from "./conversion";
+export type {
+  Capture,
+  Conversion,
+  ConversionResult,
+  ResolvedPresentation,
+} from "./conversion";
+export { previewConversion, resolveConversion } from "./conversion-service";
+export type {
+  ConversionPreview,
+  ResolvedConversion,
+} from "./conversion-service";

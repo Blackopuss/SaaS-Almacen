@@ -100,8 +100,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 58 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-09 (servicio de conversión y vista previa en servidor)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08, INV-09. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 59 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-10 (lista de productos paginada en servidor)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -138,6 +138,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Productos (INV-02):** las altas solo por `createProduct`; el actor (`{ organizationId, userId }`) sale siempre de la sesión. Un fallo esperado dentro de una transacción se saca con una excepción propia (ver `Rejected`) para que todo se revierta, cupo incluido.
 - **Unidades (INV-05):** agregar o cambiar una unidad = `UNITS` en código + migración que actualice la tabla `unit`. Una tabla sembrada por migración se agrega a `REFERENCE_TABLES` en `tests/setup/global-db.ts`.
 - **Cantidades (INV-06):** toda cantidad capturada pasa por `parseQuantity` con la regla del producto (`unitCode`, `quantityStep`); nunca `Number()` ni redondeos. Componentes cliente no importan `@/platform/*`: las opciones (unidades, precisiones) se arman en el servidor y se pasan como props (ver `unit-options.ts`).
+- **Conversión (INV-09):** todo movimiento convierte su captura con `resolveConversion(tx, productId, captura)` dentro de su transacción y guarda cantidad capturada, factor, versión de presentación y cantidad base; el navegador solo manda lo tecleado y el id de la presentación.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)
