@@ -20,3 +20,15 @@ export type {
   ProductSummary,
   UpdateProductResult,
 } from "./products";
+export {
+  DIMENSIONS,
+  DIMENSION_LABELS,
+  UNITS,
+  areCompatible,
+  convertUnits,
+  formatQuantity,
+  getUnit,
+  isUnitCode,
+  unitsOfDimension,
+} from "./units";
+export type { Dimension, Unit, UnitCode } from "./units";

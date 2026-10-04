@@ -3,8 +3,15 @@ import { execSync } from "node:child_process";
 import { migratorConnection, testDatabaseName } from "./test-db";
 
 /**
+ * Tables seeded by migrations (fixed catalogs shared by every company).
+ * They are part of the schema, not test data: never emptied.
+ */
+const REFERENCE_TABLES = ["unit"];
+
+/**
  * Runs once before integration tests: applies migrations to the test
- * database and empties every table so each run starts from a clean state.
+ * database and empties every table (except reference catalogs) so each run
+ * starts from a clean state.
  */
 export default async function setup(): Promise<void> {
   const database = testDatabaseName();
@@ -19,8 +26,9 @@ export default async function setup(): Promise<void> {
     const tables: { name: string }[] = await conn.query(
       `SELECT table_name AS name FROM information_schema.tables
        WHERE table_schema = ? AND table_type = 'BASE TABLE'
-         AND table_name <> '_prisma_migrations'`,
-      [database],
+         AND table_name <> '_prisma_migrations'
+         AND table_name NOT IN (${REFERENCE_TABLES.map(() => "?").join(", ")})`,
+      [database, ...REFERENCE_TABLES],
     );
     await conn.query("SET FOREIGN_KEY_CHECKS = 0");
     for (const { name } of tables) {

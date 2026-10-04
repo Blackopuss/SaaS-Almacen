@@ -539,3 +539,22 @@ model Product {
   @@index([organizationId, brandId])
   @@map("product")
 }
+
+// ── Units of measure (INV-05) ────────────────────────────────────────────
+
+/// Fixed catalog shared by every company, seeded by migration from
+/// src/platform/catalog/units.ts (a test keeps both equal). Reference
+/// data: it has no company and is never emptied by the test setup.
+model Unit {
+  code        String  @id @db.VarChar(12)
+  /// count, mass, length, volume or area.
+  dimension   String  @db.VarChar(12)
+  name        String  @db.VarChar(40)
+  plural      String  @db.VarChar(40)
+  symbol      String  @db.VarChar(8)
+  /// Reference units of its dimension in one of this unit.
+  toReference Decimal @db.Decimal(18, 9)
+  fractional  Boolean
+
+  @@map("unit")
+}
