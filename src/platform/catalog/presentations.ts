@@ -34,7 +34,7 @@ export type PresentationResult =
   | { ok: true; presentationId: string }
   | {
       ok: false;
-      reason: "invalid" | "duplicate" | "not_found";
+      reason: "invalid" | "duplicate" | "not_found" | "unchanged" | "conflict";
       fieldErrors: Partial<Record<PresentationField, string>>;
       formError?: string;
     };
@@ -208,4 +208,156 @@ export async function listPresentations(
         label: `${row.name} = ${formatDecimal(factor)} ${Number(factor) === 1 ? unit.name : unit.plural}`,
       };
     });
+}
+
+/**
+ * Changes the content of a presentation (INV-08): «Caja» goes from 100 to
+ * 120 piezas. Nothing is overwritten: a new version is added and becomes
+ * the current one. Movements already recorded keep the version they used,
+ * so their quantities and their reversals never change.
+ */
+export async function changePresentationFactor(
+  actor: CatalogActor,
+  presentationId: string,
+  input: { factor: string; reason?: string },
+): Promise<PresentationResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.presentation.update",
+  );
+  const id = String(presentationId);
+  try {
+    await forOrganization(organizationId).$transaction(async (tx) => {
+      const presentation = await tx.productPresentation.findFirst({
+        where: { id },
+        select: {
+          name: true,
+          product: {
+            select: {
+              id: true,
+              sku: true,
+              status: true,
+              unitCode: true,
+              quantityStep: true,
+            },
+          },
+          versions: {
+            orderBy: { version: "desc" },
+            take: 1,
+            select: { version: true, factor: true },
+          },
+        },
+      });
+      const current = presentation?.versions[0];
+      if (
+        !presentation ||
+        !current ||
+        presentation.product.status !== "ACTIVE"
+      ) {
+        throw new Rejected({
+          ok: false,
+          reason: "not_found",
+          fieldErrors: {},
+          formError:
+            "Esta presentación ya no existe o su producto está archivado.",
+        });
+      }
+      const { product } = presentation;
+      const factor = parseQuantity(
+        {
+          unitCode: product.unitCode,
+          quantityStep: product.quantityStep.toString(),
+        },
+        String(input.factor ?? ""),
+      );
+      if (!factor.ok) {
+        throw new Rejected({
+          ok: false,
+          reason: "invalid",
+          fieldErrors: { factor: factor.error },
+        });
+      }
+      if (factor.quantity.equals(current.factor.toString())) {
+        throw new Rejected({
+          ok: false,
+          reason: "unchanged",
+          fieldErrors: { factor: "Ese ya es su contenido actual." },
+        });
+      }
+      const unit = getUnit(product.unitCode);
+      // (presentationId, version) is unique: of two simultaneous changes
+      // only one becomes the next version.
+      await tx.presentationVersion.create({
+        data: {
+          id: newId(),
+          organizationId,
+          presentationId: id,
+          version: current.version + 1,
+          factor: factor.quantity.toString(),
+          createdByUserId: userId,
+        },
+      });
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "presentation.updated",
+        target: { type: "product", id: product.id },
+        reason: input.reason,
+        metadata: {
+          sku: product.sku,
+          presentation: presentation.name,
+          version: current.version + 1,
+          antes: `${formatDecimal(current.factor.toString())} ${unit.plural}`,
+          ahora: `${formatDecimal(factor.quantity)} ${unit.plural}`,
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof Rejected) return error.result;
+    if ((error as { code?: string }).code === "P2002") {
+      return {
+        ok: false,
+        reason: "conflict",
+        fieldErrors: {},
+        formError:
+          "Alguien más acaba de cambiar esta presentación. Revisa su contenido actual.",
+      };
+    }
+    throw error;
+  }
+  return { ok: true, presentationId: id };
+}
+
+export type PresentationVersionInfo = {
+  version: number;
+  factor: string;
+  createdAt: Date;
+  createdByUserId: string;
+};
+
+/** Every content a presentation has had, oldest first. */
+export async function listPresentationVersions(
+  actor: CatalogActor,
+  presentationId: string,
+): Promise<PresentationVersionInfo[]> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.presentation.read",
+  );
+  const rows = await forOrganization(
+    actor.organizationId,
+  ).presentationVersion.findMany({
+    where: { presentationId: String(presentationId) },
+    orderBy: { version: "asc" },
+    select: {
+      version: true,
+      factor: true,
+      createdAt: true,
+      createdByUserId: true,
+    },
+  });
+  return rows.map((row) => ({ ...row, factor: row.factor.toString() }));
 }

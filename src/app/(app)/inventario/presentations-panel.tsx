@@ -7,7 +7,7 @@ import { FormField } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import type { PresentationFormState } from "./actions";
+import type { FactorFormState, PresentationFormState } from "./actions";
 
 /** Presentations of a product and the form to add one (INV-07). */
 export function PresentationsPanel({
@@ -15,15 +15,22 @@ export function PresentationsPanel({
   presentations,
   unitPlural,
   canAdd,
+  changeAction,
 }: {
   action: (
     prev: PresentationFormState,
     formData: FormData,
   ) => Promise<PresentationFormState>;
-  presentations: { id: string; label: string }[];
+  presentations: { id: string; label: string; version: number }[];
   /** Plural name of the product's unit: "piezas", "metros". */
   unitPlural: string;
   canAdd: boolean;
+  /** Changes the content of one presentation; absent when not allowed. */
+  changeAction?: (
+    presentationId: string,
+    prev: FactorFormState,
+    formData: FormData,
+  ) => Promise<FactorFormState>;
 }) {
   const [state, formAction, pending] = useActionState(action, {
     fieldErrors: {},
@@ -67,8 +74,16 @@ export function PresentationsPanel({
       ) : (
         <ul className="divide-y rounded-lg border">
           {presentations.map((presentation) => (
-            <li key={presentation.id} className="p-3 font-medium">
-              {presentation.label}
+            <li key={presentation.id} className="space-y-2 p-3">
+              <p className="font-medium">{presentation.label}</p>
+              {changeAction && (
+                <ChangeContent
+                  key={`${presentation.id}-${presentation.version}`}
+                  id={presentation.id}
+                  action={changeAction.bind(null, presentation.id)}
+                  unitPlural={unitPlural}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -135,5 +150,53 @@ export function PresentationsPanel({
         </form>
       )}
     </section>
+  );
+}
+
+/** Disclosure with the form to change what a presentation contains (INV-08). */
+function ChangeContent({
+  id,
+  action,
+  unitPlural,
+}: {
+  id: string;
+  action: (
+    prev: FactorFormState,
+    formData: FormData,
+  ) => Promise<FactorFormState>;
+  unitPlural: string;
+}) {
+  const [state, formAction, pending] = useActionState(action, { value: "" });
+  const inputId = `factor-${id}`;
+  return (
+    <details className="text-sm">
+      <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+        Cambiar contenido
+      </summary>
+      <form action={formAction} noValidate className="mt-2 space-y-3">
+        <FormField
+          id={inputId}
+          label={`Nuevo contenido en ${unitPlural}`}
+          hint="Los movimientos ya registrados conservan el contenido anterior."
+          error={state.error}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="factor"
+              key={`${inputId}-${state.value}`}
+              defaultValue={state.value}
+              inputMode="decimal"
+              autoComplete="off"
+              className="sm:max-w-xs"
+            />
+          )}
+        </FormField>
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
+          {pending ? "Guardando…" : "Guardar contenido nuevo"}
+        </Button>
+      </form>
+    </details>
   );
 }

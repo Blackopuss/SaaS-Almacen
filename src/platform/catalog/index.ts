@@ -43,9 +43,15 @@ export {
   stepsForUnit,
 } from "./quantity";
 export type { ParsedQuantity, QuantityRule, QuantityStep } from "./quantity";
-export { createPresentation, listPresentations } from "./presentations";
+export {
+  changePresentationFactor,
+  createPresentation,
+  listPresentationVersions,
+  listPresentations,
+} from "./presentations";
 export type {
   Presentation,
   PresentationField,
   PresentationResult,
+  PresentationVersionInfo,
 } from "./presentations";

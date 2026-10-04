@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   archiveProduct,
+  changePresentationFactor,
   createPresentation,
   createProduct,
   reactivateProduct,
@@ -195,4 +196,45 @@ export async function createPresentationAction(
   }
   revalidatePath(`/inventario/${productId}/editar`);
   return { fieldErrors: {}, values: { name: "", factor: "" } };
+}
+
+export type FactorFormState = {
+  error?: string;
+  saved?: boolean;
+  value: string;
+};
+
+/** Changes the content of a presentation: a new version, never an overwrite. */
+export async function changePresentationFactorAction(
+  productId: string,
+  presentationId: string,
+  _prev: FactorFormState,
+  formData: FormData,
+): Promise<FactorFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const value = String(formData.get("factor") ?? "");
+  let result;
+  try {
+    result = await changePresentationFactor(
+      { organizationId: organization.id, userId: user.id },
+      String(presentationId),
+      { factor: value },
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { error: error.message, value };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      error:
+        result.fieldErrors.factor ??
+        result.formError ??
+        "No se pudo guardar el cambio.",
+      value,
+    };
+  }
+  revalidatePath(`/inventario/${productId}/editar`);
+  return { saved: true, value: "" };
 }

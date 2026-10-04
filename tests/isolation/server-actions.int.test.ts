@@ -18,6 +18,13 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  changePresentationFactorAction: {
+    input:
+      "id de producto (solo para refrescar), id de presentación y contenido nuevo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la presentación se busca solo en esa empresa",
+    coveredBy: "tests/platform/presentation-versions.int.test.ts",
+  },
   createPresentationAction: {
     input: "id de producto, nombre de la presentación y contenido",
     identity:

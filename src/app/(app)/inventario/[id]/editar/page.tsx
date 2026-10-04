@@ -18,7 +18,11 @@ import {
   listProductGroups,
 } from "@/platform/catalog";
 
-import { createPresentationAction, updateProductAction } from "../../actions";
+import {
+  changePresentationFactorAction,
+  createPresentationAction,
+  updateProductAction,
+} from "../../actions";
 import { PresentationsPanel } from "../../presentations-panel";
 import { ProductForm } from "../../product-form";
 import { ArchiveProduct } from "../../product-status";
@@ -119,7 +123,13 @@ export default async function EditarProductoPage({
           presentations={presentations.map((p) => ({
             id: p.id,
             label: p.label,
+            version: p.version,
           }))}
+          changeAction={
+            access.allows("inventory.presentation.update")
+              ? changePresentationFactorAction.bind(null, product.id)
+              : undefined
+          }
           unitPlural={getUnit(product.unitCode).plural}
           canAdd={access.allows("inventory.presentation.create")}
         />

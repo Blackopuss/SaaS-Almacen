@@ -19,6 +19,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "product.created": "Creó un producto",
   "product.updated": "Cambió la ficha de un producto",
   "presentation.created": "Agregó una presentación a un producto",
+  "presentation.updated": "Cambió el contenido de una presentación",
   "product.archived": "Archivó un producto",
   "product.reactivated": "Reactivó un producto",
   "plan.provisioned": "Se asignó el plan de la empresa",
