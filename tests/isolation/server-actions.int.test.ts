@@ -18,6 +18,36 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  inviteAction: {
+    input: "correo y roles",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/invitations.int.test.ts",
+  },
+  resendInvitationAction: {
+    input: "id de invitación",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/invitations.int.test.ts",
+  },
+  cancelInvitationAction: {
+    input: "id de invitación",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/invitations.int.test.ts",
+  },
+  assignRolesAction: {
+    input: "id de usuario y roles",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/team.int.test.ts",
+  },
+  disableMemberAction: {
+    input: "id de usuario y motivo",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/team-disable.int.test.ts",
+  },
+  reactivateMemberAction: {
+    input: "id de usuario",
+    identity: "sesión y empresa activa (requireOrganizationContext)",
+    coveredBy: "tests/platform/team-disable.int.test.ts",
+  },
   acceptInvitationAction: {
     input: "token de la invitación",
     identity:

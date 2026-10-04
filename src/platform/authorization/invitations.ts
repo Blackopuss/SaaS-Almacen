@@ -70,7 +70,6 @@ async function issue(
     actorUserId: string;
     email: string;
     roles: Role[];
-    action: "team.invitation_created" | "team.invitation_resent";
   },
 ) {
   const now = new Date();
@@ -102,7 +101,7 @@ async function issue(
   await recordAuditEvent(tx, {
     organizationId: input.organizationId,
     actorUserId: input.actorUserId,
-    action: input.action,
+    action: "team.invitation_created",
     target: { type: "invitation", id: invitationId },
     metadata: { email: input.email, roles: input.roles },
   });
@@ -183,7 +182,6 @@ export async function createInvitation(
       actorUserId,
       email: email.data,
       roles,
-      action: "team.invitation_created",
     }),
   );
   await deliver(organizationId, actorUserId, email.data, roles, issued.token);
@@ -228,22 +226,33 @@ export async function resendInvitation(
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
   await recordAttempt(key);
 
-  const issued = await db.$transaction((tx) =>
-    issue(tx, {
-      organizationId,
-      actorUserId,
-      email: invitation.email,
-      roles,
-      action: "team.invitation_resent",
-    }),
+  // Same invitation, new token: the old link stops working and the row
+  // keeps its id (the screen may still be showing it).
+  const token = randomBytes(32).toString("base64url");
+  const renewed = await forOrganization(organizationId).$transaction(
+    async (tx) => {
+      const updated = await tx.invitation.updateMany({
+        where: { id: String(invitationId), status: "PENDING" },
+        data: {
+          tokenHash: hashInvitationToken(token),
+          expiresAt: new Date(
+            Date.now() + INVITATION_DAYS * 24 * 60 * 60 * 1000,
+          ),
+        },
+      });
+      if (updated.count === 0) return false;
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId,
+        action: "team.invitation_resent",
+        target: { type: "invitation", id: String(invitationId) },
+        metadata: { email: invitation.email, roles },
+      });
+      return true;
+    },
   );
-  await deliver(
-    organizationId,
-    actorUserId,
-    invitation.email,
-    roles,
-    issued.token,
-  );
+  if (!renewed) return { ok: false, error: GONE };
+  await deliver(organizationId, actorUserId, invitation.email, roles, token);
   return { ok: true };
 }
 

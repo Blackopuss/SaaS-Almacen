@@ -235,6 +235,72 @@ try {
         `${viewport.name}: ${path} renders without overflow and marks the active link`,
       );
     }
+    // Team screen (USR-08): reached from Configuración; the demo account is
+    // the titular, so it sees itself protected and may invite any role.
+    await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    await page.getByRole("link", { name: /Equipo/ }).click();
+    await page.waitForURL("**/configuracion/equipo");
+    await page.getByRole("heading", { name: "Equipo", level: 1 }).waitFor();
+    const people = page.getByRole("region", { name: "Personas" });
+    check(
+      (await people.getByText("Titular", { exact: true }).isVisible()) &&
+        (await people.getByText("Tú", { exact: true }).isVisible()) &&
+        (await people.getByRole("button", { name: /Desactivar a/ }).count()) <=
+          (await people.getByRole("listitem").count()) - 1 &&
+        (await page
+          .getByRole("region", { name: "Invitaciones pendientes" })
+          .isVisible()),
+      `${viewport.name}: team lists people with the titular protected and pending invitations`,
+    );
+    await page.getByRole("button", { name: "Invitar persona" }).click();
+    const inviteDialog = page.getByRole("dialog", {
+      name: "Invitar a tu equipo",
+    });
+    await inviteDialog.waitFor();
+    const roleBoxes = inviteDialog.getByRole("checkbox");
+    const smallRoles = await inviteDialog
+      .locator("label:has(input[type=checkbox])")
+      .evaluateAll(
+        (labels) =>
+          labels.filter((label) => label.getBoundingClientRect().height < 44)
+            .length,
+      );
+    await inviteDialog
+      .getByRole("button", { name: "Enviar invitación" })
+      .click();
+    await inviteDialog.getByText("Elige al menos un rol válido.").waitFor();
+    const teamOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/equipo-${viewport.name}.png` });
+    check(
+      (await roleBoxes.count()) === 4 && smallRoles === 0 && teamOverflow <= 0,
+      `${viewport.name}: the invite dialog offers the four roles with large targets and explains a missing role`,
+    );
+
+    // Optional round trip that leaves a cancelled invitation behind:
+    // TEAM_E2E=1 npm run verify:ui
+    if (process.env.TEAM_E2E === "1" && !mobile) {
+      const address = `equipo.${Date.now()}@example.test`;
+      await inviteDialog.locator("#invite-email").fill(address);
+      await inviteDialog.getByRole("checkbox", { name: /Consulta/ }).check();
+      await inviteDialog
+        .getByRole("button", { name: "Enviar invitación" })
+        .click();
+      const pendingRow = page
+        .getByRole("region", { name: "Invitaciones pendientes" })
+        .getByRole("listitem")
+        .filter({ hasText: address });
+      await pendingRow.waitFor();
+      await pendingRow.getByRole("button", { name: /Reenviar/ }).click();
+      await page.getByText("Enviamos un enlace nuevo").waitFor();
+      await pendingRow.getByRole("button", { name: /Cancelar/ }).click();
+      await pendingRow.waitFor({ state: "detached" });
+      check(true, "desktop: invite, resend and cancel an invitation");
+    } else {
+      await page.keyboard.press("Escape");
+    }
+
     await page.goto(`${BASE}/inventario`, { waitUntil: "networkidle" });
     await page.screenshot({ path: `${OUT}/shell-${viewport.name}.png` });
 

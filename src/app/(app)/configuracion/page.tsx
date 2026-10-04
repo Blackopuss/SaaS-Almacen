@@ -1,8 +1,10 @@
+import { ChevronRight, Users } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageContainer, PageHeader } from "@/components";
 import { getMfaStatus, listActiveSessions } from "@/platform/auth";
-import { requireOrganizationContext } from "@/platform/tenancy";
+import { getAccess } from "@/platform/authorization";
 
 import { MfaPanel } from "./mfa-panel";
 import { SessionsPanel } from "./sessions-panel";
@@ -10,7 +12,8 @@ import { SessionsPanel } from "./sessions-panel";
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
-  const { user, sessionId } = await requireOrganizationContext();
+  const access = await getAccess();
+  const { user, sessionId } = access;
   const [sessions, mfa] = await Promise.all([
     listActiveSessions(user.id, sessionId),
     getMfaStatus(user.id),
@@ -22,6 +25,31 @@ export default async function ConfiguracionPage() {
         title="Configuración"
         description="Tu negocio, usuarios, plan y seguridad."
       />
+      {access.can("platform.team.read") && (
+        <section aria-labelledby="empresa" className="space-y-3">
+          <h2 id="empresa" className="text-lg font-semibold">
+            Empresa
+          </h2>
+          <Link
+            href="/configuracion/equipo"
+            className="flex min-h-11 items-center gap-3 rounded-xl border bg-card p-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-5"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground">
+              <Users aria-hidden="true" className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">Equipo</span>
+              <span className="block text-sm text-muted-foreground">
+                Personas, roles e invitaciones.
+              </span>
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="size-5 shrink-0 text-muted-foreground"
+            />
+          </Link>
+        </section>
+      )}
       <section aria-labelledby="seguridad" className="space-y-3">
         <h2 id="seguridad" className="text-lg font-semibold">
           Seguridad
