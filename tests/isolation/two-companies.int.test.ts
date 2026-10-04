@@ -150,6 +150,23 @@ beforeAll(async () => {
         activeFrom: new Date(),
       },
     });
+    const category = await db.productCategory.create({
+      data: { id: newId(), organizationId, name: "Tornillería" },
+    });
+    const brand = await db.productBrand.create({
+      data: { id: newId(), organizationId, name: "Truper" },
+    });
+    await db.product.create({
+      data: {
+        id: newId(),
+        organizationId,
+        sku: "TOR-001",
+        name: "Tornillo 1/4",
+        categoryId: category.id,
+        brandId: brand.id,
+        barcode: "7501234567890",
+      },
+    });
     await db.quotaUsage.create({
       data: { id: newId(), organizationId, key: "active_products", taken: 1 },
     });

@@ -127,6 +127,9 @@ model Organization {
   subscriptionItems  SubscriptionItem[]
   entitlements       Entitlement[]
   quotaUsages        QuotaUsage[]
+  products           Product[]
+  productCategories  ProductCategory[]
+  productBrands      ProductBrand[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -467,4 +470,72 @@ model PlatformStaff {
   disabledAt DateTime? @db.DateTime(3)
 
   @@map("platform_staff")
+}
+
+// ── Product catalog (INV-01) ─────────────────────────────────────────────
+// The catalog belongs to the shared core (platform/catalog): Inventario,
+// Compras and later Ventas use the same products. Text columns use the
+// database's case- and accent-insensitive collation, so "tor-001" and
+// "TOR-001" are the same SKU.
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Grouping chosen by the business: "Tornillería", "Pinturas".
+model ProductCategory {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String       @db.VarChar(80)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+  products       Product[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@map("product_category")
+}
+
+model ProductBrand {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String       @db.VarChar(80)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+  products       Product[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@map("product_brand")
+}
+
+/// One thing the business keeps in stock. Quantities never live here:
+/// stock is the sum of movements (INV-15). An active product takes one
+/// place of the plan's quota; an archived one does not.
+model Product {
+  id             String           @id @db.Char(36)
+  organizationId String           @db.Char(36)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Code the business uses for the product; unique in the company.
+  sku            String           @db.VarChar(64)
+  name           String           @db.VarChar(160)
+  description    String?          @db.Text
+  categoryId     String?          @db.Char(36)
+  category       ProductCategory? @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
+  brandId        String?          @db.Char(36)
+  brand          ProductBrand?    @relation(fields: [organizationId, brandId], references: [organizationId, id], onDelete: Restrict)
+  /// Printed code read by a scanner; unique in the company when present.
+  barcode        String?          @db.VarChar(64)
+  status         ProductStatus    @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @db.DateTime(3)
+  updatedAt      DateTime         @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId, status, name])
+  @@index([organizationId, categoryId])
+  @@index([organizationId, brandId])
+  @@map("product")
 }
