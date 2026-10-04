@@ -1,8 +1,8 @@
-import { ChevronLeft, ShieldAlert } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { EmptyState, PageContainer, PageHeader } from "@/components";
+import { NoAccessState, PageContainer, PageHeader } from "@/components";
 import {
   ROLE_LABELS,
   assignableRoles,
@@ -37,8 +37,7 @@ export default async function EquipoPage() {
     return (
       <PageContainer>
         <BackLink />
-        <EmptyState
-          icon={ShieldAlert}
+        <NoAccessState
           title="No tienes acceso al equipo"
           description="Solo el titular y los administradores pueden ver y cambiar quién trabaja en la empresa."
         />

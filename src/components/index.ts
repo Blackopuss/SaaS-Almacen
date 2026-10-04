@@ -1,7 +1,7 @@
 // Shared visual components. shadcn/ui primitives live in ./ui.
 export { AppShell } from "./app-shell/app-shell";
 export type { ShellOrganization, ShellUser } from "./app-shell/app-shell";
-export { NAV_ITEMS, isActive } from "./app-shell/nav";
+export { NAV_ITEMS, isActive, visibleNavItems } from "./app-shell/nav";
 export type { NavItem } from "./app-shell/nav";
 export {
   AnimatePresence,
@@ -13,6 +13,7 @@ export {
 export { Providers } from "./providers";
 export {
   EmptyState,
+  NoAccessState,
   ErrorState,
   LoadingState,
   PageContainer,

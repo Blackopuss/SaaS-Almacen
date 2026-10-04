@@ -1,4 +1,4 @@
-import { CircleAlert, type LucideIcon } from "lucide-react";
+import { CircleAlert, ShieldAlert, type LucideIcon } from "lucide-react";
 
 import { Skeleton } from "./ui/skeleton";
 
@@ -99,6 +99,25 @@ export function PageContainer({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-10">
       {children}
+    </div>
+  );
+}
+
+/** Shown instead of a screen the roles of the person do not allow (USR-09). */
+export function NoAccessState({
+  title = "No tienes acceso a esta sección",
+  description = "Tu rol no incluye esta parte de la empresa. Si la necesitas, pídesela al titular o a un administrador.",
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center rounded-xl border bg-card px-6 py-14 text-center">
+      <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
+        <ShieldAlert aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-4 text-lg font-semibold">{title}</h1>
+      <p className="mt-1 max-w-sm text-muted-foreground">{description}</p>
     </div>
   );
 }

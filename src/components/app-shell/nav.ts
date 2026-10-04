@@ -14,6 +14,11 @@ export type NavItem = {
   icon: LucideIcon;
   /** Module that must be contracted to show the item (MOD-05); null = always. */
   module: "inventory" | "purchasing" | null;
+  /**
+   * Permission needed to see the item and open its screen (USR-09), from
+   * the catalog in platform/authorization; null = every member.
+   */
+  permission: string | null;
   /** Shown in the mobile bottom bar (max 4 + «Más»). */
   mobile: boolean;
 };
@@ -24,6 +29,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Inventario",
     icon: Package,
     module: "inventory",
+    permission: "inventory.product.read",
     mobile: true,
   },
   {
@@ -31,6 +37,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Movimientos",
     icon: ArrowLeftRight,
     module: "inventory",
+    permission: "inventory.movement.read",
     mobile: true,
   },
   {
@@ -38,6 +45,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Ubicaciones",
     icon: MapPin,
     module: "inventory",
+    permission: "inventory.location.read",
     mobile: true,
   },
   {
@@ -45,6 +53,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Conteos",
     icon: ClipboardCheck,
     module: "inventory",
+    permission: "inventory.count.read",
     mobile: true,
   },
   {
@@ -52,6 +61,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Compras",
     icon: ShoppingCart,
     module: "purchasing",
+    permission: "purchasing.order.read",
     mobile: false,
   },
   {
@@ -59,10 +69,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Configuración",
     icon: Settings,
     module: null,
+    permission: null,
     mobile: false,
   },
 ];
 
 export function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Items the person may see; the screens check the same permission again. */
+export function visibleNavItems(
+  can: (permission: string) => boolean,
+): NavItem[] {
+  return NAV_ITEMS.filter(
+    (item) => item.permission === null || can(item.permission),
+  );
 }

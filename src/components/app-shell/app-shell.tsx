@@ -36,6 +36,7 @@ export function AppShell({
   user,
   organization,
   organizations,
+  allowedHrefs,
   signOutAction,
   switchOrganizationAction,
 }: {
@@ -43,6 +44,8 @@ export function AppShell({
   user: ShellUser;
   organization: ShellOrganization;
   organizations: ShellOrganization[];
+  /** Sections the person may open (USR-09); the server decides. */
+  allowedHrefs: string[];
   signOutAction: () => Promise<void>;
   switchOrganizationAction: SwitchAction;
 }) {
@@ -54,8 +57,9 @@ export function AppShell({
     />
   );
   const pathname = usePathname();
-  const primary = NAV_ITEMS.filter((item) => item.mobile);
-  const secondary = NAV_ITEMS.filter((item) => !item.mobile);
+  const items = NAV_ITEMS.filter((item) => allowedHrefs.includes(item.href));
+  const primary = items.filter((item) => item.mobile);
+  const secondary = items.filter((item) => !item.mobile);
   const current = NAV_ITEMS.find((item) => isActive(pathname, item.href));
 
   return (
@@ -72,7 +76,7 @@ export function AppShell({
         <div className="-mt-2 px-3 pb-2">{switcher}</div>
         <nav aria-label="Principal" className="flex-1 px-3 pb-4">
           <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => (
+            {items.map((item) => (
               <li key={item.href}>
                 <SidebarLink
                   item={item}

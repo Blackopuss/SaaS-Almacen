@@ -1,14 +1,26 @@
 import { Package } from "lucide-react";
 import type { Metadata } from "next";
 
-import { EmptyState, PageContainer, PageHeader } from "@/components";
-import { requireOrganizationContext } from "@/platform/tenancy";
+import {
+  EmptyState,
+  NoAccessState,
+  PageContainer,
+  PageHeader,
+} from "@/components";
+import { getAccess } from "@/platform/authorization";
 
 export const metadata: Metadata = { title: "Inventario" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
 export default async function InventarioPage() {
-  await requireOrganizationContext();
+  const access = await getAccess();
+  if (!access.can("inventory.product.read")) {
+    return (
+      <PageContainer>
+        <NoAccessState />
+      </PageContainer>
+    );
+  }
   return (
     <PageContainer>
       <PageHeader
