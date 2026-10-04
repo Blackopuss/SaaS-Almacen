@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 42 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-04 (servicio de derechos efectivos)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 43 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-05 (guard de servidor: sesión → membresía → rol → módulo → límite)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -126,6 +126,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Acción de bitácora nueva (USR-11):** agregar su frase en español a `AUDIT_ACTION_LABELS` (`src/platform/audit/trail.ts`); `team-audit.int.test.ts` falla si falta.
 - **Módulos (MOD-01/02, ADR 0007):** cada módulo declara su contrato en `src/modules/<módulo>/contract.ts` con `defineModule` y se agrega a `src/modules/registry`; la plataforma nunca importa módulos, recibe ids o contratos.
 - **Modelo comercial (MOD-03, ADR 0008):** nunca modificar `plan_version`/`plan_module_price` (la base lo rechaza): crear versión nueva y mover `plan_offer`. Lo que una empresa puede usar se lee de `entitlement`, no de la suscripción.
+- **Derechos (MOD-04):** quien escriba en `entitlement` llama `invalidateEntitlements(organizationId)` después de confirmar; para decidir cupos usar `getFreshEntitlements`.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)
