@@ -16,3 +16,14 @@ export {
   setEntitlementClock,
 } from "./entitlements";
 export type { Entitlements } from "./entitlements";
+export {
+  LIMIT_REACHED_MESSAGE,
+  MODULE_NOT_CONTRACTED_MESSAGE,
+  assertModulePermission,
+  assertWithinLimit,
+  entitles,
+  getModuleAccess,
+  moduleOfPermission,
+  requireModulePermission,
+} from "./guard";
+export type { ModuleAccess } from "./guard";

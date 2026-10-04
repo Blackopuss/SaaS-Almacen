@@ -4,20 +4,28 @@ import type { Metadata } from "next";
 import {
   EmptyState,
   NoAccessState,
+  NoModuleState,
   PageContainer,
   PageHeader,
 } from "@/components";
-import { getAccess } from "@/platform/authorization";
+import { getModuleAccess } from "@/platform/billing";
 
 export const metadata: Metadata = { title: "Compras" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
 export default async function ComprasPage() {
-  const access = await getAccess();
+  const access = await getModuleAccess();
   if (!access.can("purchasing.order.read")) {
     return (
       <PageContainer>
         <NoAccessState />
+      </PageContainer>
+    );
+  }
+  if (!access.hasModule("purchasing")) {
+    return (
+      <PageContainer>
+        <NoModuleState module="Compras" />
       </PageContainer>
     );
   }

@@ -102,6 +102,35 @@ await db.user.update({
   data: { twoFactorEnabled: true },
 });
 
+// What the demo company may use (MOD-05): Inventario and Compras with the
+// 1,000-product tier, so every screen is reachable locally.
+const demo = await db.organization.findFirstOrThrow({
+  where: { ownerUserId: user.id, name: "Ferretería Demo" },
+});
+for (const grant of [
+  { kind: "MODULE" as const, key: "inventory", value: null },
+  { kind: "MODULE" as const, key: "purchasing", value: null },
+  { kind: "LIMIT" as const, key: "active_products", value: 1000 },
+  { kind: "LIMIT" as const, key: "users", value: 5 },
+]) {
+  await db.entitlement.upsert({
+    where: {
+      organizationId_kind_key: {
+        organizationId: demo.id,
+        kind: grant.kind,
+        key: grant.key,
+      },
+    },
+    update: { value: grant.value, validUntil: null },
+    create: {
+      id: newId(),
+      organizationId: demo.id,
+      ...grant,
+      validFrom: now,
+    },
+  });
+}
+
 console.log(
   `Cuenta demo lista: ${email} (contraseña en .env.local → DEMO_PASSWORD)`,
 );

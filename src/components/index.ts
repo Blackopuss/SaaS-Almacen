@@ -14,6 +14,7 @@ export { Providers } from "./providers";
 export {
   EmptyState,
   NoAccessState,
+  NoModuleState,
   ErrorState,
   LoadingState,
   PageContainer,

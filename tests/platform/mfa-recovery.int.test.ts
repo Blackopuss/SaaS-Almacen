@@ -102,9 +102,13 @@ async function challenge(email: string): Promise<string> {
 
 /** Full sign-in through the app code; returns the session cookie. */
 async function sessionFor(account: Account, step = 0): Promise<string> {
+  // The slow password check goes first, so the code is computed right
+  // before it is used: a code of the previous 30-second step would be
+  // refused if the clock crossed a step in between.
+  const headers = from("10.9.0.2", await challenge(account.email));
   const response = await auth.api.verifyTOTP({
     body: { code: totp(account.secret, step) },
-    headers: from("10.9.0.2", await challenge(account.email)),
+    headers,
     asResponse: true,
   });
   return cookieFrom(response, "better-auth.session_token");

@@ -92,7 +92,9 @@ describe("screens check on the server", () => {
     expect(found.length).toBeGreaterThanOrEqual(NAV_ITEMS.length);
     for (const file of found) {
       const source = readFileSync(file, "utf8");
-      expect(source, file).toMatch(/await (getAccess|requirePermission)\(/);
+      expect(source, file).toMatch(
+        /await (getAccess|getModuleAccess|requirePermission|requireModulePermission)\(/,
+      );
     }
   });
 
@@ -107,6 +109,13 @@ describe("screens check on the server", () => {
         `if (!access.can("${item.permission}"))`,
       );
       expect(source, item.href).toContain("<NoAccessState");
+      // …and for the module the company must have (MOD-05).
+      expect(source, item.href).toContain(
+        `if (!access.hasModule("${item.module}"))`,
+      );
+      expect(item.permission.startsWith(`${item.module}.`), item.href).toBe(
+        true,
+      );
     }
   });
 });

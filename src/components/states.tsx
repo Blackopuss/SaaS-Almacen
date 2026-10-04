@@ -1,4 +1,9 @@
-import { CircleAlert, ShieldAlert, type LucideIcon } from "lucide-react";
+import {
+  CircleAlert,
+  PackagePlus,
+  ShieldAlert,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Skeleton } from "./ui/skeleton";
 
@@ -118,6 +123,24 @@ export function NoAccessState({
       </span>
       <h1 className="mt-4 text-lg font-semibold">{title}</h1>
       <p className="mt-1 max-w-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+/** Shown instead of a screen of a module the company does not have (MOD-05). */
+export function NoModuleState({ module }: { module: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-xl border bg-card px-6 py-14 text-center">
+      <span className="grid size-12 place-items-center rounded-full bg-accent text-accent-foreground">
+        <PackagePlus aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-4 text-lg font-semibold">
+        {module} no está activo en tu empresa
+      </h1>
+      <p className="mt-1 max-w-sm text-muted-foreground">
+        Tu plan actual no incluye este módulo. El titular de la empresa puede
+        solicitarlo.
+      </p>
     </div>
   );
 }

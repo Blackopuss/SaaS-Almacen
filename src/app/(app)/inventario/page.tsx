@@ -4,20 +4,28 @@ import type { Metadata } from "next";
 import {
   EmptyState,
   NoAccessState,
+  NoModuleState,
   PageContainer,
   PageHeader,
 } from "@/components";
-import { getAccess } from "@/platform/authorization";
+import { getModuleAccess } from "@/platform/billing";
 
 export const metadata: Metadata = { title: "Inventario" };
 
 // Placeholder until its step in docs/PLAN_IMPLEMENTACION.md.
 export default async function InventarioPage() {
-  const access = await getAccess();
+  const access = await getModuleAccess();
   if (!access.can("inventory.product.read")) {
     return (
       <PageContainer>
         <NoAccessState />
+      </PageContainer>
+    );
+  }
+  if (!access.hasModule("inventory")) {
+    return (
+      <PageContainer>
+        <NoModuleState module="Inventario" />
       </PageContainer>
     );
   }
