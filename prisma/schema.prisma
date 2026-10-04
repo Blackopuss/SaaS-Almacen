@@ -121,6 +121,7 @@ model Organization {
   sessions           Session[]
   auditEvents        AuditEvent[]
   ownershipTransfers OwnershipTransfer[]
+  invitations        Invitation[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -199,6 +200,35 @@ model OwnershipTransfer {
   @@index([organizationId, status])
   @@index([organizationId, toMembershipId])
   @@map("ownership_transfer")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+}
+
+/// Invitation to join a company with roles already chosen (USR-04). The
+/// link carries a random token; only its SHA-256 is stored. It works once
+/// and expires. The titular is never invited: roles come from the catalog.
+model Invitation {
+  id              String           @id @db.Char(36)
+  organizationId  String           @db.Char(36)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Normalized (trimmed, lower case) address the link was sent to.
+  email           String           @db.VarChar(254)
+  tokenHash       String           @unique @db.Char(64)
+  roles           Json
+  status          InvitationStatus @default(PENDING)
+  invitedByUserId String           @db.Char(36)
+  expiresAt       DateTime         @db.DateTime(3)
+  createdAt       DateTime         @default(now()) @db.DateTime(3)
+  resolvedAt      DateTime?        @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, status])
+  @@index([organizationId, email])
+  @@map("invitation")
 }
 
 // ── Brute-force protection (PLT-06) ──────────────────────────────────────

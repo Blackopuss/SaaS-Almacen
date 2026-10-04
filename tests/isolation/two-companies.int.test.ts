@@ -106,6 +106,17 @@ beforeAll(async () => {
       },
     ],
   });
+  await db.invitation.createMany({
+    data: [orgA, orgB].map((organizationId, index) => ({
+      id: newId(),
+      organizationId,
+      email: `invitado.${index}.iso.${stamp}@example.test`,
+      tokenHash: randomBytes(32).toString("hex"),
+      roles: ["viewer"],
+      invitedByUserId: index === 0 ? ids.ana : ids.beto,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })),
+  });
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
 });

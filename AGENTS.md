@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 31 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-04 (crear invitación por correo)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 32 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-05 (aceptar invitación como usuario nuevo o existente)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -117,6 +117,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Autorización (USR-02):** una sola decisión, `can(subject, permission)` de `src/platform/authorization/policy.ts` (pura, denegar por defecto). En servidor: `requirePermission("modulo.recurso.accion")` (sesión + empresa + permiso; lanza `ForbiddenError`) o `getAccess()` para preguntar `access.can(...)`; en servicios, `assertAllowed(organizationId, userId, permission)`. Los roles se leen de la base en cada petición; sin membresía activa no hay permisos, ni para el titular.
 - **Reservado al titular (USR-03A):** contratar, cancelar, método de pago, cambiar plan/módulos y transferir usan `requireOwnerAction(permiso)` / `assertOwnerAction(organizationId, userId, permiso)`; el permiso debe estar en `OWNER_ONLY_PERMISSIONS` (lo que ningún rol concede).
 - **Equipo y titularidad (USR-03B):** todo cambio de roles, desactivación o invitación pasa primero por `checkTeamChange`/`checkInvitationRoles` de `src/platform/authorization/team-rules.ts` (mensajes en `TEAM_RULE_MESSAGES`). `Organization.ownerUserId` solo cambia en `acceptOwnershipTransfer` (`ownership.ts`), con bloqueo `FOR UPDATE` de la empresa.
+- **Invitaciones (USR-04):** el token de un enlace nunca se guarda ni se registra: solo `hashInvitationToken(token)`. Se exportaron `blockedFor`/`recordAttempt`/`throttleKeys` desde `@/platform/auth` para limitar flujos fuera de `auth`.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

@@ -159,3 +159,28 @@ export function mfaDisabledEmail(input: {
     ].join("\n"),
   };
 }
+
+export function invitationEmail(input: {
+  to: string;
+  organizationName: string;
+  inviterName: string;
+  roleLabels: string[];
+  url: string;
+  days: number;
+}): EmailMessage {
+  return {
+    to: input.to,
+    subject: `${input.inviterName} te invitó a ${input.organizationName} en Almacén`,
+    actionUrl: input.url,
+    text: [
+      "Hola:",
+      "",
+      `${input.inviterName} te invitó a trabajar en «${input.organizationName}» en Almacén como ${input.roleLabels.join(" y ")}.`,
+      "Acepta la invitación con este enlace:",
+      input.url,
+      "",
+      `El enlace vence en ${input.days} días y solo funciona una vez.`,
+      "Si no esperabas esta invitación, ignora este mensaje.",
+    ].join("\n"),
+  };
+}

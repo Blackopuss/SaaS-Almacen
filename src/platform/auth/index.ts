@@ -51,3 +51,10 @@ export {
 } from "./sessions";
 export type { ActiveSession } from "./sessions";
 export { handleAuthRequest, isAllowedAuthRequest } from "./http";
+export {
+  blockedFor,
+  clientIp,
+  recordAttempt,
+  throttleKeys,
+  tooManyAttemptsMessage,
+} from "./throttle";

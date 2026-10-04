@@ -25,6 +25,7 @@ import { db } from "./db";
  */
 export const TENANT_MODELS = [
   "AuditEvent",
+  "Invitation",
   "Membership",
   "MembershipRole",
   "OwnershipTransfer",

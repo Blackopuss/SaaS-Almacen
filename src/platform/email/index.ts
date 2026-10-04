@@ -5,6 +5,7 @@ export {
   backupCodeUsedEmail,
   backupCodesRegeneratedEmail,
   existingAccountEmail,
+  invitationEmail,
   mfaDisabledEmail,
   mfaEnabledEmail,
   passwordChangedEmail,

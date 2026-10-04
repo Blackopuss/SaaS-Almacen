@@ -37,6 +37,14 @@ export const RULES = {
   // A sign-in code works once: it stays "used" for the whole time an app
   // code is accepted (current step ± 1 = 90 s).
   totpUsed: { max: 1, windowSeconds: 90, blockSeconds: 90 },
+  // Invitation emails sent by one company (USR-04).
+  inviteOrganization: {
+    max: 20,
+    windowSeconds: 60 * 60,
+    blockSeconds: 60 * 60,
+  },
+  // Invitation links opened or answered from one IP (USR-05).
+  inviteTokenIp: { max: 30, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
 } as const satisfies Record<string, ThrottleRule>;
 
 export type ThrottleKey = { key: string; rule: ThrottleRule };
@@ -80,6 +88,14 @@ export const throttleKeys = {
   mfaChallengeIp: (ip: string): ThrottleKey => ({
     key: `mfa:challenge:ip:${ip}`,
     rule: RULES.mfaChallengeIp,
+  }),
+  inviteOrganization: (organizationId: string): ThrottleKey => ({
+    key: `invite:org:${organizationId}`,
+    rule: RULES.inviteOrganization,
+  }),
+  inviteTokenIp: (ip: string): ThrottleKey => ({
+    key: `invite:token:ip:${ip}`,
+    rule: RULES.inviteTokenIp,
   }),
   totpUsed: (userId: string, code: string): ThrottleKey => ({
     key: `mfa:used:${userId}:${hash(code)}`,
