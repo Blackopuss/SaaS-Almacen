@@ -15,6 +15,7 @@ import { getProduct, listProductGroups } from "@/platform/catalog";
 
 import { updateProductAction } from "../../actions";
 import { ProductForm } from "../../product-form";
+import { ArchiveProduct } from "../../product-status";
 
 export const metadata: Metadata = { title: "Editar producto" };
 
@@ -64,6 +65,18 @@ export default async function EditarProductoPage({
     listProductGroups(actor),
   ]);
   if (!product) notFound();
+  // An archived product is changed only after bringing it back.
+  if (product.status === "ARCHIVED") {
+    return (
+      <PageContainer>
+        {back}
+        <PageHeader
+          title={product.name}
+          description="Este producto está archivado. Reactívalo desde la lista de archivados para editarlo."
+        />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
@@ -86,6 +99,21 @@ export default async function EditarProductoPage({
         categories={groups.categories}
         brands={groups.brands}
       />
+      {access.allows("inventory.product.archive") && (
+        <section
+          aria-labelledby="archivar"
+          className="max-w-2xl space-y-3 rounded-xl border bg-card p-4 sm:p-6"
+        >
+          <h2 id="archivar" className="font-medium">
+            Archivar
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Si ya no manejas este producto, archívalo: libera un lugar de tu
+            plan y conserva su historial.
+          </p>
+          <ArchiveProduct productId={product.id} name={product.name} />
+        </section>
+      )}
     </PageContainer>
   );
 }

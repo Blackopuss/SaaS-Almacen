@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
 import {
+  archiveProduct,
   createProduct,
+  reactivateProduct,
   updateProduct,
   type ProductField,
+  type ProductStatusResult,
 } from "@/platform/catalog";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
@@ -97,4 +100,51 @@ export async function updateProductAction(
   }
   revalidatePath("/inventario");
   redirect(`/inventario?guardado=${encodeURIComponent(values.sku.trim())}`);
+}
+
+type StatusActionResult = { ok: true } | { ok: false; error: string };
+
+/** Runs a status change and turns "not allowed" into a message. */
+async function statusChange(
+  change: (actor: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<ProductStatusResult>,
+): Promise<StatusActionResult> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await change({
+      organizationId: organization.id,
+      userId: user.id,
+    });
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/** Archives a product and goes back to the catalog; returns only a refusal. */
+export async function archiveProductAction(
+  productId: string,
+  reason: string,
+): Promise<StatusActionResult | undefined> {
+  const result = await statusChange((actor) =>
+    archiveProduct(actor, String(productId), String(reason ?? "")),
+  );
+  if (!result.ok) return result;
+  revalidatePath("/inventario");
+  redirect("/inventario?archivado=1");
+}
+
+export async function reactivateProductAction(
+  productId: string,
+): Promise<StatusActionResult> {
+  const result = await statusChange((actor) =>
+    reactivateProduct(actor, String(productId)),
+  );
+  revalidatePath("/inventario");
+  return result;
 }

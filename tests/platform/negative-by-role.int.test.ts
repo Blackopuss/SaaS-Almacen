@@ -402,9 +402,9 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       tests: [
         "tests/platform/quota.int.test.ts",
         "tests/platform/products.int.test.ts",
+        "tests/platform/product-archive.int.test.ts",
       ],
-      waitsFor:
-        "INV-04 e IMP (reactivaciones e importaciones que usan el contador)",
+      waitsFor: "IMP (importaciones que reservan cupo)",
     },
     "NEG-20": { waitsFor: "IMP (trabajos en segundo plano)" },
     "NEG-21": { waitsFor: "INV (movimientos y archivo)" },

@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { getModuleAccess } from "@/platform/billing";
 import { listRecentProducts } from "@/platform/catalog";
 
+import { ReactivateProduct } from "./product-status";
+
 export const metadata: Metadata = { title: "Inventario" };
 
 /** Catalog of the company. The paginated list and search arrive with INV-10/11. */
@@ -37,14 +39,21 @@ export default async function InventarioPage({
     );
   }
 
-  const { creado, guardado } = await searchParams;
+  const { creado, guardado, archivado, archivados } = await searchParams;
+  const showArchived = archivados === "1";
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
   const saved = typeof guardado === "string" ? guardado.slice(0, 64) : "";
   const canEdit = access.allows("inventory.product.update");
-  const products = await listRecentProducts({
+  const actor = {
     organizationId: access.organization.id,
     userId: access.user.id,
-  });
+  };
+  const products = await listRecentProducts(
+    actor,
+    showArchived ? 50 : 10,
+    showArchived ? "ARCHIVED" : "ACTIVE",
+  );
+  const canReactivate = access.allows("inventory.product.reactivate");
   // Shown only to who may add products, and only while the plan allows it.
   const addButton = access.allows("inventory.product.create") ? (
     <Button asChild>
@@ -78,6 +87,18 @@ export default async function InventarioPage({
           </p>
         </div>
       )}
+      {archivado === "1" && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-success/30 bg-success/10 p-4 text-sm"
+        >
+          <CircleCheck
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-success"
+          />
+          <p>Producto archivado. Liberó un lugar de tu plan.</p>
+        </div>
+      )}
       {saved && (
         <div
           role="status"
@@ -92,20 +113,38 @@ export default async function InventarioPage({
           </p>
         </div>
       )}
+      <p>
+        <Link
+          href={showArchived ? "/inventario" : "/inventario?archivados=1"}
+          className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {showArchived ? "Ver productos activos" : "Ver productos archivados"}
+        </Link>
+      </p>
       {products.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="Todavía no hay productos"
-          description="Agrega tu primer producto para empezar a controlar tu inventario."
-          action={addButton}
-        />
+        showArchived ? (
+          <EmptyState
+            icon={Package}
+            title="No hay productos archivados"
+            description="Los productos que archives aparecerán aquí y podrás reactivarlos."
+          />
+        ) : (
+          <EmptyState
+            icon={Package}
+            title="Todavía no hay productos"
+            description="Agrega tu primer producto para empezar a controlar tu inventario."
+            action={addButton}
+          />
+        )
       ) : (
         <section
           aria-labelledby="recientes"
           className="rounded-xl border bg-card"
         >
           <h2 id="recientes" className="border-b p-4 font-medium sm:px-5">
-            Productos agregados recientemente
+            {showArchived
+              ? "Productos archivados"
+              : "Productos agregados recientemente"}
           </h2>
           <ul className="divide-y">
             {products.map((product) => (
@@ -121,7 +160,13 @@ export default async function InventarioPage({
                       .join(" · ")}
                   </p>
                 </div>
-                {canEdit && (
+                {showArchived && canReactivate && (
+                  <ReactivateProduct
+                    productId={product.id}
+                    name={product.name}
+                  />
+                )}
+                {!showArchived && canEdit && (
                   <Button asChild variant="ghost">
                     <Link
                       href={`/inventario/${product.id}/editar`}

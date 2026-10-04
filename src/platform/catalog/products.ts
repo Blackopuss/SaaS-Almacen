@@ -5,7 +5,7 @@ import { z } from "zod";
 import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
-import { consumeQuota } from "@/platform/entitlements";
+import { consumeQuota, releaseQuota } from "@/platform/entitlements";
 import { forOrganization } from "@/server";
 
 /**
@@ -202,10 +202,11 @@ export type ProductSummary = {
   createdAt: Date;
 };
 
-/** Latest active products of the company (a paginated list arrives with INV-10). */
+/** Latest products of the company, active or archived (a paginated list arrives with INV-10). */
 export async function listRecentProducts(
   actor: CatalogActor,
   limit = 10,
+  status: "ACTIVE" | "ARCHIVED" = "ACTIVE",
 ): Promise<ProductSummary[]> {
   await assertModulePermission(
     actor.organizationId,
@@ -213,8 +214,8 @@ export async function listRecentProducts(
     "inventory.product.read",
   );
   const rows = await forOrganization(actor.organizationId).product.findMany({
-    where: { status: "ACTIVE" },
-    orderBy: { createdAt: "desc" },
+    where: { status },
+    orderBy: { updatedAt: "desc" },
     take: Math.min(Math.max(limit, 1), 50),
     select: {
       id: true,
@@ -464,4 +465,139 @@ export async function updateProduct(
     throw error;
   }
   return { ok: true, productId: id };
+}
+
+export type ProductStatusResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "not_found" | "unchanged" | "limit_reached";
+      error: string;
+    };
+
+/** Carries an expected failure of archive/reactivate out of the transaction. */
+class StatusRejected extends Error {
+  constructor(readonly result: ProductStatusResult) {
+    super("status change rejected");
+  }
+}
+
+/**
+ * Archives a product (INV-04): it leaves the catalog in use and frees its
+ * place of the quota. Nothing is deleted: the card, its code and its
+ * history stay, and it can be reactivated.
+ */
+export async function archiveProduct(
+  actor: CatalogActor,
+  productId: string,
+  reason?: string,
+): Promise<ProductStatusResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.product.archive",
+  );
+  const id = String(productId);
+  try {
+    await forOrganization(organizationId).$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: { id },
+        select: { sku: true, name: true, status: true },
+      });
+      if (!product) {
+        throw new StatusRejected({
+          ok: false,
+          reason: "not_found",
+          error: "Este producto ya no existe.",
+        });
+      }
+      // The status in the filter decides between two simultaneous requests.
+      const archived = await tx.product.updateMany({
+        where: { id, status: "ACTIVE" },
+        data: { status: "ARCHIVED" },
+      });
+      if (archived.count === 0) {
+        throw new StatusRejected({
+          ok: false,
+          reason: "unchanged",
+          error: "Este producto ya está archivado.",
+        });
+      }
+      if (!(await releaseQuota(tx, "active_products"))) {
+        throw new Error(`Quota counter out of step for ${organizationId}`);
+      }
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "product.archived",
+        target: { type: "product", id },
+        reason,
+        metadata: { sku: product.sku, name: product.name },
+      });
+    });
+  } catch (error) {
+    if (error instanceof StatusRejected) return error.result;
+    throw error;
+  }
+  return { ok: true };
+}
+
+/** Brings an archived product back. It needs a free place of the quota. */
+export async function reactivateProduct(
+  actor: CatalogActor,
+  productId: string,
+): Promise<ProductStatusResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.product.reactivate",
+  );
+  const id = String(productId);
+  try {
+    await forOrganization(organizationId).$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: { id },
+        select: { sku: true, name: true },
+      });
+      if (!product) {
+        throw new StatusRejected({
+          ok: false,
+          reason: "not_found",
+          error: "Este producto ya no existe.",
+        });
+      }
+      const reactivated = await tx.product.updateMany({
+        where: { id, status: "ARCHIVED" },
+        data: { status: "ACTIVE" },
+      });
+      if (reactivated.count === 0) {
+        throw new StatusRejected({
+          ok: false,
+          reason: "unchanged",
+          error: "Este producto ya está activo.",
+        });
+      }
+      const quota = await consumeQuota(tx, organizationId, "active_products");
+      if (!quota.ok) {
+        throw new StatusRejected({
+          ok: false,
+          reason: "limit_reached",
+          error: quotaMessage(quota.limit, quota.taken),
+        });
+      }
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "product.reactivated",
+        target: { type: "product", id },
+        metadata: { sku: product.sku, name: product.name },
+      });
+    });
+  } catch (error) {
+    if (error instanceof StatusRejected) return error.result;
+    throw error;
+  }
+  return { ok: true };
 }

@@ -18,6 +18,18 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  archiveProductAction: {
+    input: "id de producto y motivo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el producto se busca solo en esa empresa",
+    coveredBy: "tests/platform/product-archive.int.test.ts",
+  },
+  reactivateProductAction: {
+    input: "id de producto",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el producto se busca solo en esa empresa",
+    coveredBy: "tests/platform/product-archive.int.test.ts",
+  },
   updateProductAction: {
     input: "id de producto y los campos de la ficha (sin cantidades)",
     identity:
