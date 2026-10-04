@@ -84,3 +84,5 @@ export type {
   AcceptInvitationResult,
   InvitationPreview,
 } from "./invitation-accept";
+export { assignRoles, countSeatsInUse, listTeamMembers } from "./team";
+export type { TeamActionReason, TeamActionResult, TeamMember } from "./team";

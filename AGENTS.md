@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 33 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-06 (asignar y combinar roles)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 34 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-07 (desactivar miembro)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -119,6 +119,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Equipo y titularidad (USR-03B):** todo cambio de roles, desactivación o invitación pasa primero por `checkTeamChange`/`checkInvitationRoles` de `src/platform/authorization/team-rules.ts` (mensajes en `TEAM_RULE_MESSAGES`). `Organization.ownerUserId` solo cambia en `acceptOwnershipTransfer` (`ownership.ts`), con bloqueo `FOR UPDATE` de la empresa.
 - **Invitaciones (USR-04):** el token de un enlace nunca se guarda ni se registra: solo `hashInvitationToken(token)`. Se exportaron `blockedFor`/`recordAttempt`/`throttleKeys` desde `@/platform/auth` para limitar flujos fuera de `auth`.
 - **Aceptar invitación (USR-05):** el correo de la membresía sale siempre de la invitación, nunca del formulario. Para crear cuentas fuera del registro normal usar `prepareInvitedAccount` + `insertInvitedAccount` dentro de la transacción del llamador.
+- **Cambios de equipo (USR-06):** las operaciones sobre miembros pasan por `withTeamChange` de `team.ts` (bloqueo de empresa + reglas + transacción); no escribir `membership_role` desde otro lugar.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)
