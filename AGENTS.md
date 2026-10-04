@@ -100,8 +100,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 45 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-07 (contador de cupo de productos con control de concurrencia)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 46 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: MOD-08 (cupo de usuarios por plan)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -130,6 +130,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Derechos (MOD-04):** quien escriba en `entitlement` llama `invalidateEntitlements(organizationId)` después de confirmar; para decidir cupos usar `getFreshEntitlements`.
 - **Guard de módulo (MOD-05):** pantallas de un módulo empiezan con `const access = await getModuleAccess()` y comprueban `access.can("…")` y `access.hasModule("…")`; los servicios de módulo llaman `assertModulePermission(organizationId, userId, permiso)`; las altas que consumen cupo llaman además `assertWithinLimit`.
 - **Activar módulos (MOD-06):** solo con `activateModule`/`deactivateModule` pasando `moduleRegistry` de `@/modules/registry`; nunca escribir derechos de módulo a mano fuera de pruebas y del sembrado de desarrollo.
+- **Cupos (MOD-07):** toda alta o reactivación que consuma un límite llama `consumeQuota(tx, organizationId, "active_products")` dentro de su misma transacción y aborta si `ok` es falso; archivar llama `releaseQuota`. Nunca contar filas para decidir si cabe.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

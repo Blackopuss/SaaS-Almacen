@@ -125,6 +125,7 @@ model Organization {
   subscriptions      Subscription[]
   subscriptionItems  SubscriptionItem[]
   entitlements       Entitlement[]
+  quotaUsages        QuotaUsage[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -428,4 +429,25 @@ model Entitlement {
   @@unique([organizationId, id])
   @@unique([organizationId, kind, key])
   @@map("entitlement")
+}
+
+/// How much of a plan limit a company is using (MOD-07). `taken` counts
+/// what exists plus what is reserved (e.g. by an import in progress), so
+/// one conditional UPDATE decides whether something fits: two requests for
+/// the last place cannot both win.
+model QuotaUsage {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Limit key of the entitlement: "active_products", "users".
+  key            String       @db.VarChar(40)
+  /// In use + reserved.
+  taken          Int          @default(0)
+  /// Part of `taken` that is only reserved.
+  reserved       Int          @default(0)
+  updatedAt      DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, key])
+  @@map("quota_usage")
 }

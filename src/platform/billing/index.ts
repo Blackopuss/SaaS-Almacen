@@ -33,3 +33,18 @@ export type {
   ModuleChangeReason,
   ModuleChangeResult,
 } from "./modules";
+export {
+  QUOTA_KEYS,
+  confirmReservation,
+  consumeQuota,
+  getQuotaUsage,
+  releaseQuota,
+  releaseReservation,
+  reserveQuota,
+} from "./quota";
+export type {
+  QuotaClient,
+  QuotaKey,
+  QuotaResult,
+  QuotaUsageSummary,
+} from "./quota";

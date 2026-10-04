@@ -30,6 +30,7 @@ export const TENANT_MODELS = [
   "Membership",
   "MembershipRole",
   "OwnershipTransfer",
+  "QuotaUsage",
   "Subscription",
   "SubscriptionItem",
 ] as const;

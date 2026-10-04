@@ -391,7 +391,11 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
     },
     "NEG-17": { tests: ["tests/platform/module-activation.int.test.ts"] },
     "NEG-18": { waitsFor: "MOD-11 (estados de suscripción)" },
-    "NEG-19": { waitsFor: "MOD-07 (cupo de productos)" },
+    "NEG-19": {
+      tests: ["tests/platform/quota.int.test.ts"],
+      waitsFor:
+        "INV e IMP (altas, reactivaciones e importaciones que usan el contador)",
+    },
     "NEG-20": { waitsFor: "IMP (trabajos en segundo plano)" },
     "NEG-21": { waitsFor: "INV (movimientos y archivo)" },
     "NEG-22": { waitsFor: "INV (reversas)" },

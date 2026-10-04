@@ -150,6 +150,9 @@ beforeAll(async () => {
         activeFrom: new Date(),
       },
     });
+    await db.quotaUsage.create({
+      data: { id: newId(), organizationId, key: "active_products", taken: 1 },
+    });
     await db.entitlement.create({
       data: {
         id: newId(),
