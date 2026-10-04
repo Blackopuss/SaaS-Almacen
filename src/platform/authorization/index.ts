@@ -9,3 +9,14 @@ export {
   isRole,
 } from "./catalog";
 export type { Permission, Role } from "./catalog";
+export { can, canAll, canAny, knownRoles, permissionsOf } from "./policy";
+export type { Subject } from "./policy";
+export {
+  FORBIDDEN_MESSAGE,
+  assertAllowed,
+  getAccess,
+  isAllowed,
+  loadSubject,
+  requirePermission,
+} from "./access";
+export type { Access } from "./access";

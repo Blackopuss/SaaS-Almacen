@@ -99,8 +99,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 28 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-02** (función central de autorización, denegar por defecto). FUN-07 tiene propuesta en `docs/MATRIZ_ROLES_PERMISOS.md`, pendiente de aprobación del fundador.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 29 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: USR-03A** (acciones reservadas al titular).
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -114,6 +114,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Server Action nueva (PLT-15):** agregarla a `REVIEWED` en `tests/isolation/server-actions.int.test.ts` (qué recibe, de dónde sale la identidad, qué prueba cubre el caso entre empresas); la prueba falla si falta. Nunca tomar `userId` u `organizationId` del cliente: salen de `requireSession`/`requireOrganizationContext`.
 - **Better Auth por HTTP (PLT-15):** solo los enlaces de correo pasan por `/api/auth/*` (lista de permitidos en `src/platform/auth/http.ts`). Los flujos nuevos se hacen con Server Actions + `auth.api`; un enlace de correo nuevo se agrega a la lista con su prueba.
 - **Roles y permisos (USR-01):** la matriz aprobada `docs/MATRIZ_ROLES_PERMISOS.md` es la fuente de verdad; el catálogo está en `src/platform/authorization/catalog.ts` y `catalog.test.ts` falla si no coinciden. Cambiar un permiso = cambiar ambos (y una migración si se agrega un rol: `CHECK` en `membership_role`). El titular no es un rol.
+- **Autorización (USR-02):** una sola decisión, `can(subject, permission)` de `src/platform/authorization/policy.ts` (pura, denegar por defecto). En servidor: `requirePermission("modulo.recurso.accion")` (sesión + empresa + permiso; lanza `ForbiddenError`) o `getAccess()` para preguntar `access.can(...)`; en servicios, `assertAllowed(organizationId, userId, permission)`. Los roles se leen de la base en cada petición; sin membresía activa no hay permisos, ni para el titular.
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)
