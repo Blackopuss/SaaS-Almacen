@@ -301,6 +301,25 @@ try {
       await page.keyboard.press("Escape");
     }
 
+    // «Mi plan» (MOD-10): quotas with their bars, modules and validity.
+    await page.goto(`${BASE}/configuracion`, { waitUntil: "networkidle" });
+    await page.getByRole("link", { name: /Mi plan/ }).click();
+    await page.waitForURL("**/configuracion/plan");
+    await page.getByRole("heading", { name: "Mi plan", level: 1 }).waitFor();
+    const planOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/plan-${viewport.name}.png` });
+    check(
+      (await page.getByRole("progressbar").count()) === 2 &&
+        (await page
+          .getByRole("progressbar", { name: "Productos activos" })
+          .getAttribute("aria-valuemax")) === "1000" &&
+        (await page.getByText("Próximamente", { exact: true }).count()) === 2 &&
+        planOverflow <= 0,
+      `${viewport.name}: «Mi plan» shows product and user quotas, modules and no overflow`,
+    );
+
     // Internal console (MOD-09): a titular is not platform staff, so the
     // console answers "not found" instead of announcing itself.
     const consoleResponse = await page.goto(`${BASE}/interno`, {

@@ -40,3 +40,5 @@ export type {
   ProvisionInput,
   ProvisionResult,
 } from "./provisioning";
+export { getPlanOverview, usageLevel, usagePercent } from "./overview";
+export type { PlanModule, PlanOverview } from "./overview";

@@ -353,17 +353,21 @@ describe("acceptInvitationAsNewUser", () => {
     SLOW,
   );
 
-  it("limits attempts per IP", async () => {
-    const ip = "203.0.113.77";
-    let throttled = 0;
-    for (let i = 0; i < 32; i++) {
-      const result = await acceptInvitationAsNewUser(
-        "token-inventado-con-forma-valida-0000000000",
-        { name: "Bot", password: PASSWORD },
-        from(ip),
-      );
-      if (!result.ok && result.reason === "throttled") throttled++;
-    }
-    expect(throttled).toBe(2);
-  });
+  it(
+    "limits attempts per IP",
+    async () => {
+      const ip = "203.0.113.77";
+      let throttled = 0;
+      for (let i = 0; i < 32; i++) {
+        const result = await acceptInvitationAsNewUser(
+          "token-inventado-con-forma-valida-0000000000",
+          { name: "Bot", password: PASSWORD },
+          from(ip),
+        );
+        if (!result.ok && result.reason === "throttled") throttled++;
+      }
+      expect(throttled).toBe(2);
+    },
+    SLOW,
+  );
 });

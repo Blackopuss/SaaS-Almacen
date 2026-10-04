@@ -1,4 +1,10 @@
-import { ChevronRight, History, Users, type LucideIcon } from "lucide-react";
+import {
+  ChevronRight,
+  Gauge,
+  History,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -26,6 +32,7 @@ export default async function ConfiguracionPage() {
         description="Tu negocio, usuarios, plan y seguridad."
       />
       {(access.can("platform.team.read") ||
+        access.can("platform.plan.read") ||
         access.can("platform.audit.read")) && (
         <section aria-labelledby="empresa" className="space-y-3">
           <h2 id="empresa" className="text-lg font-semibold">
@@ -37,6 +44,14 @@ export default async function ConfiguracionPage() {
               icon={Users}
               title="Equipo"
               description="Personas, roles e invitaciones."
+            />
+          )}
+          {access.can("platform.plan.read") && (
+            <SettingsLink
+              href="/configuracion/plan"
+              icon={Gauge}
+              title="Mi plan"
+              description="Cupos, módulos y vigencia."
             />
           )}
           {access.can("platform.audit.read") && (
@@ -76,7 +91,8 @@ function SettingsLink({
   title,
   description,
 }: {
-  href: "/configuracion/equipo" | "/configuracion/bitacora";
+  href:
+    "/configuracion/equipo" | "/configuracion/plan" | "/configuracion/bitacora";
   icon: LucideIcon;
   title: string;
   description: string;
