@@ -230,6 +230,40 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const countId = newId();
+    await db.stockCount.create({
+      data: {
+        id: countId,
+        organizationId,
+        locationId: location.id,
+        openLocationId: location.id,
+        startedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const countLineId = newId();
+    await db.stockCountLine.create({
+      data: {
+        id: countLineId,
+        organizationId,
+        countId,
+        productId,
+        countedAt: new Date(),
+        systemQuantity: "5",
+        unitCode: "piece",
+      },
+    });
+    await db.stockCountCapture.create({
+      data: {
+        id: newId(),
+        organizationId,
+        lineId: countLineId,
+        productId,
+        capturedQuantity: "4",
+        factor: "1",
+        baseQuantity: "4",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     await db.entitlement.create({
       data: {
         id: newId(),

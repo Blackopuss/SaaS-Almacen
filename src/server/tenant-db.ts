@@ -41,6 +41,9 @@ export const TENANT_MODELS = [
   "ProductPresentation",
   "QuotaUsage",
   "StockBalance",
+  "StockCount",
+  "StockCountCapture",
+  "StockCountLine",
   "StockMinimum",
   "StockMovement",
   "StockMovementLine",
@@ -242,6 +245,7 @@ const LOCKABLE = {
   facility: "facility",
   location: "location",
   product: "product",
+  stockCount: "stock_count",
 } as const;
 
 /**

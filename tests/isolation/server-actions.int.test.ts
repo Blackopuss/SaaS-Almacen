@@ -18,6 +18,42 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  openCountAction: {
+    input: "id de ubicación y nota",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
+  captureCountAction: {
+    input: "id de conteo, id de producto, forma de captura y cantidad",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); conteo, producto y presentación se buscan solo en esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
+  removeCaptureAction: {
+    input: "id de conteo e id de captura",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la captura se busca solo dentro de ese conteo y esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
+  cancelCountAction: {
+    input: "id de conteo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el conteo se busca solo en esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
+  findCountProductsAction: {
+    input: "texto de búsqueda (nombre, clave o código de barras)",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo lee productos de esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
+  loadCountProductAction: {
+    input: "id de producto",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el producto se busca solo en esa empresa",
+    coveredBy: "tests/inventory/counts.int.test.ts",
+  },
   setMinimumAction: {
     input: "id de producto y cantidad mínima (vacía = quitarla)",
     identity:

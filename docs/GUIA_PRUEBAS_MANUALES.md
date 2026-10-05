@@ -44,7 +44,8 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/movimientos/entrada`, `/salida`, `/reubicar`, `/ajuste`, `/saldo-inicial` | Registrar un movimiento de un producto | Titular, Administrador, Almacén (según permiso) |
 | `/movimientos/salida-rapida` | Salida de varios productos en una sola confirmación | Quien pueda registrar salidas |
 | `/ubicaciones` | Zonas, pasillos y estantes; «General» existe siempre | Según rol |
-| `/conteos`, `/compras` | Todavía vacías (solo el aviso de «sin datos») | Según rol |
+| `/conteos`, `/conteos/<id>` | Iniciar un conteo físico y capturar lo contado | Titular, Administrador, Almacén (Consulta solo lee) |
+| `/compras` | Todavía vacía (solo el aviso de «sin datos») | Según rol |
 | `/configuracion` | Seguridad (dos pasos, sesiones) y enlaces de empresa | Todos |
 | `/configuracion/equipo` | Personas, roles e invitaciones | Titular y Administrador |
 | `/configuracion/plan` | Mi plan: cupos, módulos y vigencia | Titular y Administrador |
@@ -285,11 +286,24 @@ Dime la marca y modelo del lector, y si alguna lectura se perdió, se duplicó o
 
 En un producto por piezas, un mínimo de `0.5` debe rechazarse. Los productos archivados no aparecen.
 
+**F14. Conteo físico: captura**
+
+1. `/conteos` → elige una ubicación, escribe una nota opcional → «Iniciar conteo».
+2. Busca o escanea un producto con presentación «Caja»: el cursor pasa a la cantidad. Elige «Caja», escribe `2`: antes de guardar deberías ver «2 cajas × 100 = 200 piezas». Enter guarda y el cursor vuelve a la búsqueda.
+3. Captura el mismo producto otra vez en piezas (`30`). Deberías ver «Contado: 230 piezas», las dos capturas por separado y el aviso de que hay empaques y sueltos (para revisar que no se contó dos veces).
+4. Cada producto muestra lo que el sistema tenía en esa ubicación al contarlo y la diferencia («Faltan 20 piezas», «Sobran…», «Coincide»).
+5. Si no hay nada de un producto, captura `0`. Quita una captura equivocada con el bote de basura.
+6. Intenta iniciar otro conteo de la misma ubicación: se rechaza y te ofrece continuar el abierto.
+7. «Cancelar conteo»: queda cerrado, visible y sin cambios posibles.
+
+En todo momento tus existencias siguen iguales: capturar no mueve nada. Aplicar las diferencias como ajustes llega en un paso posterior.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Conteos físicos y avisos por correo de existencias bajas (la lista sí existe).
+- Aplicar las diferencias de un conteo como ajustes (hoy solo se captura y se compara).
+- Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores.
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).

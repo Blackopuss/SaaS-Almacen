@@ -138,6 +138,9 @@ model Organization {
   stockMovementLines   StockMovementLine[]
   stockBalances        StockBalance[]
   stockMinimums        StockMinimum[]
+  stockCounts          StockCount[]
+  stockCountLines      StockCountLine[]
+  stockCountCaptures   StockCountCapture[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -186,6 +189,7 @@ model Location {
   children       Location[]          @relation("LocationTree")
   movementLines  StockMovementLine[]
   balances       StockBalance[]
+  counts         StockCount[]
   /// True for General, NULL for other locations (never false; SQL CHECK).
   /// MySQL allows multiple NULLs in the unique key, but only one true.
   isDefault      Boolean?
@@ -605,6 +609,7 @@ model Product {
   movementLines  StockMovementLine[]
   balances       StockBalance[]
   minimum        StockMinimum?
+  countLines     StockCountLine[]
   status         ProductStatus         @default(ACTIVE)
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   updatedAt      DateTime              @updatedAt @db.DateTime(3)
@@ -658,6 +663,7 @@ model ProductPresentation {
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   versions       PresentationVersion[]
   movementLines  StockMovementLine[]
+  countCaptures  StockCountCapture[]
 
   @@unique([organizationId, id])
   /// Lets a movement line prove its presentation is of its product.
@@ -681,6 +687,7 @@ model PresentationVersion {
   createdByUserId String              @db.Char(36)
   createdAt       DateTime            @default(now()) @db.DateTime(3)
   movementLines   StockMovementLine[]
+  countCaptures   StockCountCapture[]
 
   @@unique([organizationId, id])
   /// Lets a movement line prove its version is of its presentation.
@@ -829,4 +836,90 @@ model StockMinimum {
   @@unique([organizationId, id])
   @@unique([organizationId, productId])
   @@map("stock_minimum")
+}
+
+enum StockCountStatus {
+  /// Being captured.
+  OPEN
+  /// Its differences were written as adjustments (INV-33); immutable.
+  APPLIED
+  /// Abandoned without changing stock.
+  CANCELLED
+}
+
+/// A physical count of one location (INV-31): people write down what
+/// they find; the system compares it with its balance. Capturing never
+/// changes stock: only applying the count does (INV-33).
+model StockCount {
+  id              String           @id @db.Char(36)
+  organizationId  String           @db.Char(36)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  locationId      String           @db.Char(36)
+  location        Location         @relation(fields: [organizationId, locationId], references: [organizationId, id], onDelete: Restrict)
+  status          StockCountStatus @default(OPEN)
+  /// The location while the count is open, null afterwards: the unique
+  /// index below allows one open count per location.
+  openLocationId  String?          @db.Char(36)
+  note            String?          @db.VarChar(200)
+  startedAt       DateTime         @default(now()) @db.DateTime(3)
+  startedByUserId String           @db.Char(36)
+  closedAt        DateTime?        @db.DateTime(3)
+  closedByUserId  String?          @db.Char(36)
+  lines           StockCountLine[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, openLocationId])
+  @@index([organizationId, status, startedAt])
+  @@map("stock_count")
+}
+
+/// One product in a count. It keeps the reference of the comparison: the
+/// moment the product was first counted and the balance the system had
+/// then. Movements after that moment are not part of what was counted
+/// (INV-32).
+model StockCountLine {
+  id             String              @id @db.Char(36)
+  organizationId String              @db.Char(36)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  countId        String              @db.Char(36)
+  count          StockCount          @relation(fields: [organizationId, countId], references: [organizationId, id], onDelete: Restrict)
+  productId      String              @db.Char(36)
+  product        Product             @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  countedAt      DateTime            @db.DateTime(3)
+  /// Balance of the location at `countedAt`, in the product's unit.
+  systemQuantity Decimal             @db.Decimal(18, 3)
+  unitCode       String              @db.VarChar(12)
+  captures       StockCountCapture[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, countId, productId])
+  @@unique([organizationId, productId, id])
+  @@map("stock_count_line")
+}
+
+/// What was written down for a product: «2 cajas», «30 piezas». Each
+/// capture keeps how it was counted and what it is in the product's unit
+/// (baseQuantity = capturedQuantity × factor); the count of the product is
+/// the sum of its captures.
+model StockCountCapture {
+  id                    String               @id @db.Char(36)
+  organizationId        String               @db.Char(36)
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lineId                String               @db.Char(36)
+  productId             String               @db.Char(36)
+  line                  StockCountLine       @relation(fields: [organizationId, productId, lineId], references: [organizationId, productId, id], onDelete: Restrict)
+  capturedQuantity      Decimal              @db.Decimal(12, 3)
+  capturedUnitCode      String?              @db.VarChar(12)
+  presentationId        String?              @db.Char(36)
+  presentation          ProductPresentation? @relation(fields: [organizationId, productId, presentationId], references: [organizationId, productId, id], onDelete: Restrict, onUpdate: Restrict)
+  presentationVersionId String?              @db.Char(36)
+  presentationVersion   PresentationVersion? @relation(fields: [organizationId, presentationId, presentationVersionId], references: [organizationId, presentationId, id], onDelete: Restrict, onUpdate: Restrict)
+  factor                Decimal              @db.Decimal(18, 6)
+  baseQuantity          Decimal              @db.Decimal(12, 3)
+  createdByUserId       String               @db.Char(36)
+  createdAt             DateTime             @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, lineId])
+  @@map("stock_count_capture")
 }

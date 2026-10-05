@@ -59,3 +59,21 @@ export {
   type LowStockPage,
   type SetMinimumResult,
 } from "./minimums";
+export {
+  COUNT_MAX_LINES,
+  COUNT_STATUS_LABELS,
+  cancelCount,
+  captureCount,
+  getCount,
+  listCounts,
+  openCount,
+  removeCapture,
+  type CaptureInput,
+  type CaptureResult,
+  type CountChangeResult,
+  type CountDetail,
+  type CountLine,
+  type CountStatus,
+  type CountSummary,
+  type OpenCountResult,
+} from "./counts";
