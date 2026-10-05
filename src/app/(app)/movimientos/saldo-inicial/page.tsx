@@ -1,3 +1,4 @@
+import { newId } from "@/lib";
 import {
   ChevronLeft,
   ChevronRight,
@@ -175,6 +176,7 @@ export default async function SaldoInicialPage({
           </p>
         )}
         <EntryForm
+          idempotencyKey={newId()}
           mode="initial"
           productId={product.id}
           captures={captureOptions(product, presentations)}

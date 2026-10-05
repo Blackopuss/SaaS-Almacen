@@ -28,6 +28,12 @@ export type InventoryActor = { organizationId: string; userId: string };
 /** A balance beyond this is a mistake, not stock. */
 const MAX_BALANCE = "999999999999.999";
 
+/** Random text chosen by whoever shows the form: a UUID fits. */
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,64}$/;
+
+const KEY_REUSED =
+  "Esta confirmación ya se usó para otro movimiento. Recarga la página para registrar uno nuevo.";
+
 const optionalText = (max: number, tooLong: string) =>
   z
     .string()
@@ -76,6 +82,20 @@ const entrySchema = z.object({
     500,
     "La nota es demasiado larga (máximo 500 caracteres).",
   ),
+  /**
+   * Key of this confirmation (INV-21), created when the form is shown and
+   * sent again on every retry: the same key never writes a second
+   * movement. Without it there is no protection against repeats.
+   */
+  idempotencyKey: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || null)
+    .refine((value) => value === null || IDEMPOTENCY_KEY.test(value), {
+      message:
+        "No pudimos identificar esta confirmación. Recarga la página e inténtalo de nuevo.",
+    }),
 });
 
 export type EntryInput = z.input<typeof entrySchema>;
@@ -87,6 +107,11 @@ export type MovementResult =
       movementId: string;
       /** «Entraron 25 piezas de Tornillo a General. Ahora hay 325 piezas ahí.» */
       summary: string;
+      /**
+       * The confirmation had already been registered (a retry): nothing
+       * was written now and `movementId` is the original movement.
+       */
+      repeated?: true;
     }
   | {
       ok: false;
@@ -220,7 +245,14 @@ async function post(
           ? kind.missingQuantity
           : issue.message;
     }
-    return { ok: false, reason: "invalid", fieldErrors };
+    // The key has no field in the form: its problem goes to the top.
+    const { idempotencyKey: keyProblem, ...rest } = fieldErrors;
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: rest,
+      formError: keyProblem,
+    };
   }
   const data = parsed.data;
   if (data.presentationId && data.unitCode) {
@@ -250,6 +282,14 @@ async function post(
       // between our check and the balance we write (INV-19B). «General»
       // is never archived and needs no lock.
       if (data.locationId) await lockRows(tx, "location", [data.locationId]);
+
+      // A retry of a confirmation that already went through answers with
+      // the movement it wrote, before any other check: by now the stock or
+      // the product may have changed because of that very movement.
+      if (data.idempotencyKey) {
+        const replay = await findReplay(tx, data.idempotencyKey);
+        if (replay) return answerReplay(replay, type, userId, data);
+      }
       const product = productId
         ? await tx.product.findFirst({
             where: { id: productId },
@@ -350,6 +390,7 @@ async function post(
           type,
           reason: data.reason,
           reference: data.reference,
+          idempotencyKey: data.idempotencyKey,
           createdByUserId: userId,
         },
       });
@@ -415,8 +456,105 @@ async function post(
     }, LOCKING_TRANSACTION);
   } catch (error) {
     if (error instanceof Rejected) return error.result;
+    // The same key arrived at once for another product (the product lock
+    // did not put them in line): the database kept one movement.
+    if (
+      data.idempotencyKey &&
+      (error as { code?: string }).code === "P2002" &&
+      JSON.stringify((error as { meta?: unknown }).meta ?? "").includes(
+        "idempotencyKey",
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "not_allowed",
+        fieldErrors: {},
+        formError: KEY_REUSED,
+      };
+    }
     throw error;
   }
+}
+
+type ReplayClient = {
+  stockMovement: ReturnType<typeof forOrganization>["stockMovement"];
+};
+
+/** The movement a key already wrote in this company, with its only line. */
+async function findReplay(client: ReplayClient, idempotencyKey: string) {
+  return client.stockMovement.findFirst({
+    where: { idempotencyKey },
+    select: {
+      id: true,
+      type: true,
+      createdByUserId: true,
+      lines: {
+        orderBy: { lineNumber: "asc" },
+        take: 1,
+        select: {
+          productId: true,
+          locationId: true,
+          capturedQuantity: true,
+          capturedUnitCode: true,
+          presentationId: true,
+          baseQuantity: true,
+          unitCode: true,
+          product: { select: { name: true } },
+          location: { select: { name: true } },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Answer to a repeated confirmation: the original movement when the
+ * request is the same one, a refusal when the key is being reused for
+ * something else.
+ */
+function answerReplay(
+  replay: NonNullable<Awaited<ReturnType<typeof findReplay>>>,
+  type: keyof typeof KINDS,
+  userId: string,
+  data: z.output<typeof entrySchema>,
+): MovementResult {
+  const line = replay.lines[0];
+  let sameQuantity = false;
+  try {
+    sameQuantity =
+      !!line &&
+      dec(data.quantity.replace(/,(?=\d{3}(\D|$))/g, "")).equals(
+        line.capturedQuantity.toString(),
+      );
+  } catch {
+    sameQuantity = false;
+  }
+  if (
+    !line ||
+    replay.type !== type ||
+    replay.createdByUserId !== userId ||
+    line.productId !== data.productId ||
+    (data.locationId !== null && line.locationId !== data.locationId) ||
+    (line.presentationId ?? null) !== data.presentationId ||
+    (line.capturedUnitCode ?? null) !== data.unitCode ||
+    !sameQuantity
+  ) {
+    return reject("not_allowed", null, KEY_REUSED);
+  }
+  const moved = formatStock(line.baseQuantity.toString(), line.unitCode);
+  const one = dec(line.baseQuantity.toString()).equals(1);
+  const what =
+    type === "INITIAL"
+      ? `saldo inicial de ${line.product.name} en ${line.location.name}: ${moved}`
+      : type === "EXIT"
+        ? `${one ? "salió" : "salieron"} ${moved} de ${line.product.name} de ${line.location.name}`
+        : `${one ? "entró" : "entraron"} ${moved} de ${line.product.name} a ${line.location.name}`;
+  return {
+    ok: true,
+    movementId: replay.id,
+    repeated: true,
+    summary: `Este movimiento ya estaba registrado: ${what}. No se registró de nuevo.`,
+  };
 }
 
 /** Total stock of each product (the sum of its locations), in its unit. */

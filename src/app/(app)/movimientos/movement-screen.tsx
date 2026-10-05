@@ -1,3 +1,4 @@
+import { newId } from "@/lib";
 import { ChevronLeft, ChevronRight, Package, Search } from "lucide-react";
 import Form from "next/form";
 import Link from "next/link";
@@ -282,6 +283,7 @@ export async function MovementScreen({
           Hoy hay {formatStock(total ?? "0", product.unitCode)} en total.
         </p>
         <EntryForm
+          idempotencyKey={newId()}
           mode="exit"
           productId={product.id}
           captures={captureOptions(product, presentations)}
@@ -305,6 +307,7 @@ export async function MovementScreen({
           : "Todavía no tiene existencias."}
       </p>
       <EntryForm
+        idempotencyKey={newId()}
         productId={product.id}
         captures={captureOptions(product, presentations)}
         locations={locations.map((location) => ({

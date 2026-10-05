@@ -101,6 +101,8 @@ async function receive(
         quantity: values.quantity,
         reference: values.reference,
         reason: values.reason,
+        // Created with the form and resent on every retry (INV-21).
+        idempotencyKey: text("idempotencyKey"),
         ...captureFields(values.capture),
       },
     );

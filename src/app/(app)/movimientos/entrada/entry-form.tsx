@@ -60,6 +60,7 @@ export function EntryForm({
   captures,
   locations,
   defaultLocationId,
+  idempotencyKey,
 }: {
   mode?: keyof typeof MODES;
   productId: string;
@@ -71,6 +72,12 @@ export function EntryForm({
   /** Path of each location and what it holds today. */
   locations: { id: string; label: string }[];
   defaultLocationId: string;
+  /**
+   * Key of this confirmation, created by the server with the screen. It
+   * travels again if the person retries, so a repeat never writes a second
+   * movement (INV-21).
+   */
+  idempotencyKey: string;
 }) {
   // React resets a form after its action; the answers count how many came
   // back so the select is rebuilt showing what the person had chosen.
@@ -124,6 +131,7 @@ export function EntryForm({
 
   return (
     <form action={formAction} noValidate className="max-w-xl space-y-5">
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {state.formError && (
         <div
           role="alert"
