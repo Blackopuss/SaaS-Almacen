@@ -46,6 +46,7 @@ export async function ensureDefaultLocation(
       organizationId,
       facilityId: facility.id,
       name: "General",
+      kind: "GENERAL",
       isDefault: true,
     },
   });

@@ -386,7 +386,12 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
         "tests/platform/organization-context.int.test.ts",
       ],
     },
-    "NEG-12": { tests: ["tests/isolation/two-companies.int.test.ts"] },
+    "NEG-12": {
+      tests: [
+        "tests/isolation/two-companies.int.test.ts",
+        "tests/platform/location-hierarchy.int.test.ts",
+      ],
+    },
     "NEG-13": { tests: ["tests/platform/negative-by-role.int.test.ts"] },
     "NEG-14": { tests: ["tests/platform/invitation-accept.int.test.ts"] },
     "NEG-15": { tests: ["tests/platform/seats.int.test.ts"] },

@@ -105,16 +105,18 @@ describe("automatic facility and General (INV-13)", () => {
   });
 
   it("concurrent first provisioning and retries create only one pair", async () => {
-    const actor = await company();
-    // Model an old company missing the initial pair, before any stock exists.
-    await db.$transaction(async (tx) => {
-      await tx.location.deleteMany({
-        where: { organizationId: actor.organizationId },
-      });
-      await tx.facility.deleteMany({
-        where: { organizationId: actor.organizationId },
-      });
+    // An old company that never got the initial pair (locations are never
+    // deleted, so it is created without them).
+    const owner = await newUser();
+    const organization = await db.organization.create({
+      data: {
+        id: newId(),
+        name: "Ferretería sin ubicaciones",
+        ownerUserId: owner.id,
+        memberships: { create: { id: newId(), userId: owner.id } },
+      },
     });
+    const actor = { organizationId: organization.id, userId: owner.id };
     const results = await Promise.all(
       Array.from({ length: 5 }, () =>
         db.$transaction((tx) =>
@@ -162,9 +164,9 @@ describe("database constraints", () => {
   it("rejects a second default even when the application is bypassed", async () => {
     const facility = await defaults(actorA);
     await expect(db.$executeRaw`
-      INSERT INTO location (id, organizationId, facilityId, name, isDefault, updatedAt)
-      VALUES (${newId()}, ${actorA.organizationId}, ${facility.id}, 'General', true, UTC_TIMESTAMP(3))
-    `).rejects.toThrow(/Duplicate entry|unique constraint/i);
+      INSERT INTO location (id, organizationId, facilityId, name, kind, isDefault, updatedAt)
+      VALUES (${newId()}, ${actorA.organizationId}, ${facility.id}, 'General', 'GENERAL', true, UTC_TIMESTAMP(3))
+    `).rejects.toThrow(/Duplicate entry|unique constraint|location_tree/i);
     await expect(
       db.location.create({
         data: {
@@ -172,6 +174,7 @@ describe("database constraints", () => {
           organizationId: actorA.organizationId,
           facilityId: facility.id,
           name: "Otra predeterminada",
+          kind: "GENERAL",
           isDefault: true,
         },
       }),
@@ -183,11 +186,12 @@ describe("database constraints", () => {
     ).toBe(1);
   });
 
-  it("names ignore capitals and accents within a facility; NULL defaults allow many ordinary locations", async () => {
+  it("names at the root ignore capitals and accents; NULL defaults allow many ordinary locations", async () => {
     const facility = await defaults(actorA);
     const data = {
       organizationId: actorA.organizationId,
       facilityId: facility.id,
+      kind: "AISLE" as const,
     };
     await db.location.create({
       data: { id: newId(), ...data, name: "Pasillo Á" },
@@ -198,9 +202,7 @@ describe("database constraints", () => {
     for (const name of ["pasillo a", "PASILLO Á", "general", "Géneral"]) {
       await expect(
         db.location.create({ data: { id: newId(), ...data, name } }),
-      ).rejects.toThrow(
-        /Unique constraint|location_organizationId_facilityId_name_key/,
-      );
+      ).rejects.toThrow(/location_tree: name repeated at the root/);
     }
     const other = await defaults(actorB);
     await expect(
@@ -209,6 +211,7 @@ describe("database constraints", () => {
           id: newId(),
           organizationId: actorB.organizationId,
           facilityId: other.id,
+          kind: "AISLE",
           name: "Pasillo Á",
         },
       }),
@@ -227,6 +230,7 @@ describe("database constraints", () => {
             id: newId(),
             organizationId: actorA.organizationId,
             facilityId: facility.id,
+            kind: "ZONE",
             name,
           },
         }),
@@ -239,6 +243,7 @@ describe("database constraints", () => {
           organizationId: actorA.organizationId,
           facilityId: facility.id,
           name: "False",
+          kind: "ZONE",
           isDefault: false,
         },
       }),
@@ -257,8 +262,8 @@ describe("database constraints", () => {
       }),
     ).rejects.toThrow(/Unique constraint|facility_organizationId_key/);
     await expect(db.$executeRaw`
-      INSERT INTO location (id, organizationId, facilityId, name, updatedAt)
-      VALUES (${newId()}, ${actorA.organizationId}, ${facility.id}, 'Ajena', UTC_TIMESTAMP(3))
+      INSERT INTO location (id, organizationId, facilityId, name, kind, updatedAt)
+      VALUES (${newId()}, ${actorA.organizationId}, ${facility.id}, 'Ajena', 'ZONE', UTC_TIMESTAMP(3))
     `).rejects.toThrow(/foreign key/i);
     const own = (await defaults(actorA)).locations.find(
       (row) => row.isDefault,

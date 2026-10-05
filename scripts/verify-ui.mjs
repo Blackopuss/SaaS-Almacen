@@ -244,12 +244,18 @@ try {
             .getByRole("heading", { name: "General", exact: true })
             .isVisible()) &&
             (await facility
-              .getByText("Ubicación por defecto de tu inventario.", {
-                exact: true,
-              })
+              .getByText(
+                "Ubicación inicial: aquí llega lo que aún no acomodas.",
+                { exact: true },
+              )
               .isVisible()) &&
-            (await facility.getByRole("button").count()) === 0,
-          `${viewport.name}: locations shows the facility and General in read-only mode`,
+            // General is fixed: its row offers no action (INV-14).
+            (await facility
+              .getByRole("listitem")
+              .filter({ hasText: "Ubicación inicial" })
+              .getByRole("button")
+              .count()) === 0,
+          `${viewport.name}: locations shows the facility and General, which has no actions`,
         );
       }
     }

@@ -18,6 +18,36 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  createLocationAction: {
+    input: "nombre, tipo e id de la ubicación que la contiene",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/platform/location-hierarchy.int.test.ts",
+  },
+  renameLocationAction: {
+    input: "id de ubicación y nombre nuevo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/platform/location-hierarchy.int.test.ts",
+  },
+  moveLocationAction: {
+    input: "id de ubicación e id del destino",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/platform/location-hierarchy.int.test.ts",
+  },
+  archiveLocationAction: {
+    input: "id de ubicación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/platform/location-hierarchy.int.test.ts",
+  },
+  restoreLocationAction: {
+    input: "id de ubicación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la ubicación se busca solo en esa empresa",
+    coveredBy: "tests/platform/location-hierarchy.int.test.ts",
+  },
   changePresentationFactorAction: {
     input:
       "id de producto (solo para refrescar), id de presentación y contenido nuevo",

@@ -154,21 +154,45 @@ model Facility {
   @@map("facility")
 }
 
+/// What a location is (INV-14). The order is the hierarchy: a zone holds
+/// aisles and shelves, an aisle holds shelves, a shelf holds nothing.
+/// Levels are optional (a shelf may hang directly from the facility), but a
+/// location only goes inside a coarser one, so a cycle cannot be built.
+enum LocationKind {
+  /// The default location of the facility; always at the root, no children.
+  GENERAL
+  ZONE
+  AISLE
+  SHELF
+}
+
 model Location {
   id             String       @id @db.Char(36)
   organizationId String       @db.Char(36)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   facilityId     String       @db.Char(36)
   facility       Facility     @relation(fields: [organizationId, facilityId], references: [organizationId, id], onDelete: Restrict)
+  /// Name given by the business; unique among the locations of its parent.
   name           String       @db.VarChar(120)
+  /// Fixed when the location is created (trigger).
+  kind           LocationKind
+  /// Location that contains this one, in the same facility; NULL = root.
+  parentId       String?      @db.Char(36)
+  parent         Location?    @relation("LocationTree", fields: [organizationId, facilityId, parentId], references: [organizationId, facilityId, id], onDelete: Restrict, onUpdate: Restrict)
+  children       Location[]   @relation("LocationTree")
   /// True for General, NULL for other locations (never false; SQL CHECK).
   /// MySQL allows multiple NULLs in the unique key, but only one true.
   isDefault      Boolean?
+  /// Archived locations stay for the history; nothing is deleted.
+  archivedAt     DateTime?    @db.DateTime(3)
   createdAt      DateTime     @default(now()) @db.DateTime(3)
   updatedAt      DateTime     @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
-  @@unique([organizationId, facilityId, name])
+  @@unique([organizationId, facilityId, id])
+  /// Names repeat under different parents ("Estante 1" in two aisles). At
+  /// the root parentId is NULL and MySQL would not compare: a trigger does.
+  @@unique([organizationId, facilityId, parentId, name])
   @@unique([organizationId, facilityId, isDefault])
   @@map("location")
 }
