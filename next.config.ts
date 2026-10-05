@@ -37,6 +37,13 @@ const nextConfig: NextConfig = {
   // user menu. Compile and runtime errors are still shown when they happen.
   devIndicators: false,
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Import files travel in a Server Action: up to 10 MB of file
+      // (FILE_PURPOSES.import_source) plus the form around it.
+      bodySizeLimit: "11mb",
+    },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -143,6 +143,7 @@ model Organization {
   stockCountCaptures   StockCountCapture[]
   jobs                 Job[]
   storedFiles          StoredFile[]
+  productImports       ProductImport[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -978,25 +979,66 @@ model Job {
 /// was generated for it to download. The row says whose it is; the bytes
 /// live in the file storage under a key that starts with the company.
 model StoredFile {
-  id              String       @id @db.Char(36)
-  organizationId  String       @db.Char(36)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id              String          @id @db.Char(36)
+  organizationId  String          @db.Char(36)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// What it is for: "import_source", "export". Decides who may read it.
-  purpose         String       @db.VarChar(40)
+  purpose         String          @db.VarChar(40)
   /// Name shown to people; never used as a path.
-  name            String       @db.VarChar(160)
+  name            String          @db.VarChar(160)
   /// Decided by the server from the extension, not by the browser.
-  contentType     String       @db.VarChar(100)
+  contentType     String          @db.VarChar(100)
   size            Int
-  sha256          String       @db.Char(64)
+  sha256          String          @db.Char(64)
   /// Where the bytes are in the storage: "<organizationId>/<id>".
-  storageKey      String       @db.VarChar(100)
-  createdByUserId String       @db.Char(36)
-  createdAt       DateTime     @default(now()) @db.DateTime(3)
+  storageKey      String          @db.VarChar(100)
+  createdByUserId String          @db.Char(36)
+  createdAt       DateTime        @default(now()) @db.DateTime(3)
   /// Set when it was removed; the bytes are gone, the row stays as a trace.
-  deletedAt       DateTime?    @db.DateTime(3)
+  deletedAt       DateTime?       @db.DateTime(3)
+  productImports  ProductImport[]
 
   @@unique([organizationId, id])
   @@index([organizationId, purpose, createdAt])
   @@map("stored_file")
+}
+
+enum ProductImportStatus {
+  /// The file was read; its columns are being matched to ours (IMP-04).
+  MAPPING
+  /// Columns and decimal separator are set; ready to be validated (IMP-05).
+  READY
+}
+
+/// An import of products from a spreadsheet (IMP-04 on): the file that
+/// was uploaded and how to read it. Nothing of the catalog changes until
+/// the import is confirmed (IMP-08).
+model ProductImport {
+  id               String              @id @db.Char(36)
+  organizationId   String              @db.Char(36)
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fileId           String              @db.Char(36)
+  file             StoredFile          @relation(fields: [organizationId, fileId], references: [organizationId, id], onDelete: Restrict)
+  status           ProductImportStatus @default(MAPPING)
+  /// Sheet that was read; null for CSV.
+  sheetName        String?             @db.VarChar(64)
+  /// Row of the file (from 1) that holds the titles.
+  headerRow        Int
+  /// Titles of the file, by column: ["Clave", "Nombre", …].
+  headers          Json
+  /// Rows with data under the titles.
+  dataRows         Int
+  /// Cells that held a formula: their stored value is what is read.
+  formulaCells     Int                 @default(0)
+  /// Which column of the file feeds each of ours: { "sku": 0, "name": 1 }.
+  mapping          Json
+  /// "." or ","; null until the person says how decimals are written.
+  decimalSeparator String?             @db.Char(1)
+  createdByUserId  String              @db.Char(36)
+  createdAt        DateTime            @default(now()) @db.DateTime(3)
+  updatedAt        DateTime            @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt])
+  @@map("product_import")
 }

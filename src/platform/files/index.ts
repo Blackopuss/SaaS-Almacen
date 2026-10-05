@@ -19,3 +19,8 @@ export type {
 } from "./files";
 export { buildCsv, buildXlsx, neutralizeFormula } from "./spreadsheet";
 export type { Cell, Sheet } from "./spreadsheet";
+export { READ_LIMITS, readSpreadsheet } from "./spreadsheet-reader";
+export type {
+  ReadSpreadsheetResult,
+  SpreadsheetContent,
+} from "./spreadsheet-reader";

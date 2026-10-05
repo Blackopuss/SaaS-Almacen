@@ -37,7 +37,7 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
 | `/inicio` | Resumen del día: existencias bajas, últimos movimientos y uso del plan | Todos (cada bloque según permiso) |
 | `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
-| `/inventario/importar` | Plantilla para importar el catálogo desde Excel | Titular, Administrador, Almacén |
+| `/inventario/importar` | Plantilla, subir archivo y elegir columnas para importar el catálogo | Titular, Administrador, Almacén |
 | `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
 | `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/nuevo` | Alta de producto | Titular, Administrador, Almacén |
@@ -338,6 +338,16 @@ Deberías ver, según tu rol: «Existencias bajas» con los cinco productos más
 3. Deberías ver: los títulos de las 13 columnas, cuatro productos de ejemplo (por pieza con caja de 100, por metro con rollo, por kilogramo con saco y uno sin presentación) y, en Excel, la hoja «Instrucciones» con qué poner en cada columna y la lista de unidades válidas.
 
 Dime si falta alguna columna de las que tiene tu Excel actual, o si algún título o ejemplo no se entiende. Subir el archivo y revisarlo llega en los pasos siguientes.
+
+**G2. Subir tu archivo y elegir columnas**
+
+1. En `/inventario/importar`, sube la plantilla llena o **tu propio Excel** (.xlsx o .csv, hasta 10 MB).
+2. Deberías llegar a «Columnas de tu archivo»: la hoja leída, cuántas filas tiene, tus primeras filas tal como se leyeron y, para cada dato nuestro, la columna de tu archivo que le corresponde (se propone sola si el título se parece: «Código», «Artículo», «UM», «Existencia»…).
+3. Elige cómo vienen los decimales (punto o coma). No hay opción marcada de inicio: guardar sin elegir se rechaza.
+4. Guarda. Abajo aparece cómo se leen tus números con esa elección; si elegiste mal verás «no se entiende así» y puedes cambiarla.
+5. Prueba también: un archivo que no es Excel con extensión .xlsx (se rechaza con explicación), un Excel con fórmulas (avisa que toma el valor guardado, no las ejecuta), dos columnas con el mismo título, y elegir la misma columna para dos datos.
+
+Subir y mapear no cambia tu inventario. Dime qué títulos de tu Excel real no se reconocieron solos, para agregarlos.
 
 ## 4. Lo que todavía no existe
 

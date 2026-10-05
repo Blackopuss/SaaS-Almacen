@@ -10,8 +10,11 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { Button } from "@/components/ui/button";
-import { IMPORT_COLUMNS } from "@/modules/inventory";
+import { formatDateTime } from "@/lib";
+import { IMPORT_COLUMNS, listImports } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
+
+import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Importar productos" };
 
@@ -52,6 +55,12 @@ export default async function ImportarPage() {
       </PageContainer>
     );
   }
+  const imports = access.can("inventory.import.read")
+    ? await listImports({
+        organizationId: access.organization.id,
+        userId: access.user.id,
+      })
+    : [];
   const required = IMPORT_COLUMNS.filter((column) => column.required).map(
     (column) => column.header,
   );
@@ -114,10 +123,56 @@ export default async function ImportarPage() {
           <li>Borra las filas de ejemplo antes de importar.</li>
         </ul>
       </section>
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        El siguiente paso —subir tu archivo, revisar errores y confirmar— se
-        habilitará aquí mismo. Por ahora puedes ir llenando la plantilla.
-      </p>
+      <section
+        aria-labelledby="subir"
+        className="max-w-3xl space-y-4 rounded-xl border bg-card p-4 sm:p-5"
+      >
+        <div className="space-y-1">
+          <h2 id="subir" className="font-medium">
+            2. Sube tu archivo
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Puede ser la plantilla llena o tu propio Excel: en el siguiente paso
+            eliges qué columna es cada dato. Subirlo no cambia tu inventario.
+          </p>
+        </div>
+        <UploadForm />
+      </section>
+      {imports.length > 0 && (
+        <section
+          aria-labelledby="importaciones"
+          className="max-w-3xl rounded-xl border bg-card"
+        >
+          <h2 id="importaciones" className="border-b p-4 font-medium sm:px-5">
+            Archivos que has subido
+          </h2>
+          <ul className="divide-y">
+            {imports.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={`/inventario/importar/${item.id}`}
+                  className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:px-5"
+                >
+                  <span className="min-w-0 font-medium [overflow-wrap:anywhere]">
+                    {item.fileName}
+                  </span>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {item.dataRows.toLocaleString("es-MX")}{" "}
+                    {item.dataRows === 1 ? "fila" : "filas"} ·{" "}
+                    {item.status === "READY"
+                      ? "columnas listas"
+                      : "falta elegir columnas"}{" "}
+                    ·{" "}
+                    <time dateTime={item.createdAt.toISOString()}>
+                      {formatDateTime(item.createdAt)}
+                    </time>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </PageContainer>
   );
 }

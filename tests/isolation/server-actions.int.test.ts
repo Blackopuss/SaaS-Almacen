@@ -18,6 +18,19 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  startImportAction: {
+    input: "archivo .xlsx o .csv",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el archivo se guarda como privado de esa empresa",
+    coveredBy: "tests/inventory/imports.int.test.ts",
+  },
+  saveMappingAction: {
+    input:
+      "id de importación, columna del archivo para cada dato y separador decimal",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la importación se busca solo en esa empresa",
+    coveredBy: "tests/inventory/imports.int.test.ts",
+  },
   applyCountAction: {
     input: "id de conteo y motivo",
     identity:

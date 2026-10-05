@@ -230,9 +230,10 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const storedFileId = newId();
     await db.storedFile.create({
       data: {
-        id: newId(),
+        id: storedFileId,
         organizationId,
         purpose: "import_source",
         name: "productos.csv",
@@ -240,6 +241,18 @@ beforeAll(async () => {
         size: 3,
         sha256: "0".repeat(64),
         storageKey: `${organizationId}/prueba`,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.productImport.create({
+      data: {
+        id: newId(),
+        organizationId,
+        fileId: storedFileId,
+        headerRow: 1,
+        headers: ["Clave", "Nombre"],
+        dataRows: 1,
+        mapping: {},
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
@@ -298,7 +311,7 @@ beforeAll(async () => {
   }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
-});
+}, 60_000);
 
 afterAll(async () => {
   await db.$disconnect();
