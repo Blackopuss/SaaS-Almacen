@@ -230,6 +230,14 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.job.create({
+      data: {
+        id: newId(),
+        organizationId,
+        type: "test.noop",
+        payload: {},
+      },
+    });
     const countId = newId();
     await db.stockCount.create({
       data: {

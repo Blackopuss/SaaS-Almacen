@@ -30,6 +30,7 @@ export const TENANT_MODELS = [
   "Entitlement",
   "Facility",
   "Invitation",
+  "Job",
   "Location",
   "Membership",
   "MembershipRole",

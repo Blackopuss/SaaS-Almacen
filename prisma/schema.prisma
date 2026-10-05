@@ -141,6 +141,7 @@ model Organization {
   stockCounts          StockCount[]
   stockCountLines      StockCountLine[]
   stockCountCaptures   StockCountCapture[]
+  jobs                 Job[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -928,4 +929,46 @@ model StockCountCapture {
   @@unique([organizationId, id])
   @@index([organizationId, lineId])
   @@map("stock_count_capture")
+}
+
+enum JobStatus {
+  /// Waiting for its turn (or for its next attempt).
+  PENDING
+  /// A worker has it.
+  RUNNING
+  DONE
+  /// It used up its attempts; nothing retries it again.
+  FAILED
+}
+
+/// Work done in the background for a company (IMP-01): an import, an
+/// export. The row is the queue — it survives restarts — and carries the
+/// company it belongs to, which is the only company its handler works in.
+model Job {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Which handler runs it: "inventory.import_products".
+  type            String       @db.VarChar(64)
+  payload         Json
+  status          JobStatus    @default(PENDING)
+  /// Times a worker has started it.
+  attempts        Int          @default(0)
+  maxAttempts     Int          @default(5)
+  /// Not before this moment (now, or later after a failed attempt).
+  runAt           DateTime     @default(now()) @db.DateTime(3)
+  lockedAt        DateTime?    @db.DateTime(3)
+  lockedBy        String?      @db.VarChar(64)
+  /// Why the last attempt failed, for people; never secrets.
+  lastError       String?      @db.VarChar(500)
+  result          Json?
+  /// Person who asked for it (an account; not a company row).
+  createdByUserId String?      @db.Char(36)
+  createdAt       DateTime     @default(now()) @db.DateTime(3)
+  finishedAt      DateTime?    @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([status, runAt])
+  @@index([organizationId, type, createdAt])
+  @@map("job")
 }

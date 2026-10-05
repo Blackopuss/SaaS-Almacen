@@ -32,7 +32,8 @@
     "staff": "tsx --conditions=react-server scripts/staff.mts",
     "dev:test": "node scripts/dev-test.mjs",
     "test:company": "tsx --conditions=react-server scripts/test-company.mts",
-    "stock:reconcile": "tsx --conditions=react-server scripts/stock-reconcile.mts"
+    "stock:reconcile": "tsx --conditions=react-server scripts/stock-reconcile.mts",
+    "worker": "tsx --conditions=react-server scripts/worker.mts"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",
