@@ -78,7 +78,7 @@ export type RowsValidation = {
 type Location = { id: string; path: string; isDefault: boolean };
 
 /** Text to compare names: no accents, case or extra spaces. */
-const fold = (text: string) =>
+export const foldName = (text: string) =>
   text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -90,14 +90,14 @@ const fold = (text: string) =>
 const foldPath = (path: string) =>
   path
     .split(/[›>/\\]/)
-    .map(fold)
+    .map(foldName)
     .filter(Boolean)
     .join(" > ");
 
 const UNIT_BY_NAME = new Map<string, string>(
   UNITS.flatMap((unit) =>
     [unit.name, unit.plural, unit.symbol, unit.code].map(
-      (name) => [fold(name), unit.code] as const,
+      (name) => [foldName(name), unit.code] as const,
     ),
   ),
 );
@@ -205,7 +205,7 @@ export function validateImportRows(
     const barcode = text("barcode", 64);
 
     const unitText = cell("unit");
-    const unitCode = UNIT_BY_NAME.get(fold(unitText)) ?? null;
+    const unitCode = UNIT_BY_NAME.get(foldName(unitText)) ?? null;
     if (unitText === "") {
       issue("unit", "Falta la unidad: pieza, metro, kilogramo…");
     } else if (!unitCode) {
@@ -254,7 +254,10 @@ export function validateImportRows(
       if (content && content.isZero()) {
         issue("presentationContent", "El contenido debe ser mayor que cero.");
       } else if (content) {
-        if (unitCode && UNIT_BY_NAME.get(fold(presentationName)) === unitCode) {
+        if (
+          unitCode &&
+          UNIT_BY_NAME.get(foldName(presentationName)) === unitCode
+        ) {
           issue(
             "presentation",
             `«${presentationName}» es la unidad del producto, no una presentación. Déjala vacía.`,
@@ -276,12 +279,12 @@ export function validateImportRows(
       let base: ReturnType<typeof dec> | null = null;
       let inPresentation = false;
       const inUnit =
-        countedIn === "" || UNIT_BY_NAME.get(fold(countedIn)) === unitCode;
+        countedIn === "" || UNIT_BY_NAME.get(foldName(countedIn)) === unitCode;
       if (inUnit) {
         base = quantity("initialStock", stockText);
       } else if (
         presentationName !== null &&
-        fold(countedIn) === fold(presentationName)
+        foldName(countedIn) === foldName(presentationName)
       ) {
         if (presentation) {
           const count = dec(stockText);
@@ -336,7 +339,7 @@ export function validateImportRows(
 
     // The same product in several rows: one per location, saying the same.
     if (sku !== "" && unitCode) {
-      const key = fold(sku);
+      const key = foldName(sku);
       const first = firstBySku.get(key);
       const place = stock?.locationId ?? "";
       if (!first) {
@@ -347,7 +350,7 @@ export function validateImportRows(
           locations: new Set([place]),
         });
       } else if (
-        fold(first.name) !== fold(name) ||
+        foldName(first.name) !== foldName(name) ||
         first.unitCode !== unitCode
       ) {
         issue(
@@ -367,8 +370,8 @@ export function validateImportRows(
     }
     if (barcode !== null && sku !== "") {
       const owner = skuByBarcode.get(barcode);
-      if (!owner) skuByBarcode.set(barcode, { sku: fold(sku), row });
-      else if (owner.sku !== fold(sku)) {
+      if (!owner) skuByBarcode.set(barcode, { sku: foldName(sku), row });
+      else if (owner.sku !== foldName(sku)) {
         issue(
           "barcode",
           `Ese código de barras ya lo tiene otro producto en la fila ${owner.row}.`,
@@ -430,15 +433,28 @@ export type ImportValidation =
     }
   | { ok: false; reason: "not_found" | "not_ready" | "file"; error: string };
 
+type ImportFailure = Extract<ImportValidation, { ok: false }>;
+
+/** An import read and checked whole: every row, right or wrong. */
+export type CheckedImport = {
+  ok: true;
+  importId: string;
+  fileName: string;
+  totalRows: number;
+  headers: string[];
+  mapping: ImportMapping;
+  result: RowsValidation;
+};
+
 /**
- * Validates an import whose columns are set. It reads the file again and
- * answers with the problems found; it changes nothing, so it can be run
- * as many times as needed while the person corrects their file.
+ * Reads the file of an import again and checks every row. The steps that
+ * follow (classification, confirmation) start from here, so they always
+ * work with what the file and the company say now.
  */
-export async function validateImport(
+export async function checkImport(
   actor: InventoryActor,
   importId: string,
-): Promise<ImportValidation> {
+): Promise<CheckedImport | ImportFailure> {
   const { organizationId, userId } = actor;
   await assertModulePermission(organizationId, userId, "inventory.import.read");
   const row = await forOrganization(organizationId).productImport.findFirst({
@@ -499,15 +515,38 @@ export async function validateImport(
     decimalSeparator: separator,
     locations,
   });
-
   return {
     ok: true,
     importId: row.id,
     fileName: row.file.name,
     totalRows: data.length,
+    headers,
+    mapping,
+    result,
+  };
+}
+
+/**
+ * Validates an import whose columns are set. It reads the file again and
+ * answers with the problems found; it changes nothing, so it can be run
+ * as many times as needed while the person corrects their file.
+ */
+export async function validateImport(
+  actor: InventoryActor,
+  importId: string,
+): Promise<ImportValidation> {
+  const checked = await checkImport(actor, importId);
+  if (!checked.ok) return checked;
+  const { result } = checked;
+
+  return {
+    ok: true,
+    importId: checked.importId,
+    fileName: checked.fileName,
+    totalRows: checked.totalRows,
     validRows: result.valid.length,
     invalidRows: result.invalidRows,
-    products: new Set(result.valid.map((line) => fold(line.sku))).size,
+    products: new Set(result.valid.map((line) => foldName(line.sku))).size,
     issueCount: result.issues.length,
     issues: result.issues.slice(0, MAX_ISSUES),
     preview: result.valid.slice(0, PREVIEW_ROWS).map((line) => {

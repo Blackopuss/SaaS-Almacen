@@ -110,3 +110,9 @@ export {
   type RowsValidation,
   type ValidImportRow,
 } from "./import-validation";
+export {
+  classifyImport,
+  type ClassifiedProduct,
+  type ImportClassification,
+  type ImportProductKind,
+} from "./import-classification";

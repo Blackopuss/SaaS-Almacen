@@ -358,6 +358,16 @@ Subir y mapear no cambia tu inventario. Dime qué títulos de tu Excel real no s
 
 Revisar no importa nada: puedes corregir y volver a subir las veces que quieras. Dime qué mensajes no se entienden.
 
+**G4. Nuevos, actualizados y cupo**
+
+En la misma pantalla de revisión, «Qué pasará con tus productos»:
+
+1. Sube un archivo que mezcle una clave que ya tienes (con otro nombre o marca), una de un producto archivado y una nueva. Deberías ver los tres contadores (Nuevos, Se actualizan, Se reactivan), qué cambia en los existentes («Nombre: A → B») y cuántos lugares de tu plan necesita contra los disponibles.
+2. Sube más productos nuevos de los que caben en tu plan: te dice cuántos faltan y que no se importará una parte.
+3. Choques: una existencia inicial para un producto que ya tiene movimientos, una unidad distinta a la que ya tiene el producto, o un código de barras que ya usa otro producto. Aparecen por fila, con la explicación.
+
+Sigue sin importarse nada: confirmar llega en los pasos siguientes.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:

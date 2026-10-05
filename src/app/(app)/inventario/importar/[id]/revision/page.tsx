@@ -16,13 +16,22 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { validateImport } from "@/modules/inventory";
+import { classifyImport, validateImport } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
 export const metadata: Metadata = { title: "Revisión de la importación" };
 
 const ISSUES_PER_PAGE = 50;
+/** Products of the file listed with what happens to each. */
+const PRODUCTS_SHOWN = 20;
+
+const KIND = {
+  new: { label: "Nuevo", variant: "default" },
+  update: { label: "Se actualiza", variant: "secondary" },
+  reactivate: { label: "Se reactiva", variant: "warning" },
+} as const;
 
 /**
  * Third step of an import (IMP-05): every row checked, with its problems
@@ -61,10 +70,11 @@ export default async function RevisionPage({
       </PageContainer>
     );
   }
-  const result = await validateImport(
-    { organizationId: access.organization.id, userId: access.user.id },
-    id,
-  );
+  const actor = {
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  };
+  const result = await validateImport(actor, id);
   if (!result.ok && result.reason === "not_found") notFound();
   if (!result.ok) {
     return (
@@ -110,6 +120,9 @@ export default async function RevisionPage({
       ? `/inventario/importar/${id}/revision?pagina=${n}`
       : `/inventario/importar/${id}/revision`;
   const clean = result.invalidRows === 0;
+  // New or existing, and the places of the plan they need (IMP-06).
+  const classified = await classifyImport(actor, id);
+  const plan = classified.ok ? classified : null;
 
   return (
     <PageContainer>
@@ -262,6 +275,156 @@ export default async function RevisionPage({
               )}
             </nav>
           )}
+        </section>
+      )}
+
+      {plan && plan.validRows > 0 && (
+        <section
+          aria-labelledby="clasificacion"
+          className="max-w-3xl rounded-xl border bg-card"
+        >
+          <div className="space-y-3 border-b p-4 sm:p-5">
+            <h2 id="clasificacion" className="font-medium">
+              Qué pasará con tus productos
+            </h2>
+            <dl className="grid grid-cols-3 gap-3 text-sm">
+              {(
+                [
+                  ["Nuevos", plan.counts.new],
+                  ["Se actualizan", plan.counts.update],
+                  ["Se reactivan", plan.counts.reactivate],
+                ] as const
+              ).map(([term, value]) => (
+                <div key={term}>
+                  <dt className="text-muted-foreground">{term}</dt>
+                  <dd className="text-2xl font-semibold tracking-tight tabular-nums">
+                    {count(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p
+              className="flex items-start gap-2 text-sm"
+              role={plan.quota.fits ? undefined : "alert"}
+            >
+              {plan.quota.fits ? (
+                <CircleCheck
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-success"
+                />
+              ) : (
+                <CircleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-destructive"
+                />
+              )}
+              <span>
+                {plan.quota.limit === null ? (
+                  "Tu empresa todavía no tiene un plan con cupo de productos: no se pueden agregar productos nuevos."
+                ) : plan.quota.required === 0 ? (
+                  "No necesita lugares de tu plan: solo actualiza productos que ya tienes."
+                ) : (
+                  <>
+                    Necesita{" "}
+                    <span className="font-medium tabular-nums">
+                      {plan.quota.required === 1
+                        ? "1 lugar"
+                        : `${count(plan.quota.required)} lugares`}
+                    </span>{" "}
+                    de tu plan (productos nuevos y reactivados). Tienes{" "}
+                    <span className="font-medium tabular-nums">
+                      {count(plan.quota.available)}
+                    </span>{" "}
+                    disponibles de {count(plan.quota.limit)}.
+                    {!plan.quota.fits &&
+                      ` Faltan ${count(plan.quota.required - plan.quota.available)}: quita productos del archivo, archiva los que ya no uses o pide un nivel mayor. No se importará una parte.`}
+                  </>
+                )}{" "}
+                {plan.quota.fits && plan.quota.required > 0 && (
+                  <span className="text-muted-foreground">
+                    Los lugares se apartan al confirmar.
+                  </span>
+                )}
+              </span>
+            </p>
+          </div>
+          {plan.conflicts.length > 0 && (
+            <div className="border-b">
+              <h3 className="flex items-center gap-2 px-4 pt-4 text-sm font-medium sm:px-5">
+                <CircleAlert
+                  aria-hidden="true"
+                  className="size-4 text-destructive"
+                />
+                {plan.conflictCount === 1
+                  ? "1 choque con tu catálogo actual"
+                  : `${count(plan.conflictCount)} choques con tu catálogo actual`}
+              </h3>
+              <ul className="divide-y">
+                {plan.conflicts.map((conflict, index) => (
+                  <li key={index} className="space-y-1 p-4 text-sm sm:px-5">
+                    <p className="text-muted-foreground tabular-nums">
+                      Fila {conflict.row} · {conflict.header}
+                      {conflict.value && ` · dice «${conflict.value}»`}
+                    </p>
+                    <p>{conflict.message}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <ul className="divide-y">
+            {plan.products.slice(0, PRODUCTS_SHOWN).map((product) => (
+              <li key={product.row} className="space-y-1 p-4 sm:px-5">
+                <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <Badge variant={KIND[product.kind].variant}>
+                    {KIND[product.kind].label}
+                  </Badge>
+                  <span className="font-medium [overflow-wrap:anywhere]">
+                    {product.name}
+                  </span>
+                  <span className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                    {product.sku}
+                  </span>
+                </p>
+                {product.changes.length > 0 && (
+                  <ul className="text-sm text-muted-foreground">
+                    {product.changes.map((change) => (
+                      <li key={change} className="[overflow-wrap:anywhere]">
+                        {change}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+          {plan.counts.new + plan.counts.update + plan.counts.reactivate >
+            PRODUCTS_SHOWN && (
+            <p className="border-t p-4 text-sm text-muted-foreground sm:px-5">
+              Se muestran los primeros {PRODUCTS_SHOWN} productos del archivo.
+            </p>
+          )}
+          <p className="flex items-start gap-2 border-t p-4 text-sm sm:px-5">
+            {plan.ready ? (
+              <>
+                <CircleCheck
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-success"
+                />
+                Todo listo para importar. La confirmación se habilitará en esta
+                pantalla; por ahora nada cambió en tu inventario.
+              </>
+            ) : (
+              <>
+                <CircleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-warning"
+                />
+                Todavía no se puede importar: corrige lo marcado y vuelve a
+                subir el archivo.
+              </>
+            )}
+          </p>
         </section>
       )}
 
