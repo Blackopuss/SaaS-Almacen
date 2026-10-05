@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   IMPORT_COLUMNS,
+  confirmImport,
   saveImportMapping,
   startImport,
   type ImportColumnKey,
@@ -110,4 +111,42 @@ export async function saveMappingAction(
   }
   revalidatePath(`/inventario/importar/${String(importId)}`);
   return { fieldErrors: {}, saved: true, values };
+}
+
+export type ConfirmImportState =
+  { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Confirms an import: its places of the plan are held, all or none
+ * (IMP-07). The import is looked for only inside the company of the
+ * session; sending it twice confirms once.
+ */
+export async function confirmImportAction(
+  importId: string,
+): Promise<ConfirmImportState> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await confirmImport(
+      { organizationId: organization.id, userId: user.id },
+      String(importId),
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath("/inventario/importar");
+    revalidatePath(`/inventario/importar/${String(importId)}`);
+    revalidatePath(`/inventario/importar/${String(importId)}/revision`);
+    return {
+      ok: true,
+      message:
+        result.reserved === 0
+          ? "Importación confirmada."
+          : result.reserved === 1
+            ? "Importación confirmada: se apartó 1 lugar de tu plan."
+            : `Importación confirmada: se apartaron ${result.reserved} lugares de tu plan.`,
+    };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }

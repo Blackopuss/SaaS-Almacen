@@ -11,7 +11,11 @@ import {
 } from "@/components";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib";
-import { IMPORT_COLUMNS, listImports } from "@/modules/inventory";
+import {
+  IMPORT_COLUMNS,
+  IMPORT_STATUS_LABELS,
+  listImports,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
 import { UploadForm } from "./upload-form";
@@ -159,10 +163,7 @@ export default async function ImportarPage() {
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {item.dataRows.toLocaleString("es-MX")}{" "}
                     {item.dataRows === 1 ? "fila" : "filas"} ·{" "}
-                    {item.status === "READY"
-                      ? "columnas listas"
-                      : "falta elegir columnas"}{" "}
-                    ·{" "}
+                    {IMPORT_STATUS_LABELS[item.status].toLowerCase()} ·{" "}
                     <time dateTime={item.createdAt.toISOString()}>
                       {formatDateTime(item.createdAt)}
                     </time>

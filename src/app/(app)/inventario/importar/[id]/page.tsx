@@ -12,7 +12,12 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IMPORT_COLUMNS, getImport } from "@/modules/inventory";
+import {
+  IMPORT_COLUMNS,
+  IMPORT_STATUS_LABELS,
+  getImport,
+  isImportEditable,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
 import { MappingForm } from "./mapping-form";
@@ -70,7 +75,9 @@ export default async function ImportacionPage({
   if (!detail) notFound();
 
   const canMap =
-    moduleState === "active" && access.allows("inventory.import.create");
+    moduleState === "active" &&
+    isImportEditable(detail.status) &&
+    access.allows("inventory.import.create");
   const fileColumns = detail.headers.map((header, index) => ({
     index,
     label: header
@@ -97,10 +104,8 @@ export default async function ImportacionPage({
         description={`${detail.fileName}${detail.sheetName ? ` · hoja «${detail.sheetName}»` : ""}`}
       />
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <Badge variant={detail.status === "READY" ? "default" : "secondary"}>
-          {detail.status === "READY"
-            ? "Columnas listas"
-            : "Falta elegir columnas"}
+        <Badge variant={detail.status === "MAPPING" ? "secondary" : "default"}>
+          {IMPORT_STATUS_LABELS[detail.status]}
         </Badge>
         <span className="tabular-nums">
           {detail.dataRows === 1
@@ -216,7 +221,9 @@ export default async function ImportacionPage({
         </section>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Puedes consultar esta importación, pero no cambiar sus columnas.
+          {isImportEditable(detail.status)
+            ? "Puedes consultar esta importación, pero no cambiar sus columnas."
+            : "Esta importación ya se confirmó: sus columnas quedaron como están."}
         </p>
       )}
 
@@ -292,11 +299,13 @@ export default async function ImportacionPage({
           </p>
         </section>
       )}
-      {detail.status === "READY" && (
+      {detail.status !== "MAPPING" && (
         <p>
           <Button asChild>
             <Link href={`/inventario/importar/${detail.id}/revision`}>
-              Revisar las filas
+              {isImportEditable(detail.status)
+                ? "Revisar las filas"
+                : "Ver la revisión"}
             </Link>
           </Button>
         </p>

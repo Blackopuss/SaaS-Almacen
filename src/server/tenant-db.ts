@@ -248,6 +248,7 @@ const LOCKABLE = {
   facility: "facility",
   location: "location",
   product: "product",
+  productImport: "product_import",
   stockCount: "stock_count",
 } as const;
 

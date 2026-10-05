@@ -23,6 +23,22 @@ import type { InventoryActor } from "./movements";
 
 export type DecimalSeparator = "." | ",";
 
+export const IMPORT_STATUS_LABELS = {
+  MAPPING: "Falta elegir columnas",
+  READY: "Columnas listas",
+  CONFIRMED: "Confirmada, en espera",
+  RUNNING: "Importando…",
+  DONE: "Importada",
+  FAILED: "No se pudo terminar",
+  CANCELLED: "Cancelada",
+} as const;
+
+export type ImportStatus = keyof typeof IMPORT_STATUS_LABELS;
+
+/** While the person is still deciding how to read the file. */
+export const isImportEditable = (status: ImportStatus) =>
+  status === "MAPPING" || status === "READY";
+
 /** Our columns whose content is a number. */
 export const NUMERIC_IMPORT_COLUMNS = [
   "presentationContent",
@@ -227,7 +243,7 @@ export async function startImport(
 
 export type ImportDetail = {
   id: string;
-  status: "MAPPING" | "READY";
+  status: ImportStatus;
   fileName: string;
   /** Sheet that was read; null for CSV. */
   sheetName: string | null;
@@ -238,6 +254,9 @@ export type ImportDetail = {
   formulaCells: number;
   mapping: ImportMapping;
   decimalSeparator: DecimalSeparator | null;
+  /** Places of the plan held since it was confirmed (IMP-07). */
+  reservedPlaces: number;
+  confirmedAt: Date | null;
   /** First rows of data, as text, to recognize the columns. */
   preview: { row: number; cells: string[] }[];
   /**
@@ -290,6 +309,8 @@ export async function getImport(
       formulaCells: true,
       mapping: true,
       decimalSeparator: true,
+      reservedPlaces: true,
+      confirmedAt: true,
       createdAt: true,
       file: { select: { name: true } },
     },
@@ -342,6 +363,8 @@ export async function getImport(
     formulaCells: row.formulaCells,
     mapping,
     decimalSeparator,
+    reservedPlaces: row.reservedPlaces,
+    confirmedAt: row.confirmedAt,
     preview,
     numbers,
     createdAt: row.createdAt,
@@ -384,7 +407,7 @@ export async function saveImportMapping(
   const client = forOrganization(organizationId);
   const row = await client.productImport.findFirst({
     where: { id: String(input.importId).slice(0, 36) },
-    select: { id: true, headers: true },
+    select: { id: true, headers: true, status: true },
   });
   if (!row) {
     return {
@@ -392,6 +415,15 @@ export async function saveImportMapping(
       reason: "not_found",
       fieldErrors: {},
       formError: "Esta importación ya no existe.",
+    };
+  }
+  if (!isImportEditable(row.status)) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {},
+      formError:
+        "Esta importación ya se confirmó: sus columnas ya no se pueden cambiar.",
     };
   }
   const columns = Array.isArray(row.headers) ? row.headers.length : 0;
@@ -447,17 +479,27 @@ export async function saveImportMapping(
   if (Object.keys(fieldErrors).length > 0 || !decimalSeparator) {
     return { ok: false, reason: "invalid", fieldErrors };
   }
-  await client.productImport.updateMany({
-    where: { id: row.id },
+  const saved = await client.productImport.updateMany({
+    // Confirmed meanwhile: its columns stay as they were confirmed.
+    where: { id: row.id, status: { in: ["MAPPING", "READY"] } },
     data: { mapping, decimalSeparator, status: "READY" },
   });
+  if (saved.count !== 1) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {},
+      formError:
+        "Esta importación ya se confirmó: sus columnas ya no se pueden cambiar.",
+    };
+  }
   return { ok: true };
 }
 
 export type ImportSummary = {
   id: string;
   fileName: string;
-  status: "MAPPING" | "READY";
+  status: ImportStatus;
   dataRows: number;
   createdAt: Date;
 };

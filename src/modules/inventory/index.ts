@@ -88,8 +88,10 @@ export {
   type ImportTemplateFormat,
 } from "./import-template";
 export {
+  IMPORT_STATUS_LABELS,
   NUMERIC_IMPORT_COLUMNS,
   getImport,
+  isImportEditable,
   listImports,
   normalizeDecimal,
   saveImportMapping,
@@ -98,6 +100,7 @@ export {
   type DecimalSeparator,
   type ImportDetail,
   type ImportMapping,
+  type ImportStatus,
   type ImportSummary,
   type SaveMappingResult,
   type StartImportResult,
@@ -116,3 +119,4 @@ export {
   type ImportClassification,
   type ImportProductKind,
 } from "./import-classification";
+export { confirmImport, type ConfirmImportResult } from "./import-confirmation";

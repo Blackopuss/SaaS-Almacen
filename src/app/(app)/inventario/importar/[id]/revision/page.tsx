@@ -18,8 +18,15 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { classifyImport, validateImport } from "@/modules/inventory";
+import {
+  classifyImport,
+  getImport,
+  isImportEditable,
+  validateImport,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
+
+import { ConfirmImport } from "./confirm-import";
 
 export const metadata: Metadata = { title: "Revisión de la importación" };
 
@@ -121,8 +128,19 @@ export default async function RevisionPage({
       : `/inventario/importar/${id}/revision`;
   const clean = result.invalidRows === 0;
   // New or existing, and the places of the plan they need (IMP-06).
-  const classified = await classifyImport(actor, id);
+  const [classified, detail] = await Promise.all([
+    classifyImport(actor, id),
+    getImport(actor, id),
+  ]);
   const plan = classified.ok ? classified : null;
+  // Once confirmed its places are held: the question is no longer whether
+  // it fits.
+  const editable = detail ? isImportEditable(detail.status) : false;
+  const canConfirm =
+    editable &&
+    Boolean(plan?.ready) &&
+    moduleState === "active" &&
+    access.allows("inventory.import.confirm");
 
   return (
     <PageContainer>
@@ -278,7 +296,29 @@ export default async function RevisionPage({
         </section>
       )}
 
-      {plan && plan.validRows > 0 && (
+      {detail && !editable && (
+        <div
+          role="status"
+          className="flex max-w-3xl items-start gap-2 rounded-xl border bg-card p-4 text-sm"
+        >
+          <CircleCheck
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-success"
+          />
+          <p>
+            <span className="font-medium">Importación confirmada.</span>{" "}
+            {detail.reservedPlaces === 0
+              ? "No necesitó lugares de tu plan."
+              : detail.reservedPlaces === 1
+                ? "Tiene 1 lugar de tu plan apartado."
+                : `Tiene ${count(detail.reservedPlaces)} lugares de tu plan apartados.`}{" "}
+            Ya no admite cambios. Sus productos se crearán en segundo plano en
+            el paso siguiente; por ahora tu inventario sigue igual.
+          </p>
+        </div>
+      )}
+
+      {plan && plan.validRows > 0 && editable && (
         <section
           aria-labelledby="clasificacion"
           className="max-w-3xl rounded-xl border bg-card"
@@ -411,8 +451,8 @@ export default async function RevisionPage({
                   aria-hidden="true"
                   className="mt-0.5 size-4 shrink-0 text-success"
                 />
-                Todo listo para importar. La confirmación se habilitará en esta
-                pantalla; por ahora nada cambió en tu inventario.
+                Todo listo para importar. Al confirmar se apartan los lugares de
+                tu plan; hasta entonces nada cambia en tu inventario.
               </>
             ) : (
               <>
@@ -425,6 +465,17 @@ export default async function RevisionPage({
               </>
             )}
           </p>
+          {canConfirm && (
+            <div className="border-t p-4 sm:px-5">
+              <ConfirmImport
+                importId={plan.importId}
+                products={
+                  plan.counts.new + plan.counts.update + plan.counts.reactivate
+                }
+                places={plan.quota.required}
+              />
+            </div>
+          )}
         </section>
       )}
 

@@ -478,7 +478,7 @@ export async function checkImport(
     };
   }
   const separator = row.decimalSeparator;
-  if (row.status !== "READY" || (separator !== "." && separator !== ",")) {
+  if (row.status === "MAPPING" || (separator !== "." && separator !== ",")) {
     return {
       ok: false,
       reason: "not_ready",

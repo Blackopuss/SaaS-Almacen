@@ -368,6 +368,15 @@ En la misma pantalla de revisión, «Qué pasará con tus productos»:
 
 Sigue sin importarse nada: confirmar llega en los pasos siguientes.
 
+**G5. Confirmar la importación (por ahora, solo en la base de pruebas)**
+
+Hazlo con `npm run dev:test`, no en tu base de desarrollo: confirmar aparta lugares de tu plan y todavía no existe el paso que crea los productos ni el que libera lo apartado.
+
+1. Con una importación «lista», «Confirmar importación». El aviso te dice cuántos productos y cuántos lugares de tu plan aparta.
+2. Deberías ver «Importación confirmada. Tiene N lugares de tu plan apartados», sin botón para confirmar otra vez y sin poder cambiar sus columnas.
+3. En «Mi plan» o al revisar otra importación, los lugares disponibles ya descuentan los apartados; dar de alta productos a mano respeta ese apartado.
+4. Tu inventario sigue igual: los productos se crearán en el paso siguiente.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
