@@ -35,6 +35,7 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/registro`, `/ingresar` | Crear cuenta e iniciar sesión | Cualquiera |
 | `/recuperar-contrasena` | Pedir enlace para cambiar contraseña | Cualquiera |
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
+| `/inicio` | Resumen del día: existencias bajas, últimos movimientos y uso del plan | Todos (cada bloque según permiso) |
 | `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
 | `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
 | `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
@@ -320,6 +321,12 @@ Un movimiento en otra ubicación, o anterior a que contaras ese producto, no apa
 **F17. Reconciliación (comprobación técnica)**
 
 En la terminal, `npm run stock:reconcile` revisa que las existencias de cada producto en cada ubicación coincidan con la suma de sus movimientos, en todas las empresas. Deberías ver «0 diferencia(s)». Solo lee; si algún día reporta una diferencia, avísame con el texto que imprime: es una falla a investigar, no algo que se corrija solo.
+
+**F18. Inicio**
+
+Al entrar ahora llegas a `/inicio` (también es el primer elemento del menú; en el celular la barra inferior es Inicio, Inventario, Movimientos, Conteos y «Más», donde quedó Ubicaciones).
+
+Deberías ver, según tu rol: «Existencias bajas» con los cinco productos más vacíos y el enlace «Ver todas»; «Uso de tu plan» con productos activos y personas (solo titular y administrador); «Últimos movimientos» con los cinco más recientes; y los botones «Registrar entrada» y «Salida rápida» si puedes registrar. Una persona sin rol ve solo el aviso de que pida uno.
 
 ## 4. Lo que todavía no existe
 

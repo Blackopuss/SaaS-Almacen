@@ -100,8 +100,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08, INV-09, INV-10, INV-11, INV-12, INV-13, INV-14, INV-15, INV-16, INV-17, INV-18, INV-19, INV-19B, INV-20, INV-21, INV-22, INV-23, INV-24, INV-25, INV-26, INV-27, INV-28, INV-29, INV-30, INV-31, INV-32, INV-33, INV-34. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 85 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-35 (panel de inicio)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08, INV-09, INV-10, INV-11, INV-12, INV-13, INV-14, INV-15, INV-16, INV-17, INV-18, INV-19, INV-19B, INV-20, INV-21, INV-22, INV-23, INV-24, INV-25, INV-26, INV-27, INV-28, INV-29, INV-30, INV-31, INV-32, INV-33, INV-34, INV-35. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 86 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: IMP-01 (worker y cola durable en MySQL)**.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -166,6 +166,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Conteo y movimientos posteriores (INV-32):** nunca comparar lo contado con el saldo de hoy. Diferencia = contado − `systemQuantity`; movido después = saldo de hoy − `systemQuantity`; objetivo = saldo de hoy + diferencia. Si el objetivo es negativo no se aplica: se recuenta.
 - **Aplicar conteos (INV-33):** el estado del conteo, leído bajo su candado, es la guarda de idempotencia; la clave `count-<id>` es la segunda. No usar `useTransition` como candado de un envío: sigue pendiente hasta que la pantalla se repinta y descarta lo que llegue mientras; usar una bandera propia (`busy` en `capture-form.tsx`).
 - **Reconciliación (INV-34):** una diferencia entre saldo e historial es un defecto que se investiga; ninguna tarea ni pantalla «repara» saldos por su cuenta. Comprobar con `npm run stock:reconcile` (o `DATABASE_NAME=almacen_test npm run stock:reconcile`). Un caso de aceptación nuevo de la fase 1 se agrega a `phase1-cases.int.test.ts`.
+- **Inicio (INV-35):** un bloque nuevo del panel se pinta solo si `access.can(...)` de su sección y reutiliza el servicio de esa sección; el panel no tiene consultas propias. La barra inferior móvil admite cuatro secciones (`mobile: true` en `nav.ts`).
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

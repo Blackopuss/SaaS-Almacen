@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   ClipboardCheck,
+  House,
   MapPin,
   Package,
   Settings,
@@ -25,6 +26,15 @@ export type NavItem = {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   {
+    // Every member lands here; each block inside checks its own permission.
+    href: "/inicio",
+    label: "Inicio",
+    icon: House,
+    module: null,
+    permission: null,
+    mobile: true,
+  },
+  {
     href: "/inventario",
     label: "Inventario",
     icon: Package,
@@ -46,7 +56,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: MapPin,
     module: "inventory",
     permission: "inventory.location.read",
-    mobile: true,
+    // The bottom bar holds four: locations change the least day to day.
+    mobile: false,
   },
   {
     href: "/conteos",

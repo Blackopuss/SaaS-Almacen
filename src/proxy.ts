@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * (requireSession), because a cookie alone proves nothing.
  */
 const PROTECTED = [
+  "/inicio",
   "/inventario",
   "/movimientos",
   "/ubicaciones",

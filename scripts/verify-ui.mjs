@@ -77,7 +77,7 @@ async function signedInPage(browser, viewport, options = {}) {
     await page.fill("#email", DEMO.email);
     await page.fill("#password", DEMO.password);
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
-    if (await enterDemoCode(page, "/inventario")) return page;
+    if (await enterDemoCode(page, "/inicio")) return page;
   }
   throw new Error("No se pudo entrar con la cuenta demo.");
 }
@@ -200,6 +200,7 @@ try {
 
   // Application shell (BAS-13): navigation on mobile and desktop.
   const SECTIONS = [
+    "/inicio",
     "/inventario",
     "/movimientos",
     "/ubicaciones",
@@ -216,8 +217,8 @@ try {
 
     await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inventario",
-      `${viewport.name}: / redirects to /inventario`,
+      new URL(page.url()).pathname === "/inicio",
+      `${viewport.name}: / redirects to /inicio`,
     );
 
     for (const path of SECTIONS) {
@@ -229,7 +230,8 @@ try {
         .locator(`nav a[aria-current="page"][href="${path}"]`)
         .count();
       const visibleNav =
-        mobile && !["/compras", "/configuracion"].includes(path);
+        mobile &&
+        !["/ubicaciones", "/compras", "/configuracion"].includes(path);
       check(
         overflow <= 0 && (!mobile || visibleNav ? current > 0 : true),
         `${viewport.name}: ${path} renders without overflow and marks the active link`,
@@ -542,7 +544,7 @@ try {
     );
     await page.goto(`${BASE}/ingresar`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inventario",
+      new URL(page.url()).pathname === "/inicio",
       "signed in: /ingresar goes straight to the app",
     );
     await page.getByRole("button", { name: "Más" }).click();
@@ -687,7 +689,7 @@ try {
     // Company creation (PLT-10): only for accounts without a company.
     await page.goto(`${BASE}/crear-empresa`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inventario",
+      new URL(page.url()).pathname === "/inicio",
       "company: an account with a company skips /crear-empresa",
     );
     // Active company (PLT-11): shown in «Más» on mobile.
@@ -711,7 +713,7 @@ try {
 
     await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inventario",
+      new URL(page.url()).pathname === "/inicio",
       "MFA: the mandatory setup screen sends accounts with MFA to the app",
     );
     await page.context().close();

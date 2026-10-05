@@ -39,6 +39,7 @@ describe("menu by role", () => {
 
   it("Almacén does not see Compras", () => {
     expect(menuOf(member("warehouse"))).toEqual([
+      "Inicio",
       "Inventario",
       "Movimientos",
       "Ubicaciones",
@@ -49,6 +50,7 @@ describe("menu by role", () => {
 
   it("Comprador does not see Conteos", () => {
     expect(menuOf(member("buyer"))).toEqual([
+      "Inicio",
       "Inventario",
       "Movimientos",
       "Ubicaciones",
@@ -63,9 +65,9 @@ describe("menu by role", () => {
     );
   });
 
-  it("a member without roles only sees Configuración", () => {
-    expect(menuOf(member())).toEqual(["Configuración"]);
-    expect(menuOf(member("cajero"))).toEqual(["Configuración"]);
+  it("a member without roles only sees Inicio and Configuración", () => {
+    expect(menuOf(member())).toEqual(["Inicio", "Configuración"]);
+    expect(menuOf(member("cajero"))).toEqual(["Inicio", "Configuración"]);
   });
 
   it("combined roles see the union", () => {

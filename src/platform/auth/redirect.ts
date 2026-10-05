@@ -3,7 +3,7 @@
  * crafted link can never send someone to another website after signing in
  * (open redirect, ASVS 5.1.5).
  */
-export const DEFAULT_AFTER_SIGN_IN = "/inventario";
+export const DEFAULT_AFTER_SIGN_IN = "/inicio";
 
 export function safeRedirectPath(value: unknown): string {
   if (typeof value !== "string" || value.length === 0 || value.length > 512) {
