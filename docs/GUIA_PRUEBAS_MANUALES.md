@@ -229,3 +229,31 @@ También me sirve mucho:
 - Pasos que sobran o que faltan.
 - Lo que se ve mal en el celular (abre `http://localhost:3000` desde las herramientas de tu navegador en vista móvil).
 - Las tres decisiones pendientes: quién será personal de plataforma, si el registro debe dar un periodo de prueba automático, y si reactivar a un miembro necesita un permiso distinto al de desactivarlo.
+
+Contiene:
+
+- Cómo entrar: arrancar la app, cuenta demo, de dónde sale la contraseña y el código de dos pasos, y el buzón local /correos.
+- Mapa de pantallas: cada dirección, qué es y qué rol puede entrar.
+- Recorridos paso a paso con lo que deberías ver en cada uno: cuenta y acceso, equipo y roles, bitácora, productos, y plan con consola interna.
+- Lo que todavía no existe, para que no lo reportes como falla.
+- Plantilla para darme cada observación.
+
+Dos avisos antes de probar:
+
+- El recorrido E1 te pide correr npm ruest para poder entrar a /interno; hoy no
+
+Contiene:
+
+- Cómo entrar: arrancar la app, cuenta demo, de dónde sale la contraseña y el código de dos pasos, y el buzón local /correos.
+- Mapa de pantallas: cada dirección, qu
+- Recorridos paso a paso con lo que deberías ver en cada uno: cuenta y acceso, equipo y roles, bitácora,
+  productos, y plan con consola interna
+- Lo que todavía no existe, para que no lo reportes como falla.
+- Plantilla para darme cada observación
+
+Dos avisos antes de probar:
+
+- El recorrido E1 te pide correr npm run staff -- add <demo@almacen.test> para poder entrar a /interno; hoy no hay nadie con ese acceso.
+- Las empresas que crees al probar el rde desarrollo, porque su bitácora no sepuede borrar.
+
+No recorrí la guía de punta a punta como la leerías tú. Cada flujo lo probé por separado durante la sesión, así que algún texto exacto de pantalla ue escribí; si ves una diferencia,anótala como observación.
