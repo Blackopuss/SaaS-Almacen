@@ -35,10 +35,15 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/registro`, `/ingresar` | Crear cuenta e iniciar sesión | Cualquiera |
 | `/recuperar-contrasena` | Pedir enlace para cambiar contraseña | Cualquiera |
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
-| `/inventario` | Productos recientes, agregar, archivados | Quien pueda ver productos |
+| `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
+| `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/nuevo` | Alta de producto | Titular, Administrador, Almacén |
 | `/inventario/<id>/editar` | Ficha, presentaciones y archivar | Titular, Administrador, Almacén |
-| `/movimientos`, `/ubicaciones`, `/conteos`, `/compras` | Todavía vacías (solo el aviso de «sin datos») | Según rol |
+| `/movimientos` | Historial con filtros (fechas, producto, persona, tipo) y botones para registrar | Quien pueda ver movimientos |
+| `/movimientos/entrada`, `/salida`, `/reubicar`, `/ajuste`, `/saldo-inicial` | Registrar un movimiento de un producto | Titular, Administrador, Almacén (según permiso) |
+| `/movimientos/salida-rapida` | Salida de varios productos en una sola confirmación | Quien pueda registrar salidas |
+| `/ubicaciones` | Zonas, pasillos y estantes; «General» existe siempre | Según rol |
+| `/conteos`, `/compras` | Todavía vacías (solo el aviso de «sin datos») | Según rol |
 | `/configuracion` | Seguridad (dos pasos, sesiones) y enlaces de empresa | Todos |
 | `/configuracion/equipo` | Personas, roles e invitaciones | Titular y Administrador |
 | `/configuracion/plan` | Mi plan: cupos, módulos y vigencia | Titular y Administrador |
@@ -199,13 +204,73 @@ Asigna a la empresa de prueba un cupo pequeño (por ejemplo 2) y crea 3 producto
 
 En la consola pon «Vigente hasta» mañana para comprobar que se muestra la fecha en «Mi plan». (Para verlo vencido habría que esperar a que pase la fecha: entonces todo queda en solo lectura, sin perder datos.)
 
+### F. Existencias y movimientos
+
+Para estos recorridos conviene la base de pruebas (no ensucia desarrollo, porque los movimientos no se pueden borrar): `npm run dev:test` abre la app en `http://localhost:3100` y `npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator]` crea ahí una empresa y te imprime el correo para entrar.
+
+**F1. Lista de productos**
+
+Crea más de 25 productos. Deberías ver: páginas con «Anterior/Siguiente», búsqueda por nombre, clave o código de barras (la coincidencia exacta aparece arriba), filtros por categoría y marca que se combinan y quedan en la dirección, y las existencias de cada producto.
+
+**F2. Entrada, con cajas y otras unidades**
+
+1. En un producto con presentación «Caja de 100», `/movimientos` → «Registrar entrada» → búscalo.
+2. Captura `3` en «Caja»: antes de confirmar deberías ver «3 cajas × 100 = 300 piezas».
+3. Confirma. Deberías ver el aviso de registro y el total actualizado en la ficha.
+4. En un producto por metros, captura `275` en centímetros: se guardan `2.75 metros`.
+5. Intenta `0.5` piezas en un producto que solo admite enteros: se rechaza junto al campo.
+
+**F3. Saldo inicial**
+
+`/movimientos/saldo-inicial`: captura lo que ya había de un producto sin movimientos. Deberías ver: se acepta una vez por ubicación; si el producto ya tiene otros movimientos, se rechaza y te manda a entrada o ajuste.
+
+**F4. Salida y existencias que no bajan de cero**
+
+Registra una salida mayor a lo que hay en la ubicación. Deberías ver: «Solo hay X… no pueden salir Y» y nada cambia.
+
+**F5. Doble envío y conexión perdida**
+
+1. Al confirmar un movimiento, da doble clic rápido: debe quedar un solo movimiento.
+2. Con las herramientas del navegador pon la red en «Sin conexión» justo antes de confirmar: deberías ver «Verificando estado…» y, al volver la red, o te lleva al movimiento registrado o te dice que no se registró y puedes reenviarlo sin duplicar.
+
+**F6. Reubicar**
+
+Con dos ubicaciones, `/movimientos/reubicar`: mueve parte de un producto. Deberías ver: sale de una, entra a la otra, el total no cambia; origen y destino iguales se rechaza.
+
+**F7. Ajuste**
+
+`/movimientos/ajuste`: escribe lo que contaste. Deberías ver: se registra solo la diferencia (+ o −), el motivo es obligatorio y el ajuste aparece en la bitácora.
+
+**F8. Reversa**
+
+En el historial, «Reversar» un movimiento con motivo. Deberías ver: un movimiento «Reversa» que deshace las mismas cantidades (con el contenido de caja de aquel día), la etiqueta «Reversado» en el original y que no se puede reversar dos veces. Si reversar dejaría existencias negativas, se rechaza.
+
+**F9. Ficha de producto**
+
+`/inventario/<id>` (clic en el nombre): total, desglose por ubicación, equivalencia en presentaciones («250 piezas, equivalentes a 2 cajas de 100 y 50 piezas») y últimos movimientos, con «Ver historial completo».
+
+**F10. Historial con filtros**
+
+En `/movimientos` combina fechas «Desde/Hasta», producto (parte del nombre o la clave), persona y tipo. Deberías ver: el conteo de resultados, los filtros en la dirección (puedes recargar o compartirla), páginas de 25 que conservan los filtros y «Quitar filtros». Las fechas son días de tu zona horaria: un movimiento de las 11 de la noche cuenta en ese día.
+
+**F11. Salida rápida de varias líneas**
+
+1. `/movimientos` → «Salida rápida».
+2. Escribe o escanea un código de barras o clave exacta y Enter: se agrega una línea y el cursor vuelve a la búsqueda. Repite el mismo código: la cantidad sube a 2.
+3. Escribe parte de un nombre: elige de la lista.
+4. Cambia una línea a «Caja» si el producto tiene presentación; si tiene existencias en varias ubicaciones, elige de cuál sale.
+5. Pon en una línea más de lo que hay y confirma. Deberías ver: «No se registró nada…», el motivo en esa línea y las demás intactas.
+6. Corrige, elige motivo (o «Otro» y escríbelo), agrega una referencia y confirma. Deberías ver: un solo movimiento «Salida» con todas las líneas, y las existencias de cada producto abajo.
+
+No cobra, no maneja precios ni genera ticket: solo registra lo que sale.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Existencias, entradas, salidas, reubicaciones, ajustes y conteos (las pantallas están vacías).
-- Lista de productos con paginación, búsqueda y filtros (hoy solo se ven los últimos 10; archivados, 50).
-- Ubicaciones, compras y proveedores.
+- Conteos físicos, mínimos y alertas de existencias bajas.
+- Compras y proveedores.
+- Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.
 - Prueba gratuita automática al registrarse: hoy el plan se asigna desde la consola.

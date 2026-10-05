@@ -18,6 +18,25 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  registerQuickExitAction: {
+    input:
+      "líneas (id de producto, ubicación, cantidad, forma de captura), motivo, referencia y clave de la confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); productos, presentaciones y ubicaciones se buscan solo en esa empresa",
+    coveredBy: "tests/inventory/quick-exit.int.test.ts",
+  },
+  findExitProductsAction: {
+    input: "texto de búsqueda (nombre, clave o código de barras)",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo lee productos de esa empresa",
+    coveredBy: "tests/inventory/quick-exit.int.test.ts",
+  },
+  loadExitProductAction: {
+    input: "id de producto",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el producto se busca solo en esa empresa",
+    coveredBy: "tests/inventory/quick-exit.int.test.ts",
+  },
   reverseMovementAction: {
     input: "id del movimiento, clave de la confirmación y motivo",
     identity:

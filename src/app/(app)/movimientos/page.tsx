@@ -9,6 +9,7 @@ import {
   Filter,
   Scale,
   Search,
+  Zap,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Form from "next/form";
@@ -151,6 +152,14 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const quickExitButton = access.allows("inventory.exit.create") ? (
+    <Button asChild variant="outline">
+      <Link href="/movimientos/salida-rapida">
+        <Zap aria-hidden="true" data-icon="inline-start" />
+        Salida rápida
+      </Link>
+    </Button>
+  ) : undefined;
   const transferButton = access.allows("inventory.transfer.create") ? (
     <Button asChild variant="outline">
       <Link href="/movimientos/reubicar">
@@ -185,6 +194,7 @@ export default async function MovimientosPage({
       <>
         {entryButton}
         {exitButton}
+        {quickExitButton}
         {transferButton}
         {adjustmentButton}
         {openingButton}
@@ -222,6 +232,13 @@ export default async function MovimientosPage({
                 de {justRegistered.lines[0]!.productName}, de{" "}
                 {justRegistered.lines[0]!.location} a{" "}
                 {justRegistered.lines[1]!.location}
+              </span>
+            ) : justRegistered.lines.length > 3 ? (
+              // A quick exit of many lines: the list below has the detail.
+              <span>
+                <span className="font-medium">
+                  {justRegistered.lines.length} líneas
+                </span>
               </span>
             ) : (
               justRegistered.lines.map((line, index) => (

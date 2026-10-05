@@ -30,12 +30,12 @@ export type InventoryActor = { organizationId: string; userId: string };
 const MAX_BALANCE = "999999999999.999";
 
 /** Random text chosen by whoever shows the form: a UUID fits. */
-const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,64}$/;
+export const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,64}$/;
 
-const KEY_REUSED =
+export const KEY_REUSED =
   "Esta confirmación ya se usó para otro movimiento. Recarga la página para registrar uno nuevo.";
 
-const optionalText = (max: number, tooLong: string) =>
+export const optionalText = (max: number, tooLong: string) =>
   z
     .string()
     .trim()

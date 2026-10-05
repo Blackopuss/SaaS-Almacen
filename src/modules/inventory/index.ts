@@ -42,3 +42,10 @@ export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";
 export type { ProductStock } from "./product-stock";
+export {
+  QUICK_EXIT_MAX_LINES,
+  registerQuickExit,
+  type QuickExitField,
+  type QuickExitInput,
+  type QuickExitResult,
+} from "./quick-exit";
