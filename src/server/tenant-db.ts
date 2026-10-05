@@ -225,6 +225,17 @@ export function forOrganization(organizationId: string): TenantDb {
   return guard(extend(organizationId), organizationId);
 }
 
+/**
+ * Options for a transaction that takes locks (`lockRows`, or an update
+ * used as a lock) and then decides from what it reads. With MySQL's
+ * default (REPEATABLE READ) a transaction keeps seeing the data as it was
+ * at its first read, even after waiting for a lock: it would decide with
+ * what the other transaction had not yet written. READ COMMITTED makes
+ * every read see what is committed at that moment, which is what a lock
+ * is for.
+ */
+export const LOCKING_TRANSACTION = { isolationLevel: "ReadCommitted" } as const;
+
 /** Tables whose rows a business rule may lock, by their model name. */
 const LOCKABLE = {
   facility: "facility",

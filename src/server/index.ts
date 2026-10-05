@@ -1,6 +1,7 @@
 // Infrastructure: database client and transactions.
 export { db } from "./db";
 export {
+  LOCKING_TRANSACTION,
   TENANT_MODELS,
   TenantScopeError,
   forOrganization,

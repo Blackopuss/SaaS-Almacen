@@ -383,7 +383,6 @@ describe("registerExit", () => {
     await registerEntry(actor, { productId: screws, quantity: "50" });
     await registerEntry(actor, { productId: cable, quantity: "10" });
     const archived = await product(actor, { name: "Viejo" });
-    await registerEntry(actor, { productId: archived, quantity: "5" });
     await archiveProduct(actor, archived);
     const before = await movements(actor);
     for (const [input, expected] of [

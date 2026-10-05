@@ -11,7 +11,7 @@ import {
   type Capture,
 } from "@/platform/catalog";
 import { compareLocationNames, formatLocationPath } from "@/platform/locations";
-import { forOrganization, lockRows } from "@/server";
+import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
 /**
  * Stock movements (INV-16 on). A confirmation writes the movement, its
@@ -246,6 +246,10 @@ async function post(
     return await forOrganization(organizationId).$transaction(async (tx) => {
       // From here on, nobody else moves this product until we finish.
       const [productId] = await lockRows(tx, "product", [data.productId]);
+      // Archiving a location locks its row first, so it cannot be archived
+      // between our check and the balance we write (INV-19B). «General»
+      // is never archived and needs no lock.
+      if (data.locationId) await lockRows(tx, "location", [data.locationId]);
       const product = productId
         ? await tx.product.findFirst({
             where: { id: productId },
@@ -408,7 +412,7 @@ async function post(
               ? `${one ? "Salió" : "Salieron"} ${moved} de ${product.name} de ${location.name}${how}. ${balance.equals(1) ? "Queda" : "Quedan"} ${left} ahí.`
               : `${one ? "Entró" : "Entraron"} ${moved} de ${product.name} a ${location.name}${how}. Ahora hay ${left} ahí.`,
       };
-    });
+    }, LOCKING_TRANSACTION);
   } catch (error) {
     if (error instanceof Rejected) return error.result;
     throw error;

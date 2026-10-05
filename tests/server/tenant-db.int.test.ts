@@ -3,7 +3,13 @@ import { createTestOrganization } from "../setup/organization";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
-import { TenantScopeError, db, forOrganization, lockRows } from "@/server";
+import {
+  LOCKING_TRANSACTION,
+  TenantScopeError,
+  db,
+  forOrganization,
+  lockRows,
+} from "@/server";
 
 // PLT-12: business queries need a company context and only ever see or
 // change rows of that company. Membership is today's company-scoped table.
@@ -224,6 +230,42 @@ describe("escape hatches are closed", () => {
     });
     await Promise.all([first, second]);
     expect(order).toEqual(["first locked", "first done", "second locked"]);
+  });
+
+  it("a locking transaction reads what the previous holder of the lock committed", async () => {
+    const facility = await db.facility.findFirstOrThrow({
+      where: { organizationId: orgA },
+    });
+    const scoped = forOrganization(orgA);
+    const original = facility.name;
+    // The second transaction reads once before waiting for the lock, as a
+    // service that looks something up first would.
+    const seen = async (options?: typeof LOCKING_TRANSACTION) => {
+      const first = scoped.$transaction(async (tx) => {
+        await lockRows(tx, "facility", [facility.id]);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await tx.facility.updateMany({
+          where: { id: facility.id },
+          data: { name: "Cambiada" },
+        });
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const second = scoped.$transaction(async (tx) => {
+        await tx.facility.findFirst({ where: { id: facility.id } });
+        await lockRows(tx, "facility", [facility.id]);
+        return (await tx.facility.findFirst({ where: { id: facility.id } }))
+          ?.name;
+      }, options);
+      const [, name] = await Promise.all([first, second]);
+      await db.facility.update({
+        where: { id: facility.id },
+        data: { name: original },
+      });
+      return name;
+    };
+    // MySQL's default keeps the first snapshot: the decision would be stale.
+    expect(await seen()).toBe(original);
+    expect(await seen(LOCKING_TRANSACTION)).toBe("Cambiada");
   });
 
   it("keeps the company filter inside transactions", async () => {

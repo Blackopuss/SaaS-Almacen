@@ -5,7 +5,12 @@ import { z } from "zod";
 import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
-import { forOrganization, type TenantDb } from "@/server";
+import {
+  LOCKING_TRANSACTION,
+  forOrganization,
+  lockRows,
+  type TenantDb,
+} from "@/server";
 
 import {
   LOCATION_KIND_LABELS,
@@ -79,7 +84,10 @@ const reject = (
   });
 };
 
-type Tx = Pick<TenantDb, "facility" | "location" | "auditEvent">;
+type Tx = Pick<
+  TenantDb,
+  "facility" | "location" | "auditEvent" | "stockBalance"
+>;
 
 type Row = {
   id: string;
@@ -121,6 +129,8 @@ async function changeTree(
         }
         return change(tx, facility.id);
       },
+      // Each read after the lock must see what the previous change left.
+      LOCKING_TRANSACTION,
     );
     return { ok: true, locationId };
   } catch (error) {
@@ -393,8 +403,8 @@ export async function moveLocation(
 
 /**
  * Archives an empty location: it leaves the lists but stays in the history.
- * What it contains must be archived or moved out first. From INV-15 on, a
- * location with stock will not be archived either (NEG-21).
+ * What it contains must be archived or moved out first, and it must hold
+ * no stock (INV-19B, NEG-21).
  */
 export async function archiveLocation(
   actor: LocationActor,
@@ -407,10 +417,24 @@ export async function archiveLocation(
     "inventory.location.archive",
   );
   return changeTree(organizationId, async (tx) => {
+    // Movements into a location lock its row: none arrives while we decide.
+    await lockRows(tx, "location", [String(locationId)]);
     const location = await findLocation(tx, locationId);
     if (location.isDefault) reject("not_allowed", GENERAL_FIXED);
     if (location.archivedAt) {
       reject("unchanged", "Esta ubicación ya está archivada.");
+    }
+    // A location that holds stock is not archived (INV-19B, NEG-21).
+    const stocked = await tx.stockBalance.count({
+      where: { locationId: location.id, quantity: { gt: 0 } },
+    });
+    if (stocked > 0) {
+      reject(
+        "not_allowed",
+        stocked === 1
+          ? "Todavía hay existencias de un producto aquí. Regístralas como salida o ajústalas a cero antes de archivarla."
+          : `Todavía hay existencias de ${stocked} productos aquí. Regístralas como salida o ajústalas a cero antes de archivarla.`,
+      );
     }
     const inside = await tx.location.count({
       where: { parentId: location.id, archivedAt: null },

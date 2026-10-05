@@ -2,11 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 
-import { isMultipleOf, newId } from "@/lib";
+import { dec, formatDecimal, isMultipleOf, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import { consumeQuota, releaseQuota } from "@/platform/entitlements";
-import { forOrganization } from "@/server";
+import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
 import { defaultStep, stepProblem } from "./quantity";
 import { getUnit, isUnitCode } from "./units";
@@ -736,7 +736,7 @@ export type ProductStatusResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "not_found" | "unchanged" | "limit_reached";
+      reason: "not_found" | "unchanged" | "limit_reached" | "has_stock";
       error: string;
     };
 
@@ -766,15 +766,33 @@ export async function archiveProduct(
   const id = String(productId);
   try {
     await forOrganization(organizationId).$transaction(async (tx) => {
+      // Movements lock the product too: none can slip in while we decide.
+      await lockRows(tx, "product", [id]);
       const product = await tx.product.findFirst({
         where: { id },
-        select: { sku: true, name: true, status: true },
+        select: { sku: true, name: true, status: true, unitCode: true },
       });
       if (!product) {
         throw new StatusRejected({
           ok: false,
           reason: "not_found",
           error: "Este producto ya no existe.",
+        });
+      }
+      // A product with stock is not archived (INV-19B): what is on the
+      // shelves must still be visible and countable.
+      const stock = await tx.stockBalance.aggregate({
+        where: { productId: id, quantity: { gt: 0 } },
+        _sum: { quantity: true },
+        _count: true,
+      });
+      if (product.status === "ACTIVE" && stock._count > 0) {
+        const unit = getUnit(product.unitCode);
+        const total = dec((stock._sum.quantity ?? 0).toString());
+        throw new StatusRejected({
+          ok: false,
+          reason: "has_stock",
+          error: `Todavía hay ${formatDecimal(total)} ${total.equals(1) ? unit.name : unit.plural} de este producto${stock._count > 1 ? ` en ${stock._count} ubicaciones` : ""}. Regístralas como salida o ajústalas a cero antes de archivarlo.`,
         });
       }
       // The status in the filter decides between two simultaneous requests.
@@ -800,7 +818,7 @@ export async function archiveProduct(
         reason,
         metadata: { sku: product.sku, name: product.name },
       });
-    });
+    }, LOCKING_TRANSACTION);
   } catch (error) {
     if (error instanceof StatusRejected) return error.result;
     throw error;
