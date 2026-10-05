@@ -298,6 +298,15 @@ En un producto por piezas, un mínimo de `0.5` debe rechazarse. Los productos ar
 
 En todo momento tus existencias siguen iguales: capturar no mueve nada. Aplicar las diferencias como ajustes llega en un paso posterior.
 
+**F15. Conteo: movimientos después de contar**
+
+1. En un conteo abierto, cuenta un producto que el sistema tiene en 40 y captura `38` («Faltan 2 piezas»).
+2. Sin cerrar el conteo, registra una salida de 5 de ese producto en la misma ubicación y vuelve al conteo.
+3. Deberías ver: «Después de contarlo salieron 5 piezas (1 movimiento)», el movimiento listado, la diferencia intacta («Faltan 2 piezas») y «Hoy el sistema tiene 35 piezas. Al aplicar la diferencia quedarían 33 piezas» (no 38: la salida posterior se respeta).
+4. Conflicto: cuenta `3` de un producto con 40 y después registra una salida de 10. Deberías ver el aviso rojo de que hay que volver a contarlo; quita sus capturas, cuéntalo de nuevo y el aviso desaparece con una referencia nueva.
+
+Un movimiento en otra ubicación, o anterior a que contaras ese producto, no aparece como «posterior».
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:

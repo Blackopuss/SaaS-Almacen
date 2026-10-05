@@ -102,6 +102,25 @@ export default async function ConteoPage({
         )}
       </p>
 
+      {count.conflicts > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-destructive"
+          />
+          <p>
+            {count.conflicts === 1
+              ? "Un producto se movió después de contarlo más de lo que el conteo permite"
+              : `${count.conflicts} productos se movieron después de contarlos más de lo que el conteo permite`}
+            : hay que volver a contar {count.conflicts === 1 ? "ese" : "esos"}{" "}
+            antes de aplicar. Están marcados abajo.
+          </p>
+        </div>
+      )}
+
       {canCapture && <CaptureForm countId={count.id} />}
 
       <section aria-labelledby="contado" className="rounded-xl border bg-card">
@@ -118,6 +137,12 @@ export default async function ConteoPage({
                     : count.differences === 1
                       ? "1 con diferencia"
                       : `${count.differences.toLocaleString("es-MX")} con diferencia`
+                }${
+                  count.movedAfter === 0
+                    ? ""
+                    : count.movedAfter === 1
+                      ? " · 1 con movimientos posteriores"
+                      : ` · ${count.movedAfter.toLocaleString("es-MX")} con movimientos posteriores`
                 }`}
           </p>
         </div>
@@ -190,6 +215,62 @@ export default async function ConteoPage({
                     {line.differenceLabel}
                   </Badge>
                 </p>
+                {line.since &&
+                  (line.since.movedLabel || line.since.conflict) && (
+                    <div className="space-y-1 rounded-lg border bg-muted/50 p-3 text-sm">
+                      {line.since.movedLabel && (
+                        <p className="font-medium">
+                          {line.since.movedLabel}
+                          {line.since.movementCount > 0 &&
+                            ` (${line.since.movementCount === 1 ? "1 movimiento" : `${line.since.movementCount} movimientos`})`}
+                          .
+                        </p>
+                      )}
+                      {line.since.movements.length > 0 && (
+                        <ul className="text-muted-foreground">
+                          {line.since.movements.map((movement, index) => (
+                            <li key={index} className="tabular-nums">
+                              {movement.typeLabel} · {movement.quantity} ·{" "}
+                              <time dateTime={movement.createdAt.toISOString()}>
+                                {formatDateTime(movement.createdAt)}
+                              </time>
+                            </li>
+                          ))}
+                          {line.since.movementCount >
+                            line.since.movements.length && (
+                            <li>
+                              <Link
+                                href={`/movimientos?producto=${line.productId}`}
+                                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                              >
+                                Ver todos en el historial
+                              </Link>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                      {line.since.conflict ? (
+                        <p className="flex items-start gap-1.5">
+                          <CircleAlert
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 shrink-0 text-destructive"
+                          />
+                          Hoy el sistema tiene {line.since.currentLabel} y la
+                          diferencia no cabe: salió más de lo que se contó.
+                          Quita sus capturas y cuéntalo de nuevo.
+                        </p>
+                      ) : (
+                        <p className="tabular-nums">
+                          Hoy el sistema tiene {line.since.currentLabel}. Al
+                          aplicar la diferencia quedarían{" "}
+                          <span className="font-medium">
+                            {line.since.targetLabel}
+                          </span>
+                          .
+                        </p>
+                      )}
+                    </div>
+                  )}
               </li>
             ))}
           </ul>
@@ -197,9 +278,9 @@ export default async function ConteoPage({
       </section>
       {open && count.lines.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Capturar no cambia tus existencias. Las diferencias se aplicarán como
-          ajustes en un paso aparte, después de revisar lo que se haya movido
-          mientras contabas.
+          Capturar no cambia tus existencias. Cada diferencia se compara con lo
+          que el sistema tenía al contar ese producto; lo que se mueva después
+          se respeta y se muestra aquí.
         </p>
       )}
     </PageContainer>

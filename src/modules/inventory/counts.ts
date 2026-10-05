@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { dec, formatDecimal, newId } from "@/lib";
+import { dec, formatDecimal, newId, type Decimal } from "@/lib";
 import { assertModulePermission } from "@/platform/billing";
 import {
   pluralizeName,
@@ -12,7 +12,12 @@ import {
 import { formatLocationPath } from "@/platform/locations";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
-import { formatStock, type InventoryActor } from "./movements";
+import {
+  MOVEMENT_TYPE_LABELS,
+  formatStock,
+  type InventoryActor,
+  type MovementType,
+} from "./movements";
 
 /**
  * Physical counts: capture (INV-31). A count belongs to one location.
@@ -623,6 +628,41 @@ export type CountLine = {
   differenceLabel: string;
   /** Packages and loose units both captured: check nothing was counted twice. */
   mixed: boolean;
+  /**
+   * What happened in the location after the product was counted (INV-32).
+   * Only while the count is open; null once it is closed.
+   */
+  since: {
+    /** Balance of the location right now. */
+    current: string;
+    currentLabel: string;
+    /** current − system: what moved after counting. "0" = nothing. */
+    moved: string;
+    /** «Después de contarlo salieron 5 piezas», or null when nothing moved. */
+    movedLabel: string | null;
+    /** The movements behind it, newest first (the latest few). */
+    movements: {
+      movementId: string;
+      typeLabel: string;
+      createdAt: Date;
+      /** «−5 piezas», «+12 piezas». */
+      quantity: string;
+    }[];
+    /** How many there are in all, shown or not. */
+    movementCount: number;
+    /**
+     * What the location should hold once the difference is applied:
+     * current + difference. The count stays right about what it saw, and
+     * what moved later is kept.
+     */
+    target: string;
+    targetLabel: string;
+    /**
+     * More left afterwards than the count found: applying would leave
+     * less than nothing. The product has to be counted again.
+     */
+    conflict: boolean;
+  } | null;
 };
 
 export type CountDetail = CountSummary & {
@@ -631,6 +671,10 @@ export type CountDetail = CountSummary & {
   lines: CountLine[];
   /** Lines whose count differs from the system. */
   differences: number;
+  /** Lines of an open count whose product moved after being counted. */
+  movedAfter: number;
+  /** Lines that cannot be applied until they are counted again. */
+  conflicts: number;
 };
 
 /** A count with everything captured, the latest product first. */
@@ -690,6 +734,74 @@ export async function getCount(
     count.closedByUserId,
   ]);
 
+  // While the count is open, what moved after each product was counted
+  // (INV-32). The balance only changes with movements and the reference
+  // was read under the product's lock, so «what moved since» is exactly
+  // today's balance minus the reference: no clock is trusted for it. The
+  // movements themselves are listed to explain the number.
+  const open = count.status === "OPEN";
+  const client = forOrganization(actor.organizationId);
+  const productIds = count.lines.map((line) => line.productId);
+  const balances = new Map<string, string>();
+  const later = new Map<
+    string,
+    {
+      movementId: string;
+      type: MovementType;
+      createdAt: Date;
+      signed: Decimal;
+    }[]
+  >();
+  if (open && productIds.length > 0) {
+    const firstCountedAt = new Date(
+      Math.min(...count.lines.map((line) => line.countedAt.getTime())),
+    );
+    const countedAt = new Map(
+      count.lines.map((line) => [line.productId, line.countedAt]),
+    );
+    for (let start = 0; start < productIds.length; start += 500) {
+      const ids = productIds.slice(start, start + 500);
+      const [held, moved] = await Promise.all([
+        client.stockBalance.findMany({
+          where: { locationId: count.locationId, productId: { in: ids } },
+          select: { productId: true, quantity: true },
+        }),
+        client.stockMovementLine.findMany({
+          where: {
+            locationId: count.locationId,
+            productId: { in: ids },
+            createdAt: { gte: firstCountedAt },
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 2_000,
+          select: {
+            productId: true,
+            direction: true,
+            baseQuantity: true,
+            createdAt: true,
+            movement: { select: { id: true, type: true } },
+          },
+        }),
+      ]);
+      for (const balance of held) {
+        balances.set(balance.productId, balance.quantity.toString());
+      }
+      for (const line of moved) {
+        // Each product has its own reference moment.
+        if (line.createdAt <= countedAt.get(line.productId)!) continue;
+        const quantity = dec(line.baseQuantity.toString());
+        const list = later.get(line.productId) ?? [];
+        list.push({
+          movementId: line.movement.id,
+          type: line.movement.type,
+          createdAt: line.createdAt,
+          signed: line.direction === "IN" ? quantity : quantity.negated(),
+        });
+        later.set(line.productId, list);
+      }
+    }
+  }
+
   const lines: CountLine[] = count.lines.map((line) => {
     const { unitCode } = line;
     const counted = line.captures.reduce(
@@ -728,6 +840,15 @@ export async function getCount(
           ? `${difference.abs().equals(1) ? "Falta" : "Faltan"} ${formatStock(difference.abs().toString(), unitCode)}`
           : `${difference.equals(1) ? "Sobra" : "Sobran"} ${formatStock(difference.toString(), unitCode)}`,
       mixed: isMixed(line.captures),
+      since: open
+        ? sinceCounted(
+            unitCode,
+            system,
+            difference,
+            dec(balances.get(line.productId) ?? 0),
+            later.get(line.productId) ?? [],
+          )
+        : null,
     };
   });
 
@@ -747,5 +868,55 @@ export async function getCount(
     products: lines.length,
     lines,
     differences: lines.filter((line) => line.difference !== "0").length,
+    movedAfter: lines.filter((line) => line.since && line.since.moved !== "0")
+      .length,
+    conflicts: lines.filter((line) => line.since?.conflict).length,
+  };
+}
+
+/** Movements shown under a counted product; the rest are only counted. */
+const LATER_SHOWN = 5;
+
+function sinceCounted(
+  unitCode: string,
+  system: Decimal,
+  difference: Decimal,
+  current: Decimal,
+  movements: {
+    movementId: string;
+    type: MovementType;
+    createdAt: Date;
+    signed: Decimal;
+  }[],
+): NonNullable<CountLine["since"]> {
+  const moved = current.minus(system);
+  const target = current.plus(difference);
+  const amount = formatStock(moved.abs().toString(), unitCode);
+  const one = moved.abs().equals(1);
+  return {
+    current: current.toString(),
+    currentLabel: formatStock(current.toString(), unitCode),
+    moved: moved.toString(),
+    movedLabel: moved.isZero()
+      ? // In and out by the same amount: nothing changed, but it moved.
+        movements.length > 0
+        ? "Después de contarlo hubo movimientos que se compensan entre sí"
+        : null
+      : moved.isNegative()
+        ? `Después de contarlo ${one ? "salió" : "salieron"} ${amount}`
+        : `Después de contarlo ${one ? "entró" : "entraron"} ${amount}`,
+    movements: movements.slice(0, LATER_SHOWN).map((movement) => ({
+      movementId: movement.movementId,
+      typeLabel: MOVEMENT_TYPE_LABELS[movement.type],
+      createdAt: movement.createdAt,
+      quantity: `${movement.signed.isNegative() ? "−" : "+"}${formatStock(movement.signed.abs().toString(), unitCode)}`,
+    })),
+    movementCount: movements.length,
+    target: target.toString(),
+    targetLabel: formatStock(
+      (target.isNegative() ? dec(0) : target).toString(),
+      unitCode,
+    ),
+    conflict: target.isNegative(),
   };
 }

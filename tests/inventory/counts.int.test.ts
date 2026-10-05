@@ -11,7 +11,9 @@ import {
   openCount,
   registerEntry,
   registerExit,
+  registerTransfer,
   removeCapture,
+  reverseMovement,
   type InventoryActor,
 } from "@/modules/inventory";
 import { moduleRegistry } from "@/modules/registry";
@@ -570,5 +572,218 @@ describe("who and which company", () => {
         })
       ).ok,
     ).toBe(true);
+  });
+});
+
+// INV-32: what moved after a product was counted is part of the picture.
+describe("movements after counting", () => {
+  /** A shelf with 40 of a new product, and its count with 38 captured. */
+  async function counted(owner: InventoryActor, captured = "38") {
+    const productId = await product(owner, `Tornillo ${++counter}`);
+    const locationId = await shelf(owner);
+    await registerEntry(owner, { productId, locationId, quantity: "40" });
+    const countId = await countOf(owner, locationId);
+    const capture = await captureCount(owner, {
+      countId,
+      productId,
+      quantity: captured,
+    });
+    if (!capture.ok) throw new Error("capture failed");
+    return { productId, locationId, countId };
+  }
+  const lineOf = async (owner: InventoryActor, countId: string) =>
+    (await getCount(owner, countId))!.lines[0]!;
+
+  it("with nothing moved, applying would leave what was counted", async () => {
+    const { countId } = await counted(actor);
+    const line = await lineOf(actor, countId);
+    expect(line.since).toEqual({
+      current: "40",
+      currentLabel: "40 piezas",
+      moved: "0",
+      movedLabel: null,
+      movements: [],
+      movementCount: 0,
+      target: "38",
+      targetLabel: "38 piezas",
+      conflict: false,
+    });
+    expect(await getCount(actor, countId)).toMatchObject({
+      differences: 1,
+      movedAfter: 0,
+      conflicts: 0,
+    });
+  });
+
+  it("an exit after counting keeps the difference and lowers the target", async () => {
+    const { productId, locationId, countId } = await counted(actor);
+    await registerExit(actor, { productId, locationId, quantity: "5" });
+    const line = await lineOf(actor, countId);
+    // The count was right about what it saw: 2 were missing then.
+    expect(line).toMatchObject({
+      system: "40",
+      counted: "38",
+      difference: "-2",
+      differenceLabel: "Faltan 2 piezas",
+    });
+    expect(line.since).toMatchObject({
+      current: "35",
+      moved: "-5",
+      movedLabel: "Después de contarlo salieron 5 piezas",
+      movementCount: 1,
+      // 35 today − 2 missing = 33; not the 38 that were counted.
+      target: "33",
+      targetLabel: "33 piezas",
+      conflict: false,
+    });
+    expect(line.since!.movements).toMatchObject([
+      { typeLabel: "Salida", quantity: "−5 piezas" },
+    ]);
+    expect((await getCount(actor, countId))!.movedAfter).toBe(1);
+  });
+
+  it("entries, relocations and reversals after counting all count", async () => {
+    const { productId, locationId, countId } = await counted(actor, "45");
+    const other = await shelf(actor);
+    await registerEntry(actor, { productId, locationId, quantity: "10" });
+    await registerTransfer(actor, {
+      productId,
+      locationId,
+      toLocationId: other,
+      quantity: "4",
+    });
+    const exit = await registerExit(actor, {
+      productId,
+      locationId,
+      quantity: "1",
+    });
+    if (!exit.ok) throw new Error("exit failed");
+    await reverseMovement(actor, {
+      movementId: exit.movementId,
+      reason: "Se capturó por error",
+    });
+    // What happens in another location is not this count's business.
+    await registerEntry(actor, {
+      productId,
+      locationId: other,
+      quantity: "100",
+    });
+    const line = await lineOf(actor, countId);
+    expect(line.differenceLabel).toBe("Sobran 5 piezas");
+    expect(line.since).toMatchObject({
+      current: "46",
+      moved: "6",
+      movedLabel: "Después de contarlo entraron 6 piezas",
+      movementCount: 4,
+      target: "51",
+      conflict: false,
+    });
+    expect(line.since!.movements.map((m) => m.typeLabel)).toEqual([
+      "Reversa",
+      "Salida",
+      "Reubicación",
+      "Entrada",
+    ]);
+    expect(line.since!.movements.map((m) => m.quantity)).toEqual([
+      "+1 pieza",
+      "−1 pieza",
+      "−4 piezas",
+      "+10 piezas",
+    ]);
+  });
+
+  it("movements that cancel each other are still mentioned", async () => {
+    const { productId, locationId, countId } = await counted(actor);
+    await registerExit(actor, { productId, locationId, quantity: "3" });
+    await registerEntry(actor, { productId, locationId, quantity: "3" });
+    const line = await lineOf(actor, countId);
+    expect(line.since).toMatchObject({
+      moved: "0",
+      movedLabel:
+        "Después de contarlo hubo movimientos que se compensan entre sí",
+      movementCount: 2,
+      target: "38",
+    });
+    expect((await getCount(actor, countId))!.movedAfter).toBe(0);
+  });
+
+  it("flags a conflict when more left afterwards than was counted", async () => {
+    // 40 in the system, 3 counted: 37 are missing…
+    const { productId, locationId, countId } = await counted(actor, "3");
+    // …but then 10 more left, which the count says were not there.
+    await registerExit(actor, { productId, locationId, quantity: "10" });
+    const line = await lineOf(actor, countId);
+    expect(line.since).toMatchObject({
+      current: "30",
+      moved: "-10",
+      target: "-7",
+      targetLabel: "0 piezas",
+      conflict: true,
+    });
+    expect((await getCount(actor, countId))!.conflicts).toBe(1);
+
+    // Counting it again takes a new reference and clears the conflict.
+    const count = await getCount(actor, countId);
+    for (const capture of count!.lines[0]!.captures) {
+      await removeCapture(actor, { countId, captureId: capture.id });
+    }
+    await captureCount(actor, { countId, productId, quantity: "28" });
+    const again = await lineOf(actor, countId);
+    expect(again).toMatchObject({ system: "30", difference: "-2" });
+    expect(again.since).toMatchObject({
+      moved: "0",
+      movementCount: 0,
+      target: "28",
+      conflict: false,
+    });
+  });
+
+  it("movements before the product was counted are not «after»", async () => {
+    const productId = await product(actor, "Tornillo tardío");
+    const locationId = await shelf(actor);
+    await registerEntry(actor, { productId, locationId, quantity: "40" });
+    const countId = await countOf(actor, locationId);
+    // The count is open, but this product has not been counted yet.
+    await registerExit(actor, { productId, locationId, quantity: "15" });
+    await captureCount(actor, { countId, productId, quantity: "25" });
+    const line = await lineOf(actor, countId);
+    expect(line).toMatchObject({ system: "25", difference: "0" });
+    expect(line.since).toMatchObject({ moved: "0", movementCount: 0 });
+  });
+
+  it("each product has its own reference", async () => {
+    const first = await product(actor, "Primero");
+    const second = await product(actor, "Segundo");
+    const locationId = await shelf(actor);
+    for (const productId of [first, second]) {
+      await registerEntry(actor, { productId, locationId, quantity: "20" });
+    }
+    const countId = await countOf(actor, locationId);
+    await captureCount(actor, { countId, productId: first, quantity: "20" });
+    await registerExit(actor, { productId: first, locationId, quantity: "1" });
+    await registerExit(actor, { productId: second, locationId, quantity: "2" });
+    await captureCount(actor, { countId, productId: second, quantity: "18" });
+    const lines = Object.fromEntries(
+      (await getCount(actor, countId))!.lines.map((line) => [line.name, line]),
+    );
+    expect(lines.Primero!.since).toMatchObject({
+      moved: "-1",
+      movementCount: 1,
+      target: "19",
+    });
+    expect(lines.Segundo!.since).toMatchObject({
+      moved: "0",
+      movementCount: 0,
+      target: "18",
+    });
+  });
+
+  it("a closed count no longer follows stock", async () => {
+    const { productId, locationId, countId } = await counted(actor);
+    await cancelCount(actor, countId);
+    await registerExit(actor, { productId, locationId, quantity: "5" });
+    const count = await getCount(actor, countId);
+    expect(count!.lines[0]!.since).toBeNull();
+    expect(count).toMatchObject({ movedAfter: 0, conflicts: 0 });
   });
 });
