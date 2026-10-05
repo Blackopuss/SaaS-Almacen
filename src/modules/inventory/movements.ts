@@ -651,7 +651,7 @@ export type MovementSummary = {
  */
 export async function listRecentMovements(
   actor: InventoryActor,
-  options: { limit?: number; movementId?: string } = {},
+  options: { limit?: number; movementId?: string; productId?: string } = {},
 ): Promise<MovementSummary[]> {
   await assertModulePermission(
     actor.organizationId,
@@ -660,7 +660,11 @@ export async function listRecentMovements(
   );
   const client = forOrganization(actor.organizationId);
   const movements = await client.stockMovement.findMany({
-    where: options.movementId ? { id: String(options.movementId) } : {},
+    where: options.movementId
+      ? { id: String(options.movementId) }
+      : options.productId
+        ? { lines: { some: { productId: String(options.productId) } } }
+        : {},
     // Ids are UUIDv7: their order is the order of creation.
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: Math.min(Math.max(options.limit ?? 20, 1), 50),

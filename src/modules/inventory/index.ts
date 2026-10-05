@@ -35,3 +35,5 @@ export type {
 } from "./movements";
 export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";
+export { getProductStock } from "./product-stock";
+export type { ProductStock } from "./product-stock";

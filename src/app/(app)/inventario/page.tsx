@@ -133,7 +133,14 @@ export default async function InventarioPage({
   const row = (product: ProductSummary) => (
     <li key={product.id} className="flex items-center gap-3 p-4 sm:px-5">
       <div className="min-w-0 flex-1">
-        <p className="font-medium">{product.name}</p>
+        <p className="font-medium">
+          <Link
+            href={`/inventario/${product.id}`}
+            className="rounded underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {product.name}
+          </Link>
+        </p>
         <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
           {[product.sku, product.category, product.brand]
             .filter(Boolean)
