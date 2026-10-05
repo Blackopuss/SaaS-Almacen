@@ -2,11 +2,16 @@ import {
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowUpFromLine,
+  ChevronLeft,
+  ChevronRight,
   CircleCheck,
   ClipboardList,
+  Filter,
   Scale,
+  Search,
 } from "lucide-react";
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
 
 import {
@@ -19,15 +24,33 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatDateTime, newId } from "@/lib";
-import { listRecentMovements } from "@/modules/inventory";
+import {
+  MOVEMENT_PAGE_SIZE,
+  MOVEMENT_TYPE_LABELS,
+  listMovementAuthors,
+  listMovements,
+  listRecentMovements,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
+import { FilterSelect } from "../inventario/filter-select";
 import { ReverseMovement } from "./reverse-dialog";
+
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const TYPE_OPTIONS = Object.entries(MOVEMENT_TYPE_LABELS).map(([id, name]) => ({
+  id,
+  name,
+}));
 
 export const metadata: Metadata = { title: "Movimientos" };
 
-/** Latest stock movements (INV-16). History with filters arrives with INV-27. */
+/**
+ * History of stock movements (INV-16, INV-27): newest first, one page at a
+ * time, filtered by dates, product, person and kind. The filters live in
+ * the address, so a filtered view can be shared or reloaded.
+ */
 export default async function MovimientosPage({
   searchParams,
 }: PageProps<"/movimientos">) {
@@ -51,15 +74,66 @@ export default async function MovimientosPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const { registrado } = await searchParams;
-  const [movements, registered] = await Promise.all([
-    listRecentMovements(actor, { limit: 30 }),
+  const { registrado, desde, hasta, producto, persona, tipo, pagina } =
+    await searchParams;
+  const text = (value: unknown) =>
+    typeof value === "string" ? value.trim().slice(0, 100) : "";
+  const productText = text(producto);
+  const [history, authors, registered] = await Promise.all([
+    listMovements(actor, {
+      from: text(desde),
+      to: text(hasta),
+      // The product card links here with the id; the box sends text.
+      ...(UUID.test(productText)
+        ? { productId: productText }
+        : { productSearch: productText }),
+      userId: text(persona),
+      type: text(tipo),
+      page:
+        typeof pagina === "string" && /^\d{1,6}$/.test(pagina)
+          ? Number(pagina)
+          : 1,
+    }),
+    listMovementAuthors(actor),
     // The notice is built from the stored movement, never from the address.
     typeof registrado === "string" && registrado
       ? listRecentMovements(actor, { movementId: registrado.slice(0, 36) })
       : [],
   ]);
   const justRegistered = registered[0];
+  const movements = history.items;
+  const { applied } = history;
+  const narrowed = Boolean(
+    applied.from ||
+    applied.to ||
+    applied.productId ||
+    applied.productSearch ||
+    applied.userId ||
+    applied.type,
+  );
+  const count = (n: number) => n.toLocaleString("es-MX");
+  const first = (history.page - 1) * MOVEMENT_PAGE_SIZE + 1;
+  const last = first + movements.length - 1;
+  /** Address of a page of this same history, with its filters. */
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams();
+    if (applied.from) params.set("desde", applied.from);
+    if (applied.to) params.set("hasta", applied.to);
+    if (applied.productId) params.set("producto", applied.productId);
+    if (applied.productSearch) params.set("producto", applied.productSearch);
+    if (applied.userId) params.set("persona", applied.userId);
+    if (applied.type) params.set("tipo", applied.type);
+    if (page > 1) params.set("pagina", String(page));
+    const query = params.toString();
+    return query ? `/movimientos?${query}` : "/movimientos";
+  };
+  // Name of the product the card linked with, taken from what was found.
+  const linkedProduct = applied.productId
+    ? (movements
+        .flatMap((movement) => movement.lines)
+        .find((line) => line.productId === applied.productId)?.productName ??
+      "el producto elegido")
+    : null;
   // Shown only to who may register entries, and only while the plan allows it.
   const entryButton = access.allows("inventory.entry.create") ? (
     <Button asChild>
@@ -166,7 +240,130 @@ export default async function MovimientosPage({
           </p>
         </div>
       )}
-      {movements.length === 0 ? (
+      {(history.total > 0 || narrowed) && (
+        <Form
+          action="/movimientos"
+          role="search"
+          aria-label="Filtrar movimientos"
+          className="flex max-w-4xl flex-wrap items-end gap-2"
+        >
+          {applied.productId ? (
+            <input type="hidden" name="producto" value={applied.productId} />
+          ) : (
+            <div className="min-w-48 flex-[2_1_12rem]">
+              <label htmlFor="producto" className="sr-only">
+                Producto
+              </label>
+              <Input
+                id="producto"
+                name="producto"
+                type="search"
+                defaultValue={applied.productSearch ?? ""}
+                key={applied.productSearch ?? ""}
+                placeholder="Producto: nombre o clave"
+                maxLength={100}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                enterKeyHint="search"
+              />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
+            <label htmlFor="desde" className="text-sm text-muted-foreground">
+              Desde
+            </label>
+            <Input
+              id="desde"
+              name="desde"
+              type="date"
+              defaultValue={applied.from ?? ""}
+              key={applied.from ?? ""}
+              max={applied.to ?? undefined}
+            />
+          </div>
+          <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
+            <label htmlFor="hasta" className="text-sm text-muted-foreground">
+              Hasta
+            </label>
+            <Input
+              id="hasta"
+              name="hasta"
+              type="date"
+              defaultValue={applied.to ?? ""}
+              key={applied.to ?? ""}
+              min={applied.from ?? undefined}
+            />
+          </div>
+          <div className="flex w-full flex-wrap gap-2">
+            <FilterSelect
+              id="tipo"
+              name="tipo"
+              label="Filtrar por tipo de movimiento"
+              value={applied.type ?? ""}
+              allLabel="Tipo"
+              options={TYPE_OPTIONS}
+            />
+            {authors.length > 0 && (
+              <FilterSelect
+                id="persona"
+                name="persona"
+                label="Filtrar por persona"
+                value={
+                  authors.some((author) => author.userId === applied.userId)
+                    ? (applied.userId ?? "")
+                    : ""
+                }
+                allLabel="Persona"
+                options={authors.map((author) => ({
+                  id: author.userId,
+                  name: author.name,
+                }))}
+              />
+            )}
+            <Button type="submit" variant="outline">
+              <Filter aria-hidden="true" data-icon="inline-start" />
+              Filtrar
+            </Button>
+          </div>
+        </Form>
+      )}
+      {narrowed && (
+        <p className="text-sm" role="status">
+          {history.total === 0
+            ? "Sin resultados"
+            : history.total === 1
+              ? "1 movimiento"
+              : `${count(history.total)} movimientos`}
+          {linkedProduct && (
+            <>
+              {" "}
+              de <span className="font-medium">{linkedProduct}</span>
+            </>
+          )}
+          {applied.productSearch && (
+            <>
+              {" "}
+              con producto{" "}
+              <span className="font-medium">«{applied.productSearch}»</span>
+            </>
+          )}
+          .{" "}
+          <Link
+            href="/movimientos"
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Quitar filtros
+          </Link>
+        </p>
+      )}
+      {movements.length === 0 && narrowed ? (
+        <EmptyState
+          icon={Search}
+          title="Ningún movimiento coincide"
+          description="Prueba con otras fechas o quita algún filtro."
+        />
+      ) : movements.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
           title="Sin movimientos registrados"
@@ -180,12 +377,16 @@ export default async function MovimientosPage({
           aria-labelledby="ultimos-movimientos"
           className="rounded-xl border bg-card"
         >
-          <h2
-            id="ultimos-movimientos"
-            className="border-b p-4 font-medium sm:px-5"
-          >
-            Últimos movimientos
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b p-4 sm:px-5">
+            <h2 id="ultimos-movimientos" className="font-medium">
+              {narrowed ? "Movimientos encontrados" : "Historial"}
+            </h2>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {history.total === 1
+                ? "1 movimiento"
+                : `${count(first)}–${count(last)} de ${count(history.total)} movimientos`}
+            </p>
+          </div>
           <ul className="divide-y">
             {movements.map((movement) => (
               <li key={movement.id} className="space-y-2 p-4 sm:px-5">
@@ -259,6 +460,36 @@ export default async function MovimientosPage({
               </li>
             ))}
           </ul>
+          {history.pageCount > 1 && (
+            <nav
+              aria-label="Páginas del historial"
+              className="flex items-center justify-between gap-3 border-t p-4 sm:px-5"
+            >
+              {history.page > 1 ? (
+                <Button asChild variant="outline">
+                  <Link href={pageHref(history.page - 1)} rel="prev">
+                    <ChevronLeft aria-hidden="true" data-icon="inline-start" />
+                    Anterior
+                  </Link>
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Página {count(history.page)} de {count(history.pageCount)}
+              </p>
+              {history.page < history.pageCount ? (
+                <Button asChild variant="outline">
+                  <Link href={pageHref(history.page + 1)} rel="next">
+                    Siguiente
+                    <ChevronRight aria-hidden="true" data-icon="inline-end" />
+                  </Link>
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+            </nav>
+          )}
         </section>
       )}
     </PageContainer>

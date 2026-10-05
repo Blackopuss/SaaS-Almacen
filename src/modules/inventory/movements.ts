@@ -658,16 +658,32 @@ export async function listRecentMovements(
     actor.userId,
     "inventory.movement.read",
   );
-  const client = forOrganization(actor.organizationId);
-  const movements = await client.stockMovement.findMany({
-    where: options.movementId
+  return fetchMovements(
+    actor.organizationId,
+    options.movementId
       ? { id: String(options.movementId) }
       : options.productId
         ? { lines: { some: { productId: String(options.productId) } } }
         : {},
+    Math.min(Math.max(options.limit ?? 20, 1), 50),
+    0,
+  );
+}
+
+/** Movements that match `where`, newest first, ready to show. */
+async function fetchMovements(
+  organizationId: string,
+  where: object,
+  take: number,
+  skip: number,
+): Promise<MovementSummary[]> {
+  const client = forOrganization(organizationId);
+  const movements = await client.stockMovement.findMany({
+    where,
     // Ids are UUIDv7: their order is the order of creation.
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: Math.min(Math.max(options.limit ?? 20, 1), 50),
+    take,
+    skip,
     select: {
       id: true,
       type: true,
@@ -1826,4 +1842,186 @@ export async function reverseMovement(
     }
     throw error;
   }
+}
+
+export const MOVEMENT_PAGE_SIZE = 25;
+
+export type MovementFilters = {
+  /** First and last day, as dates of the company's calendar: "2026-10-05". */
+  from?: string;
+  to?: string;
+  productId?: string;
+  /** Part of the name or the SKU of a product; ignored with `productId`. */
+  productSearch?: string;
+  /** Person who confirmed it. */
+  userId?: string;
+  type?: string;
+  page?: number;
+};
+
+export type MovementPage = {
+  items: MovementSummary[];
+  total: number;
+  page: number;
+  pageCount: number;
+  /** The filters as they were understood; what could not be read is dropped. */
+  applied: {
+    from: string | null;
+    to: string | null;
+    productId: string | null;
+    productSearch: string | null;
+    userId: string | null;
+    type: MovementType | null;
+  };
+};
+
+/** Text as it is for LIKE: its wildcards are ordinary characters. */
+const likeLiteral = (term: string) => term.replace(/[\\%_]/g, "\\$&");
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Offset of a time zone at a moment, as "+HH:MM" / "-HH:MM". */
+function offsetOf(timeZone: string, at: Date): string {
+  try {
+    const part = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(at)
+      .find((p) => p.type === "timeZoneName")?.value;
+    const match = part?.match(/GMT([+-]\d{2}):?(\d{2})?/);
+    return match ? `${match[1]}:${match[2] ?? "00"}` : "+00:00";
+  } catch {
+    return "+00:00";
+  }
+}
+
+/** Start of a calendar day of the company, as a moment in UTC; null if unreadable. */
+function startOfDay(day: string | undefined, timeZone: string): Date | null {
+  if (!day || !DAY.test(day)) return null;
+  const guess = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(guess.getTime())) return null;
+  const start = new Date(`${day}T00:00:00.000${offsetOf(timeZone, guess)}`);
+  return Number.isNaN(start.getTime()) ? null : start;
+}
+
+/**
+ * History of movements with filters (INV-27): by dates, product, person
+ * and kind, one page at a time. Dates are days of the company's calendar
+ * (its time zone), both included.
+ */
+export async function listMovements(
+  actor: InventoryActor,
+  filters: MovementFilters = {},
+): Promise<MovementPage> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.movement.read",
+  );
+  const client = forOrganization(actor.organizationId);
+  const organization = await client.membership.findFirst({
+    select: { organization: { select: { timeZone: true } } },
+  });
+  const timeZone = organization?.organization.timeZone ?? "America/Mexico_City";
+
+  const from = startOfDay(filters.from, timeZone);
+  const toStart = startOfDay(filters.to, timeZone);
+  // The last day is included whole: up to the start of the next one.
+  const until = toStart
+    ? new Date(toStart.getTime() + 24 * 60 * 60 * 1000)
+    : null;
+  const type =
+    filters.type && filters.type in MOVEMENT_TYPE_LABELS
+      ? (filters.type as MovementType)
+      : null;
+  const productId = filters.productId
+    ? String(filters.productId).slice(0, 36)
+    : null;
+  const userId = filters.userId ? String(filters.userId).slice(0, 36) : null;
+  const productSearch =
+    (!productId &&
+      String(filters.productSearch ?? "")
+        .trim()
+        .slice(0, 100)) ||
+    null;
+
+  const where = {
+    ...(from || until
+      ? {
+          createdAt: {
+            ...(from ? { gte: from } : {}),
+            ...(until ? { lt: until } : {}),
+          },
+        }
+      : {}),
+    ...(type ? { type } : {}),
+    ...(userId ? { createdByUserId: userId } : {}),
+    ...(productId ? { lines: { some: { productId } } } : {}),
+    ...(productSearch
+      ? {
+          lines: {
+            some: {
+              product: {
+                OR: [
+                  { name: { contains: likeLiteral(productSearch) } },
+                  { sku: { contains: likeLiteral(productSearch) } },
+                ],
+              },
+            },
+          },
+        }
+      : {}),
+  };
+
+  const total = await client.stockMovement.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / MOVEMENT_PAGE_SIZE));
+  const requested = Number.isInteger(filters.page) ? Number(filters.page) : 1;
+  const page = Math.min(Math.max(requested, 1), pageCount);
+  const items = await fetchMovements(
+    actor.organizationId,
+    where,
+    MOVEMENT_PAGE_SIZE,
+    (page - 1) * MOVEMENT_PAGE_SIZE,
+  );
+  return {
+    items,
+    total,
+    page,
+    pageCount,
+    applied: {
+      from: from ? filters.from! : null,
+      to: toStart ? filters.to! : null,
+      productId,
+      productSearch,
+      userId,
+      type,
+    },
+  };
+}
+
+/** People who have confirmed movements in the company, for the filter. */
+export async function listMovementAuthors(
+  actor: InventoryActor,
+): Promise<{ userId: string; name: string }[]> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.movement.read",
+  );
+  const client = forOrganization(actor.organizationId);
+  const authors = await client.stockMovement.groupBy({
+    by: ["createdByUserId"],
+    orderBy: { createdByUserId: "asc" },
+    take: 500,
+  });
+  if (authors.length === 0) return [];
+  // Names come from the memberships of this company only.
+  const members = await client.membership.findMany({
+    where: { userId: { in: authors.map((a) => a.createdByUserId) } },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  return members
+    .map((member) => ({ userId: member.userId, name: member.user.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
 }

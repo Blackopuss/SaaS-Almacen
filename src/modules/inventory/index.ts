@@ -2,12 +2,15 @@
 // Other modules and app/ may import only from this file.
 export { inventoryModule } from "./contract";
 export {
+  MOVEMENT_PAGE_SIZE,
   MOVEMENT_TYPE_LABELS,
   findConfirmation,
   formatStock,
   getInitialBalanceState,
   getStockByLocation,
   getStockTotals,
+  listMovementAuthors,
+  listMovements,
   listProductsWithoutStock,
   listRecentMovements,
   listStockLocations,
@@ -23,6 +26,8 @@ export type {
   EntryField,
   EntryInput,
   InventoryActor,
+  MovementFilters,
+  MovementPage,
   MovementResult,
   MovementSummary,
   MovementType,

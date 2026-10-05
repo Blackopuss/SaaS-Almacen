@@ -23,7 +23,8 @@ export function FilterSelect({
   value: string;
   /** Shown while nothing is chosen: the name of the filter itself. */
   allLabel: string;
-  noneLabel: string;
+  /** Omit it when the filter has no «without one» option. */
+  noneLabel?: string;
   options: { id: string; name: string }[];
 }) {
   return (
@@ -45,7 +46,7 @@ export function FilterSelect({
             {option.name}
           </option>
         ))}
-        <option value="sin">{noneLabel}</option>
+        {noneLabel && <option value="sin">{noneLabel}</option>}
       </NativeSelect>
     </div>
   );

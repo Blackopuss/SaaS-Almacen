@@ -250,12 +250,19 @@ export default async function ProductoPage({
           aria-labelledby="movimientos-producto"
           className="rounded-xl border bg-card"
         >
-          <h2
-            id="movimientos-producto"
-            className="border-b p-4 font-medium sm:px-5"
-          >
-            Últimos movimientos
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 border-b px-4 py-2 sm:px-5">
+            <h2 id="movimientos-producto" className="font-medium">
+              Últimos movimientos
+            </h2>
+            {movements.length > 0 && (
+              <Link
+                href={`/movimientos?producto=${product.id}`}
+                className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Ver historial completo
+              </Link>
+            )}
+          </div>
           {movements.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground sm:px-5">
               Este producto todavía no tiene movimientos.
