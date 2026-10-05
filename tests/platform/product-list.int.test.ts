@@ -7,6 +7,7 @@ import {
   PRODUCT_PAGE_SIZE,
   archiveProduct,
   createProduct,
+  listProductFilterOptions,
   listProducts,
   normalizeSearch,
   type CatalogActor,
@@ -19,6 +20,7 @@ import { migratorConnection } from "../setup/test-db";
 // INV-10: the list of products is cut into pages by the database. With
 // 10,000 products each page brings only its rows.
 // INV-11: search by name, code (SKU) and barcode over the same catalog.
+// INV-12: filters by category and brand that combine with the search.
 
 const stamp = Date.now();
 const TOTAL = 10_000;
@@ -73,6 +75,19 @@ const bulkBarcode = (n: number) => `750${String(n).padStart(10, "0")}`;
  * would only slow the test down. The list does not depend on the quota.
  */
 async function bulkProducts(organizationId: string, total: number) {
+  // Product n belongs to category n % 10 and brand n % 4.
+  const categories = Array.from({ length: 10 }, (_, i) => ({
+    id: newId(),
+    organizationId,
+    name: `Categoría ${i}`,
+  }));
+  const brands = Array.from({ length: 4 }, (_, i) => ({
+    id: newId(),
+    organizationId,
+    name: `Marca ${i}`,
+  }));
+  await db.productCategory.createMany({ data: categories });
+  await db.productBrand.createMany({ data: brands });
   const connection = await migratorConnection();
   try {
     for (let start = 1; start <= total; start += 1_000) {
@@ -84,10 +99,12 @@ async function bulkProducts(organizationId: string, total: number) {
           `B-${n}`,
           bulkName(n),
           bulkBarcode(n),
+          categories[n % 10]?.id,
+          brands[n % 4]?.id,
         ]);
       }
       await connection.batch(
-        "INSERT INTO product (id, organizationId, sku, name, barcode, updatedAt) VALUES (?, ?, ?, ?, ?, NOW(3))",
+        "INSERT INTO product (id, organizationId, sku, name, barcode, categoryId, brandId, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3))",
         rows,
       );
     }
@@ -270,6 +287,46 @@ describe("listProducts with 10,000 products", () => {
     }
   });
 
+  it("filters 10,000 products by category and brand, alone, together and with a search", async () => {
+    const options = await listProductFilterOptions(actor);
+    expect(options.categories).toHaveLength(10);
+    expect(options.brands.map((b) => b.name)).toEqual([
+      "Marca 0",
+      "Marca 1",
+      "Marca 2",
+      "Marca 3",
+    ]);
+    const categoryId = options.categories.find(
+      (c) => c.name === "Categoría 3",
+    )?.id;
+    const brandId = options.brands.find((b) => b.name === "Marca 1")?.id;
+    const timed = async (filters: Parameters<typeof listProducts>[1]) => {
+      const started = performance.now();
+      const result = await listProducts(actor, filters);
+      expect(performance.now() - started).toBeLessThan(1_000);
+      return result;
+    };
+    await listProducts(actor, { categoryId });
+    expect((await timed({ categoryId })).total).toBe(1_000);
+    expect((await timed({ brandId })).total).toBe(2_500);
+    // n % 10 = 3 and n % 4 = 1 → n % 20 = 13.
+    const both = await timed({ categoryId, brandId, page: 20 });
+    expect(both).toMatchObject({ total: 500, page: 20, pageCount: 20 });
+    expect(both.items.at(-1)).toMatchObject({
+      name: bulkName(9_993),
+      category: "Categoría 3",
+      brand: "Marca 1",
+    });
+    const searched = await timed({ categoryId, brandId, search: "N000" });
+    expect(searched.items.map((p) => p.sku)).toEqual([
+      "B-13",
+      "B-33",
+      "B-53",
+      "B-73",
+      "B-93",
+    ]);
+  });
+
   it("archived products are a separate list", async () => {
     const created = await createProduct(actor, {
       sku: "ARCH-LISTA",
@@ -356,11 +413,18 @@ describe("searching products", () => {
         sku: "MAR-16",
         name: "Martillo de uña 16 oz",
         barcode: "7501234500016",
+        category: "Herramienta",
+        brand: "Truper",
       },
-      { sku: "MAR-20", name: "Martillo de bola 20 oz" },
-      { sku: "LON-1", name: "Lona 100% algodón" },
+      {
+        sku: "MAR-20",
+        name: "Martillo de bola 20 oz",
+        category: "Herramienta",
+        brand: "Urrea",
+      },
+      { sku: "LON-1", name: "Lona 100% algodón", category: "Textil" },
       { sku: "TUB_34", name: "Tubo PVC 3/4" },
-      { sku: "16", name: "Clavo estándar" },
+      { sku: "16", name: "Clavo estándar", brand: "Truper" },
     ]) {
       const result = await createProduct(actor, product);
       if (!result.ok) throw new Error("product setup failed");
@@ -403,6 +467,86 @@ describe("searching products", () => {
     expect(await skus("\\")).toEqual([]);
     expect(await skus("3/4")).toEqual(["TUB_34"]);
     expect(await skus("' OR 1=1 --")).toEqual([]);
+  });
+
+  it("filters by category and by brand, which combine with each other and with the search", async () => {
+    const options = await listProductFilterOptions(actor);
+    expect(options.categories.map((c) => c.name)).toEqual([
+      "Herramienta",
+      "Textil",
+    ]);
+    expect(options.brands.map((b) => b.name)).toEqual(["Truper", "Urrea"]);
+    const [tools, textile] = options.categories.map((c) => c.id);
+    const [truper, urrea] = options.brands.map((b) => b.id);
+    const filtered = async (filters: Parameters<typeof listProducts>[1]) =>
+      (await listProducts(actor, filters)).items.map((p) => p.sku);
+
+    expect(await filtered({ categoryId: tools })).toEqual(["MAR-20", "MAR-16"]);
+    expect(await filtered({ categoryId: textile })).toEqual(["LON-1"]);
+    expect(await filtered({ brandId: truper })).toEqual(["16", "MAR-16"]);
+    expect(await filtered({ categoryId: tools, brandId: truper })).toEqual([
+      "MAR-16",
+    ]);
+    expect(await filtered({ categoryId: textile, brandId: urrea })).toEqual([]);
+    expect(
+      await filtered({ categoryId: tools, search: "martillo bola" }),
+    ).toEqual(["MAR-20"]);
+    expect(await filtered({ brandId: urrea, search: "uña" })).toEqual([]);
+  });
+
+  it("can ask for the products without category or without brand", async () => {
+    const filtered = async (filters: Parameters<typeof listProducts>[1]) =>
+      (await listProducts(actor, filters)).items.map((p) => p.sku);
+    expect(await filtered({ categoryId: null })).toEqual(["16", "TUB_34"]);
+    expect(await filtered({ brandId: null })).toEqual(["LON-1", "TUB_34"]);
+    expect(await filtered({ categoryId: null, brandId: null })).toEqual([
+      "TUB_34",
+    ]);
+  });
+
+  it("a category or brand of another company, or one that does not exist, finds nothing", async () => {
+    const other = await company(5);
+    const created = await createProduct(other, {
+      sku: "AJENO-1",
+      name: "Martillo ajeno",
+      category: "Herramienta",
+      brand: "Truper",
+    });
+    if (!created.ok) throw new Error("product setup failed");
+    const theirs = await listProductFilterOptions(other);
+    expect(theirs.categories).toHaveLength(1);
+    const mine = await listProductFilterOptions(actor);
+    expect(mine.categories.map((c) => c.id)).not.toContain(
+      theirs.categories[0]?.id,
+    );
+    for (const filters of [
+      { categoryId: theirs.categories[0]?.id },
+      { brandId: theirs.brands[0]?.id },
+      { categoryId: newId() },
+      { brandId: "x".repeat(500) },
+      { categoryId: "' OR 1=1 --" },
+    ]) {
+      expect(await listProducts(actor, filters)).toMatchObject({
+        items: [],
+        total: 0,
+      });
+    }
+    // Their own filter works for them.
+    expect(
+      (await listProducts(other, { categoryId: theirs.categories[0]?.id }))
+        .total,
+    ).toBe(1);
+  });
+
+  it("the exact code is found whatever the filters", async () => {
+    const options = await listProductFilterOptions(actor);
+    const textile = options.categories.find((c) => c.name === "Textil")?.id;
+    const found = await listProducts(actor, {
+      categoryId: textile,
+      search: "MAR-16",
+    });
+    expect(found.total).toBe(0);
+    expect(found.exact).toMatchObject({ sku: "MAR-16" });
   });
 
   it("spaces, line breaks and very long text are tamed", async () => {

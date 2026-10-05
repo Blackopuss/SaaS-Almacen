@@ -22,13 +22,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getModuleAccess } from "@/platform/billing";
-import { listProducts, type ProductSummary } from "@/platform/catalog";
+import {
+  listProductFilterOptions,
+  listProducts,
+  type ProductSummary,
+} from "@/platform/catalog";
 
+import { FilterSelect } from "./filter-select";
 import { ReactivateProduct } from "./product-status";
 
 export const metadata: Metadata = { title: "Inventario" };
 
-/** Catalog of the company, one page at a time (INV-10), with search (INV-11). */
+/** Value of the filters that means «products without category / brand». */
+const NONE = "sin";
+
+/** Catalog of the company, one page at a time (INV-10), with search (INV-11) and filters (INV-12). */
 export default async function InventarioPage({
   searchParams,
 }: PageProps<"/inventario">) {
@@ -49,8 +57,16 @@ export default async function InventarioPage({
     );
   }
 
-  const { creado, guardado, archivado, archivados, pagina, q } =
-    await searchParams;
+  const {
+    creado,
+    guardado,
+    archivado,
+    archivados,
+    pagina,
+    q,
+    categoria,
+    marca,
+  } = await searchParams;
   const showArchived = archivados === "1";
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
   const saved = typeof guardado === "string" ? guardado.slice(0, 64) : "";
@@ -61,11 +77,32 @@ export default async function InventarioPage({
   };
   const requested =
     typeof pagina === "string" && /^\d{1,6}$/.test(pagina) ? Number(pagina) : 1;
+  const filters = await listProductFilterOptions(actor);
+  /** A filter of the address, kept only if it is one of the company's. */
+  const chosen = (value: unknown, options: { id: string }[]) =>
+    value === NONE || options.some((option) => option.id === value)
+      ? (value as string)
+      : "";
+  const category = chosen(categoria, filters.categories);
+  const brand = chosen(marca, filters.brands);
+  const filterValue = (value: string) =>
+    value === "" ? undefined : value === NONE ? null : value;
   const list = await listProducts(actor, {
     status: showArchived ? "ARCHIVED" : "ACTIVE",
     page: requested,
     search: typeof q === "string" ? q : "",
+    categoryId: filterValue(category),
+    brandId: filterValue(brand),
   });
+  const narrowed = Boolean(list.search || category || brand);
+  const categoryName =
+    category === NONE
+      ? "sin categoría"
+      : filters.categories.find((option) => option.id === category)?.name;
+  const brandName =
+    brand === NONE
+      ? "sin marca"
+      : filters.brands.find((option) => option.id === brand)?.name;
   const search = list.search;
   const products = list.items;
   const first = (list.page - 1) * list.pageSize + 1;
@@ -76,6 +113,8 @@ export default async function InventarioPage({
     const params = new URLSearchParams();
     if (showArchived) params.set("archivados", "1");
     if (search) params.set("q", search);
+    if (category) params.set("categoria", category);
+    if (brand) params.set("marca", brand);
     if (page > 1) params.set("pagina", String(page));
     const query = params.toString();
     return query ? `/inventario?${query}` : "/inventario";
@@ -174,11 +213,11 @@ export default async function InventarioPage({
           {showArchived ? "Ver productos activos" : "Ver productos archivados"}
         </Link>
       </p>
-      {(list.total > 0 || search) && (
+      {(list.total > 0 || narrowed) && (
         <Form
           action="/inventario"
           role="search"
-          className="flex max-w-xl items-center gap-2"
+          className="flex max-w-3xl flex-wrap items-center gap-2"
         >
           {showArchived && <input type="hidden" name="archivados" value="1" />}
           <label htmlFor="q" className="sr-only">
@@ -187,6 +226,7 @@ export default async function InventarioPage({
               : "Buscar productos"}
           </label>
           <Input
+            className="min-w-48 flex-[2_1_12rem]"
             id="q"
             name="q"
             type="search"
@@ -205,47 +245,94 @@ export default async function InventarioPage({
             <Search aria-hidden="true" data-icon="inline-start" />
             Buscar
           </Button>
+          {(filters.categories.length > 0 || filters.brands.length > 0) && (
+            <div className="flex w-full flex-wrap gap-2">
+              {filters.categories.length > 0 && (
+                <FilterSelect
+                  id="categoria"
+                  name="categoria"
+                  label="Filtrar por categoría"
+                  value={category}
+                  allLabel="Categoría"
+                  noneLabel="Sin categoría"
+                  options={filters.categories}
+                />
+              )}
+              {filters.brands.length > 0 && (
+                <FilterSelect
+                  id="marca"
+                  name="marca"
+                  label="Filtrar por marca"
+                  value={brand}
+                  allLabel="Marca"
+                  noneLabel="Sin marca"
+                  options={filters.brands}
+                />
+              )}
+            </div>
+          )}
         </Form>
       )}
-      {search && (
+      {narrowed && (
         <p className="text-sm" role="status">
           {list.total === 0
             ? "Sin resultados"
             : list.total === 1
               ? "1 resultado"
-              : `${count(list.total)} resultados`}{" "}
-          para <span className="font-medium">«{search}»</span>.{" "}
+              : `${count(list.total)} resultados`}
+          {search && (
+            <>
+              {" "}
+              para <span className="font-medium">«{search}»</span>
+            </>
+          )}
+          {categoryName && (
+            <>
+              {" "}
+              · Categoría: <span className="font-medium">{categoryName}</span>
+            </>
+          )}
+          {brandName && (
+            <>
+              {" "}
+              · Marca: <span className="font-medium">{brandName}</span>
+            </>
+          )}
+          .{" "}
           <Link
             href={showArchived ? "/inventario?archivados=1" : "/inventario"}
             className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            Quitar búsqueda
+            {category || brand ? "Quitar filtros" : "Quitar búsqueda"}
           </Link>
         </p>
       )}
-      {list.exact && list.total > 1 && (
-        <section
-          aria-labelledby="coincidencia-exacta"
-          className="rounded-xl border border-primary/40 bg-card"
-        >
-          <h2
-            id="coincidencia-exacta"
-            className="border-b p-4 text-sm font-medium text-muted-foreground sm:px-5"
+      {list.exact &&
+        !(list.total === 1 && products[0]?.id === list.exact.id) && (
+          <section
+            aria-labelledby="coincidencia-exacta"
+            className="rounded-xl border border-primary/40 bg-card"
           >
-            Coincidencia exacta de clave o código de barras
-          </h2>
-          <ul>{row(list.exact)}</ul>
-        </section>
-      )}
+            <h2
+              id="coincidencia-exacta"
+              className="border-b p-4 text-sm font-medium text-muted-foreground sm:px-5"
+            >
+              Coincidencia exacta de clave o código de barras
+            </h2>
+            <ul>{row(list.exact)}</ul>
+          </section>
+        )}
       {products.length === 0 ? (
-        search ? (
+        narrowed ? (
           <EmptyState
             icon={Search}
             title="No encontramos productos"
             description={
-              showArchived
-                ? "Ningún producto archivado coincide. Revisa cómo está escrito o busca con menos palabras."
-                : "Ningún producto coincide. Revisa cómo está escrito, busca con menos palabras o mira en los archivados."
+              category || brand
+                ? "Ningún producto coincide con esos filtros. Quita alguno o busca con menos palabras."
+                : showArchived
+                  ? "Ningún producto archivado coincide. Revisa cómo está escrito o busca con menos palabras."
+                  : "Ningún producto coincide. Revisa cómo está escrito, busca con menos palabras o mira en los archivados."
             }
           />
         ) : showArchived ? (

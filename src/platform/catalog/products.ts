@@ -332,6 +332,10 @@ export async function listProducts(
     page?: number;
     pageSize?: number;
     search?: string;
+    /** Only this category (INV-12); `null` = products without category. */
+    categoryId?: string | null;
+    /** Only this brand; `null` = products without brand. */
+    brandId?: string | null;
   } = {},
 ): Promise<ProductPage> {
   await assertModulePermission(
@@ -345,6 +349,14 @@ export async function listProducts(
   const search = normalizeSearch(options.search);
   const where = {
     status,
+    // Filters combine with each other and with the search. An id of
+    // another company matches nothing: the client is scoped to this one.
+    ...(options.categoryId === undefined
+      ? {}
+      : { categoryId: groupId(options.categoryId) }),
+    ...(options.brandId === undefined
+      ? {}
+      : { brandId: groupId(options.brandId) }),
     AND: search
       .split(" ")
       .filter(Boolean)
@@ -388,6 +400,37 @@ export async function listProducts(
     search,
     exact: exact ? toSummary(exact) : null,
   };
+}
+
+/** Id of a category or brand as it came from a filter; never longer than an id. */
+const groupId = (value: string | null) =>
+  value === null ? null : String(value).slice(0, 36);
+
+export type ProductFilterOptions = {
+  categories: { id: string; name: string }[];
+  brands: { id: string; name: string }[];
+};
+
+/** Categories and brands of the company, by name, to filter the list (INV-12). */
+export async function listProductFilterOptions(
+  actor: CatalogActor,
+): Promise<ProductFilterOptions> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.product.read",
+  );
+  const client = forOrganization(actor.organizationId);
+  const query = {
+    orderBy: { name: "asc" },
+    take: 500,
+    select: { id: true, name: true },
+  } as const;
+  const [categories, brands] = await Promise.all([
+    client.productCategory.findMany(query),
+    client.productBrand.findMany(query),
+  ]);
+  return { categories, brands };
 }
 
 /** A whole number inside the range; anything else becomes the fallback or the nearest bound. */
