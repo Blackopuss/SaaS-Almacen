@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { DEFAULT_TIME_ZONE, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
+import { ensureDefaultLocation } from "@/platform/locations";
 import { db } from "@/server";
 
 /**
@@ -100,7 +101,8 @@ export async function createOrganization(
         memberships: { create: { id: newId(), userId } },
       },
     });
-    // Same transaction: the company and its first record exist together.
+    await ensureDefaultLocation(tx, organizationId);
+    // Same transaction: company, physical space and audit exist together.
     await recordAuditEvent(tx, {
       organizationId,
       actorUserId: userId,

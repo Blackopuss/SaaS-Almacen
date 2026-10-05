@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
@@ -25,7 +27,7 @@ beforeAll(async () => {
     [orgA, ana, "Empresa A"],
     [orgB, beto, "Empresa B"],
   ] as const) {
-    await db.organization.create({
+    await createTestOrganization({
       data: {
         id,
         name,

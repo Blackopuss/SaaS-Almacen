@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
@@ -17,14 +19,14 @@ const tornillo = { id: newId(), name: "Ferretería El Tornillo" };
 
 beforeAll(async () => {
   await db.user.createMany({ data: [ana, beto] });
-  await db.organization.create({
+  await createTestOrganization({
     data: {
       ...esperanza,
       ownerUserId: ana.id,
       memberships: { create: { id: newId(), userId: ana.id } },
     },
   });
-  await db.organization.create({
+  await createTestOrganization({
     data: {
       ...tornillo,
       ownerUserId: beto.id,

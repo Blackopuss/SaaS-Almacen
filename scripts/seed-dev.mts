@@ -32,6 +32,8 @@ if (!totpSecret) {
 const { newId } = await import("@/lib");
 const { hashPassword } = await import("@/platform/auth/password");
 const { db } = await import("@/server/db");
+const { ensureDefaultLocation } =
+  await import("@/platform/locations/bootstrap");
 const { symmetricEncrypt } = await import("better-auth/crypto");
 const { generateBackupCodes } = await import("@/platform/auth/backup-codes");
 const { base32 } = await import("./totp.mjs");
@@ -65,19 +67,23 @@ if (credential) {
   });
 }
 
-const existing = await db.organization.findFirst({
-  where: { ownerUserId: user.id, name: "Ferretería Demo" },
-});
-if (!existing) {
-  await db.organization.create({
-    data: {
-      id: newId(),
-      name: "Ferretería Demo",
-      ownerUserId: user.id,
-      memberships: { create: { id: newId(), userId: user.id } },
-    },
+await db.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM user WHERE id = ${user.id} FOR UPDATE`;
+  const existing = await tx.organization.findFirst({
+    where: { ownerUserId: user.id, name: "Ferretería Demo" },
   });
-}
+  const organization =
+    existing ??
+    (await tx.organization.create({
+      data: {
+        id: newId(),
+        name: "Ferretería Demo",
+        ownerUserId: user.id,
+        memberships: { create: { id: newId(), userId: user.id } },
+      },
+    }));
+  await ensureDefaultLocation(tx, organization.id);
+});
 
 // MFA with the known secret, encrypted like Better Auth does. Backup codes
 // are random: generate new ones in Configuración to see them.

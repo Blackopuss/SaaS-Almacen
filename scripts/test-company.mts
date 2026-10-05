@@ -14,6 +14,8 @@ process.env.DATABASE_NAME = "almacen_test";
 
 const { newId } = await import("@/lib");
 const { db } = await import("@/server/db");
+const { ensureDefaultLocation } =
+  await import("@/platform/locations/bootstrap");
 const { hashPassword } = await import("@/platform/auth/password");
 
 const password = process.argv[2];
@@ -34,13 +36,16 @@ await db.user.create({
   },
 });
 const organizationId = newId();
-await db.organization.create({
-  data: {
-    id: organizationId,
-    name: "Ferretería de navegador",
-    ownerUserId: ownerId,
-    memberships: { create: { id: newId(), userId: ownerId } },
-  },
+await db.$transaction(async (tx) => {
+  await tx.organization.create({
+    data: {
+      id: organizationId,
+      name: "Ferretería de navegador",
+      ownerUserId: ownerId,
+      memberships: { create: { id: newId(), userId: ownerId } },
+    },
+  });
+  await ensureDefaultLocation(tx, organizationId);
 });
 const userId = newId();
 const email = `persona.navegador.${stamp}@example.test`;

@@ -234,6 +234,24 @@ try {
         overflow <= 0 && (!mobile || visibleNav ? current > 0 : true),
         `${viewport.name}: ${path} renders without overflow and marks the active link`,
       );
+      if (path === "/ubicaciones") {
+        const facility = page.getByRole("region", {
+          name: "Principal",
+          exact: true,
+        });
+        check(
+          (await facility
+            .getByRole("heading", { name: "General", exact: true })
+            .isVisible()) &&
+            (await facility
+              .getByText("Ubicación por defecto de tu inventario.", {
+                exact: true,
+              })
+              .isVisible()) &&
+            (await facility.getByRole("button").count()) === 0,
+          `${viewport.name}: locations shows the facility and General in read-only mode`,
+        );
+      }
     }
     // Team screen (USR-08): reached from Configuración; the demo account is
     // the titular, so it sees itself protected and may invite any role.

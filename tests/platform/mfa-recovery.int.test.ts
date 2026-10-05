@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { createHmac } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -270,7 +272,7 @@ describe("turning MFA off", () => {
 
   it("is refused for a titular, even with valid proof", async () => {
     const owner = await accountWithMfa(`titular.mfa.${stamp}@example.test`);
-    await db.organization.create({
+    await createTestOrganization({
       data: {
         id: newId(),
         name: "Ferretería obligatoria",

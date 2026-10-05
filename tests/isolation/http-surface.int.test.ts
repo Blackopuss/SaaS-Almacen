@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { createHmac } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -72,7 +74,7 @@ beforeAll(async () => {
     data: { emailVerified: true },
   });
   userId = user.id;
-  await db.organization.create({
+  await createTestOrganization({
     data: {
       id: newId(),
       name: "Ferretería HTTP",

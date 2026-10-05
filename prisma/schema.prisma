@@ -132,9 +132,45 @@ model Organization {
   productBrands        ProductBrand[]
   productPresentations ProductPresentation[]
   presentationVersions PresentationVersion[]
+  facilities           Facility[]
+  locations            Location[]
 
   @@index([ownerUserId])
   @@map("organization")
+}
+
+// Shared physical space (INV-13). V1 has one facility per company;
+// multi-facility operation requires an explicit future migration.
+model Facility {
+  id             String       @id @db.Char(36)
+  organizationId String       @unique @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String       @db.VarChar(120)
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+  updatedAt      DateTime     @updatedAt @db.DateTime(3)
+  locations      Location[]
+
+  @@unique([organizationId, id])
+  @@map("facility")
+}
+
+model Location {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  facilityId     String       @db.Char(36)
+  facility       Facility     @relation(fields: [organizationId, facilityId], references: [organizationId, id], onDelete: Restrict)
+  name           String       @db.VarChar(120)
+  /// True for General, NULL for other locations (never false; SQL CHECK).
+  /// MySQL allows multiple NULLs in the unique key, but only one true.
+  isDefault      Boolean?
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+  updatedAt      DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, facilityId, name])
+  @@unique([organizationId, facilityId, isDefault])
+  @@map("location")
 }
 
 enum MembershipStatus {

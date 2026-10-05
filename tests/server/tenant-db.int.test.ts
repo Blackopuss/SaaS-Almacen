@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
@@ -24,7 +26,7 @@ beforeAll(async () => {
       email: `${name}.tenant.${stamp}@example.test`,
     })),
   });
-  await db.organization.create({
+  await createTestOrganization({
     data: {
       id: orgA,
       name: "Empresa A",
@@ -32,7 +34,7 @@ beforeAll(async () => {
       memberships: { create: { id: newId(), userId: users.ana } },
     },
   });
-  await db.organization.create({
+  await createTestOrganization({
     data: {
       id: orgB,
       name: "Empresa B",

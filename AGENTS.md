@@ -90,7 +90,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Better Auth 1.7.7 en `src/platform/auth` (`auth`), ruta `src/app/api/auth/[...all]`. Secreto en `.env.local` (`npm run env:setup`). Telemetría desactivada.
 - Seguridad: `docs/seguridad/REVISION_PLT.md`, `REVISION_USR.md` y `REVISION_MOD.md` (amenazas y hallazgos por etapa) y `docs/seguridad/ASVS.md` (matriz); actualizar ambas al cerrar cada etapa. Cabeceras de seguridad en `next.config.ts`.
 - Antes de desplegar (BAS-09..11, PIL-01): revisar «Requisitos de producción» y «Pendientes» de `docs/adr/0003-autenticacion.md`.
-- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas, bitácora). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
+- Decisiones registradas en `docs/adr/` (stack, base de datos, autenticación, interfaz, empresas, bitácora, módulos, modelo comercial, consola interna, ubicaciones). Una decisión nueva o un cambio de dependencia importante agrega o actualiza un ADR.
 - Sesión: toda pantalla o Server Action protegida llama `requireSession()` (valida contra la base). `src/proxy.ts` solo es una revisión optimista por cookie; agregar ahí cada sección protegida nueva. Cuenta demo local: `npm run db:seed` (credenciales en `.env.local`: `DEMO_EMAIL`, `DEMO_PASSWORD`).
 - Límite de intentos: todo flujo de autenticación nuevo (recuperación, MFA…) usa `blockedFor`/`recordAttempt` de `src/platform/auth/throttle.ts`.
 - Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
@@ -100,8 +100,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 ## Estado actual (actualizar al cerrar cada paso)
 
 - Rama de trabajo: **`pruebas`** (subida a GitHub `Blackopuss/SaaS-Almacen`; CI en cada push). **No tocar `main`.** Un commit por paso cerrado, mensaje en español, **sin `Co-Authored-By` ni ninguna atribución a IA**.
-- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08, INV-09, INV-10. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
-- Avance: 60 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-11 (búsqueda por nombre, SKU y código de barras)**.
+- Hechos: BAS-01..08, BAS-12, BAS-13; PLT-01..PLT-16 (etapa PLT completa); USR-01, USR-02, USR-03A, USR-03B, USR-04, USR-05, USR-06, USR-07, USR-08, USR-09, USR-10, USR-11, MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08, MOD-09, MOD-10, MOD-11, INV-01, INV-02, INV-03, INV-04, INV-05, INV-06, INV-07, INV-08, INV-09, INV-10, INV-13. FUN-07 aprobada por el fundador. Pospuestos por el fundador: BAS-09..11 (servidor en internet; todo corre local). FUN-01..08 son del fundador.
+- Avance: 61 de 148 pasos hasta el lanzamiento limitado (PIL-17). **Siguiente: INV-11 (búsqueda por nombre, SKU y código de barras)**; INV-13 se adelantó con Codex.
 - Detalle de decisiones e historial: `MEMORY.md` y `docs/adr/`.
 
 ## Convenciones de código
@@ -140,6 +140,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Cantidades (INV-06):** toda cantidad capturada pasa por `parseQuantity` con la regla del producto (`unitCode`, `quantityStep`); nunca `Number()` ni redondeos. Componentes cliente no importan `@/platform/*`: las opciones (unidades, precisiones) se arman en el servidor y se pasan como props (ver `unit-options.ts`).
 - **Conversión (INV-09):** todo movimiento convierte su captura con `resolveConversion(tx, productId, captura)` dentro de su transacción y guarda cantidad capturada, factor, versión de presentación y cantidad base; el navegador solo manda lo tecleado y el id de la presentación.
 - **Listas (INV-10):** toda lista que puede crecer se pagina en la base (`skip`/`take` + `count`, orden estable terminado en `id`, sobre un índice que empiece por `organizationId`); la página va en la URL (`?pagina=`) y una fuera de rango muestra la última. Ver `listProducts`.
+- **Ubicaciones (INV-13, ADR 0010):** `src/platform/locations`. Todo lo que cree una empresa (servicio, script o fixture) llama `ensureDefaultLocation(tx, organizationId)` en la misma transacción; en pruebas, `createTestOrganization` de `tests/setup/organization.ts` en vez de `db.organization.create`. Los scripts importan `@/platform/locations/bootstrap`, no el `index.ts`. La ubicación por defecto es `isDefault: true` (las demás `NULL`, nunca `false`).
 - **Bitácora (PLT-14):** todo cambio sensible de empresa llama `recordAuditEvent(clienteDeLaTransacción, { organizationId, actorUserId, action, target, reason })` dentro de la misma transacción; eventos de cuenta con `recordSecurityEvent`. Nunca pasar secretos en `metadata` (igual se depuran).
 
 ## Recuperación de contraseña (PLT-07)

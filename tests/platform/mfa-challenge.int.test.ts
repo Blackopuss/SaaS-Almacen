@@ -1,3 +1,5 @@
+import { createTestOrganization } from "../setup/organization";
+
 import { createHmac } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -198,7 +200,7 @@ describe("isMfaRequired", () => {
         emailVerified: true,
       },
     });
-    await db.organization.create({
+    await createTestOrganization({
       data: {
         id: newId(),
         name: "Ferretería de prueba",
