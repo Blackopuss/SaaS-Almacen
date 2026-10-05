@@ -11,6 +11,7 @@ import {
   registerExit,
   registerInitialBalance,
   registerTransfer,
+  reverseMovement,
   type EntryField,
 } from "@/modules/inventory";
 import { previewConversion, type Capture } from "@/platform/catalog";
@@ -258,4 +259,38 @@ export async function registerTransferAction(
   revalidatePath("/movimientos");
   revalidatePath("/inventario");
   redirect(`/movimientos?registrado=${result.movementId}`);
+}
+
+export type ReverseState =
+  { ok: true; summary: string } | { ok: false; error: string };
+
+/**
+ * Reverses a movement with a mandatory reason (INV-25). The movement is
+ * looked for only inside the company of the session.
+ */
+export async function reverseMovementAction(
+  movementId: string,
+  idempotencyKey: string,
+  reason: string,
+): Promise<ReverseState> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await reverseMovement(
+      { organizationId: organization.id, userId: user.id },
+      {
+        movementId: String(movementId),
+        reason: String(reason ?? ""),
+        idempotencyKey: String(idempotencyKey ?? ""),
+      },
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath("/movimientos");
+    revalidatePath("/inventario");
+    return { ok: true, summary: result.summary };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }

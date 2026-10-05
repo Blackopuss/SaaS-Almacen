@@ -8,19 +8,8 @@ import { migratorConnection, testDatabaseName } from "./test-db";
  */
 const REFERENCE_TABLES = ["unit"];
 
-/**
- * Runs once before integration tests: applies migrations to the test
- * database and empties every table (except reference catalogs) so each run
- * starts from a clean state.
- */
-export default async function setup(): Promise<void> {
-  const database = testDatabaseName();
-
-  execSync("npx prisma migrate deploy", {
-    stdio: "pipe",
-    env: { ...process.env, DATABASE_NAME: database },
-  });
-
+/** Empties every table except the reference catalogs. */
+async function emptyTables(database: string): Promise<void> {
   const conn = await migratorConnection();
   try {
     const tables: { name: string }[] = await conn.query(
@@ -38,4 +27,24 @@ export default async function setup(): Promise<void> {
   } finally {
     await conn.end();
   }
+}
+
+/**
+ * Runs once before integration tests: applies migrations to the test
+ * database and empties every table (except reference catalogs) so each run
+ * starts from a clean state. The tables are emptied again when the run
+ * ends: a later migration that adds a rule (a CHECK, a unique index) must
+ * never meet rows left by an older run, which would make it fail here and
+ * nowhere else.
+ */
+export default async function setup(): Promise<() => Promise<void>> {
+  const database = testDatabaseName();
+
+  execSync("npx prisma migrate deploy", {
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_NAME: database },
+  });
+
+  await emptyTables(database);
+  return () => emptyTables(database);
 }

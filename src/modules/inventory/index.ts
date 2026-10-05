@@ -16,6 +16,7 @@ export {
   registerExit,
   registerInitialBalance,
   registerTransfer,
+  reverseMovement,
 } from "./movements";
 export type {
   AdjustmentInput,
@@ -26,6 +27,8 @@ export type {
   MovementSummary,
   MovementType,
   PendingInitialBalance,
+  ReversalInput,
+  ReversalResult,
   TransferField,
   TransferInput,
   TransferResult,

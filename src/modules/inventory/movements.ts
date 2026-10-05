@@ -624,6 +624,10 @@ export type MovementSummary = {
   authorName: string | null;
   reference: string | null;
   reason: string | null;
+  /** Id of the reversal that undid this movement, when there is one. */
+  reversedByMovementId: string | null;
+  /** Movement this one undoes, when it is a reversal. */
+  reversesMovementId: string | null;
   lines: {
     productId: string;
     productName: string;
@@ -667,6 +671,8 @@ export async function listRecentMovements(
       createdByUserId: true,
       reference: true,
       reason: true,
+      reversesMovementId: true,
+      reversedBy: { select: { id: true } },
       lines: {
         orderBy: { lineNumber: "asc" },
         select: {
@@ -734,6 +740,8 @@ export async function listRecentMovements(
     authorName: names.get(movement.createdByUserId) ?? null,
     reference: movement.reference,
     reason: movement.reason,
+    reversedByMovementId: movement.reversedBy?.id ?? null,
+    reversesMovementId: movement.reversesMovementId,
     lines: movement.lines.map((line) => ({
       productId: line.productId,
       productName: line.product.name,
@@ -1499,6 +1507,317 @@ export async function registerAdjustment(
         reason: "not_allowed",
         fieldErrors: {},
         formError: KEY_REUSED,
+      };
+    }
+    throw error;
+  }
+}
+
+const reversalSchema = z.object({
+  movementId: z.string().trim().min(1).max(36),
+  /** Why the movement is undone: always required (INV-25). */
+  reason: z
+    .string()
+    .trim()
+    .regex(
+      /^[^\u0000-\u001f\u007f]*$/,
+      "Quita los saltos de línea o tabuladores.",
+    )
+    .min(
+      5,
+      "Escribe por qué se reversa, por ejemplo: se capturó en el producto equivocado.",
+    )
+    .max(500, "El motivo es demasiado largo (máximo 500 caracteres)."),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || null)
+    .refine((value) => value === null || IDEMPOTENCY_KEY.test(value), {
+      message:
+        "No pudimos identificar esta confirmación. Recarga la página e inténtalo de nuevo.",
+    }),
+});
+
+export type ReversalInput = z.input<typeof reversalSchema>;
+
+export type ReversalResult =
+  | { ok: true; movementId: string; summary: string; repeated?: true }
+  | {
+      ok: false;
+      reason: "invalid" | "not_found" | "not_allowed";
+      error: string;
+    };
+
+class ReversalRejected extends Error {
+  constructor(readonly result: Extract<ReversalResult, { ok: false }>) {
+    super("reversal rejected");
+  }
+}
+
+const stop = (
+  reason: "invalid" | "not_found" | "not_allowed",
+  error: string,
+): never => {
+  throw new ReversalRejected({ ok: false, reason, error });
+};
+
+/**
+ * Undoes a movement with a new one (INV-25). The original is never edited
+ * or deleted: the reversal copies each of its lines in the opposite
+ * direction with the SAME quantities, presentation version and factor the
+ * original used — not today's — so a box that was 100 pieces when it
+ * entered takes 100 out, even if the box is 120 now. A movement is
+ * reversed at most once, and a reversal cannot be reversed.
+ */
+export async function reverseMovement(
+  actor: InventoryActor,
+  input: ReversalInput,
+): Promise<ReversalResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.movement.reverse",
+  );
+  const parsed = reversalSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: parsed.error.issues[0]!.message,
+    };
+  }
+  const data = parsed.data;
+  const client = forOrganization(organizationId);
+
+  // Movements never change, so reading it before locking is safe; it tells
+  // which products and locations to lock.
+  const original = await client.stockMovement.findFirst({
+    where: { id: data.movementId },
+    select: {
+      id: true,
+      type: true,
+      lines: {
+        orderBy: { lineNumber: "asc" },
+        select: {
+          productId: true,
+          locationId: true,
+          direction: true,
+          capturedQuantity: true,
+          capturedUnitCode: true,
+          presentationId: true,
+          presentationVersionId: true,
+          factor: true,
+          baseQuantity: true,
+          unitCode: true,
+        },
+      },
+    },
+  });
+  if (!original) {
+    return {
+      ok: false,
+      reason: "not_found",
+      error: "Este movimiento no existe.",
+    };
+  }
+
+  try {
+    return await client.$transaction(async (tx) => {
+      await lockRows(tx, "product", [
+        ...new Set(original.lines.map((line) => line.productId)),
+      ]);
+      await lockRows(tx, "location", [
+        ...new Set(original.lines.map((line) => line.locationId)),
+      ]);
+
+      if (data.idempotencyKey) {
+        const replay = await tx.stockMovement.findFirst({
+          where: { idempotencyKey: data.idempotencyKey },
+          select: {
+            id: true,
+            type: true,
+            createdByUserId: true,
+            reversesMovementId: true,
+          },
+        });
+        if (replay) {
+          if (
+            replay.type !== "REVERSAL" ||
+            replay.createdByUserId !== userId ||
+            replay.reversesMovementId !== original.id
+          ) {
+            return stop("not_allowed", KEY_REUSED);
+          }
+          return {
+            ok: true as const,
+            movementId: replay.id,
+            repeated: true as const,
+            summary:
+              "Esta reversa ya estaba registrada. No se registró de nuevo.",
+          };
+        }
+      }
+
+      if (original.type === "REVERSAL") {
+        return stop(
+          "not_allowed",
+          "Una reversa no se puede reversar. Si hace falta, registra de nuevo el movimiento correcto.",
+        );
+      }
+      const already = await tx.stockMovement.findFirst({
+        where: { reversesMovementId: original.id },
+        select: { id: true },
+      });
+      if (already) {
+        return stop("not_allowed", "Este movimiento ya fue reversado.");
+      }
+
+      const [products, locations] = await Promise.all([
+        tx.product.findMany({
+          where: { id: { in: original.lines.map((line) => line.productId) } },
+          select: { id: true, name: true, sku: true, status: true },
+        }),
+        tx.location.findMany({
+          where: { id: { in: original.lines.map((line) => line.locationId) } },
+          select: { id: true, name: true, archivedAt: true },
+        }),
+      ]);
+      const productOf = new Map(products.map((p) => [p.id, p]));
+      const locationOf = new Map(locations.map((l) => [l.id, l]));
+
+      const movementId = newId();
+      await tx.stockMovement.create({
+        data: {
+          id: movementId,
+          organizationId,
+          type: "REVERSAL",
+          reason: data.reason,
+          idempotencyKey: data.idempotencyKey,
+          reversesMovementId: original.id,
+          createdByUserId: userId,
+        },
+      });
+
+      const effects: string[] = [];
+      let lineNumber = 0;
+      for (const line of original.lines) {
+        const product = productOf.get(line.productId);
+        const location = locationOf.get(line.locationId);
+        if (!product || !location) {
+          return stop("not_found", "Este movimiento ya no se puede reversar.");
+        }
+        if (product.status !== "ACTIVE") {
+          return stop(
+            "not_allowed",
+            `${product.name} está archivado. Reactívalo para reversar este movimiento.`,
+          );
+        }
+        const base = dec(line.baseQuantity.toString());
+        const direction = line.direction === "IN" ? "OUT" : "IN";
+        if (direction === "IN" && location.archivedAt) {
+          return stop(
+            "not_allowed",
+            `«${location.name}» está archivada: la reversa no puede devolver existencias ahí.`,
+          );
+        }
+        const current = await tx.stockBalance.findFirst({
+          where: { productId: product.id, locationId: location.id },
+          select: { id: true, quantity: true },
+        });
+        const before = dec(current?.quantity.toString() ?? 0);
+        if (direction === "OUT" && before.lessThan(base)) {
+          // MOV-01: not even a reversal leaves a location below zero.
+          return stop(
+            "invalid",
+            `No se puede reversar: habría que sacar ${formatStock(base.toString(), line.unitCode)} de ${product.name} de ${location.name} y solo hay ${formatStock(before.toString(), line.unitCode)}. Parte de esas existencias ya salió o se movió.`,
+          );
+        }
+        const after =
+          direction === "IN" ? before.plus(base) : before.minus(base);
+        if (after.greaterThan(MAX_BALANCE)) {
+          return stop("invalid", "El saldo resultante sería demasiado grande.");
+        }
+
+        // Same capture, same version, same factor as the original line.
+        await tx.stockMovementLine.create({
+          data: {
+            id: newId(),
+            organizationId,
+            movementId,
+            lineNumber: ++lineNumber,
+            productId: product.id,
+            locationId: location.id,
+            direction,
+            capturedQuantity: line.capturedQuantity.toString(),
+            capturedUnitCode: line.capturedUnitCode,
+            presentationId: line.presentationId,
+            presentationVersionId: line.presentationVersionId,
+            factor: line.factor.toString(),
+            baseQuantity: base.toString(),
+            unitCode: line.unitCode,
+          },
+        });
+        if (current) {
+          const changed = await tx.stockBalance.updateMany({
+            where: { id: current.id, quantity: before.toString() },
+            data: { quantity: after.toString() },
+          });
+          if (changed.count !== 1) {
+            throw new Error(`Balance of ${product.id} changed under its lock`);
+          }
+        } else {
+          await tx.stockBalance.create({
+            data: {
+              id: newId(),
+              organizationId,
+              productId: product.id,
+              locationId: location.id,
+              quantity: after.toString(),
+            },
+          });
+        }
+        effects.push(
+          `${direction === "IN" ? "volvieron" : "salieron"} ${formatStock(base.toString(), line.unitCode)} de ${product.name} ${direction === "IN" ? "a" : "de"} ${location.name}`,
+        );
+      }
+
+      const first = productOf.get(original.lines[0]?.productId ?? "");
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "inventory.reversed",
+        target: { type: "movement", id: original.id },
+        reason: data.reason,
+        metadata: {
+          tipo: MOVEMENT_TYPE_LABELS[original.type],
+          producto: first?.name ?? null,
+          efecto: effects.join("; "),
+          movementId,
+        },
+      });
+
+      return {
+        ok: true as const,
+        movementId,
+        summary:
+          `${MOVEMENT_TYPE_LABELS[original.type]} reversada: ${effects.join("; ")}.`.replace(
+            /^(Ajuste|Saldo inicial) reversada/,
+            "$1 reversado",
+          ),
+      };
+    }, LOCKING_TRANSACTION);
+  } catch (error) {
+    if (error instanceof ReversalRejected) return error.result;
+    if ((error as { code?: string }).code === "P2002") {
+      const target = JSON.stringify((error as { meta?: unknown }).meta ?? "");
+      return {
+        ok: false,
+        reason: "not_allowed",
+        error: target.includes("idempotencyKey")
+          ? KEY_REUSED
+          : "Este movimiento ya fue reversado.",
       };
     }
     throw error;

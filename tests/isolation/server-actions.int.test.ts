@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  reverseMovementAction: {
+    input: "id del movimiento, clave de la confirmación y motivo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el movimiento se busca solo en esa empresa",
+    coveredBy: "tests/inventory/reversals.int.test.ts",
+  },
   registerAdjustmentAction: {
     input:
       "id de producto, ubicación, cantidad contada, forma de captura, motivo y clave de la confirmación",

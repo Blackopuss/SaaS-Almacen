@@ -422,7 +422,11 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       ],
       waitsFor: "CMP-11 (no archivar con órdenes de compra abiertas)",
     },
-    "NEG-22": { waitsFor: "INV (reversas)" },
+    "NEG-22": {
+      tests: ["tests/inventory/reversals.int.test.ts"],
+      waitsFor:
+        "CMP (una recepción de compra se corrige por Compras, no por Inventario)",
+    },
     "NEG-23": { waitsFor: "INV (conteos)" },
     "NEG-24": { waitsFor: "CMP (recepciones y devoluciones)" },
     "NEG-25": { waitsFor: "CMP-16 e IMP (exportaciones y PDF)" },

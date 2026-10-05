@@ -19,9 +19,11 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib";
+import { formatDateTime, newId } from "@/lib";
 import { listRecentMovements } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
+
+import { ReverseMovement } from "./reverse-dialog";
 
 export const metadata: Metadata = { title: "Movimientos" };
 
@@ -99,6 +101,7 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const canReverse = access.allows("inventory.movement.reverse");
   const actions =
     entryButton ||
     exitButton ||
@@ -188,6 +191,9 @@ export default async function MovimientosPage({
               <li key={movement.id} className="space-y-2 p-4 sm:px-5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <Badge variant="secondary">{movement.typeLabel}</Badge>
+                  {movement.reversedByMovementId && (
+                    <Badge variant="outline">Reversado</Badge>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     <time dateTime={movement.createdAt.toISOString()}>
                       {formatDateTime(movement.createdAt)}
@@ -231,6 +237,15 @@ export default async function MovimientosPage({
                     </li>
                   ))}
                 </ul>
+                {canReverse &&
+                  movement.type !== "REVERSAL" &&
+                  !movement.reversedByMovementId && (
+                    <ReverseMovement
+                      movementId={movement.id}
+                      idempotencyKey={newId()}
+                      description={`${movement.typeLabel} de ${movement.lines[0]?.quantity ?? ""} de ${movement.lines[0]?.productName ?? ""}`}
+                    />
+                  )}
                 {(movement.reference || movement.reason) && (
                   <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
                     {[

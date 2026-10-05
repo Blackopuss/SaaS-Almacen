@@ -127,6 +127,10 @@ async function movement(
       organizationId: f.actor.organizationId,
       type: "ENTRY",
       createdByUserId: f.actor.userId,
+      // Adjustments and reversals always say why (INV-24, INV-25).
+      ...(data.type === "ADJUSTMENT" || data.type === "REVERSAL"
+        ? { reason: "Motivo de prueba" }
+        : {}),
       ...data,
     },
   });
