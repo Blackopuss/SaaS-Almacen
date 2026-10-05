@@ -579,7 +579,9 @@ model Product {
   @@unique([organizationId, id])
   @@unique([organizationId, sku])
   @@unique([organizationId, barcode])
-  @@index([organizationId, status, name])
+  /// List and search (INV-10/11): the order by name and the three searched
+  /// columns live in one index, so a search never reads the whole table.
+  @@index([organizationId, status, name, sku, barcode])
   @@index([organizationId, categoryId])
   @@index([organizationId, brandId])
   @@map("product")

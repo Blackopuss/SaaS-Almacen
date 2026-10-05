@@ -5,6 +5,7 @@ export {
   getProduct,
   listProductGroups,
   listProducts,
+  normalizeSearch,
   PRODUCT_PAGE_SIZE,
   productSchema,
   quotaMessage,

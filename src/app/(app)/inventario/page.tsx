@@ -5,8 +5,10 @@ import {
   Package,
   Pencil,
   Plus,
+  Search,
 } from "lucide-react";
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
 
 import {
@@ -18,14 +20,15 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getModuleAccess } from "@/platform/billing";
-import { listProducts } from "@/platform/catalog";
+import { listProducts, type ProductSummary } from "@/platform/catalog";
 
 import { ReactivateProduct } from "./product-status";
 
 export const metadata: Metadata = { title: "Inventario" };
 
-/** Catalog of the company, one page at a time (INV-10). Search arrives with INV-11. */
+/** Catalog of the company, one page at a time (INV-10), with search (INV-11). */
 export default async function InventarioPage({
   searchParams,
 }: PageProps<"/inventario">) {
@@ -46,7 +49,7 @@ export default async function InventarioPage({
     );
   }
 
-  const { creado, guardado, archivado, archivados, pagina } =
+  const { creado, guardado, archivado, archivados, pagina, q } =
     await searchParams;
   const showArchived = archivados === "1";
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
@@ -61,7 +64,9 @@ export default async function InventarioPage({
   const list = await listProducts(actor, {
     status: showArchived ? "ARCHIVED" : "ACTIVE",
     page: requested,
+    search: typeof q === "string" ? q : "",
   });
+  const search = list.search;
   const products = list.items;
   const first = (list.page - 1) * list.pageSize + 1;
   const last = first + products.length - 1;
@@ -70,11 +75,38 @@ export default async function InventarioPage({
   const pageHref = (page: number) => {
     const params = new URLSearchParams();
     if (showArchived) params.set("archivados", "1");
+    if (search) params.set("q", search);
     if (page > 1) params.set("pagina", String(page));
     const query = params.toString();
     return query ? `/inventario?${query}` : "/inventario";
   };
   const canReactivate = access.allows("inventory.product.reactivate");
+  const row = (product: ProductSummary) => (
+    <li key={product.id} className="flex items-center gap-3 p-4 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{product.name}</p>
+        <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+          {[product.sku, product.category, product.brand]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </div>
+      {showArchived && canReactivate && (
+        <ReactivateProduct productId={product.id} name={product.name} />
+      )}
+      {!showArchived && canEdit && (
+        <Button asChild variant="ghost">
+          <Link
+            href={`/inventario/${product.id}/editar`}
+            aria-label={`Editar ${product.name}`}
+          >
+            <Pencil aria-hidden="true" />
+            <span className="hidden sm:inline">Editar</span>
+          </Link>
+        </Button>
+      )}
+    </li>
+  );
   // Shown only to who may add products, and only while the plan allows it.
   const addButton = access.allows("inventory.product.create") ? (
     <Button asChild>
@@ -142,8 +174,81 @@ export default async function InventarioPage({
           {showArchived ? "Ver productos activos" : "Ver productos archivados"}
         </Link>
       </p>
+      {(list.total > 0 || search) && (
+        <Form
+          action="/inventario"
+          role="search"
+          className="flex max-w-xl items-center gap-2"
+        >
+          {showArchived && <input type="hidden" name="archivados" value="1" />}
+          <label htmlFor="q" className="sr-only">
+            {showArchived
+              ? "Buscar en productos archivados"
+              : "Buscar productos"}
+          </label>
+          <Input
+            id="q"
+            name="q"
+            type="search"
+            defaultValue={search}
+            // The page keeps the box when the search changes: remount it so
+            // it shows what was applied.
+            key={search}
+            placeholder="Nombre, clave o código de barras"
+            maxLength={100}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            enterKeyHint="search"
+          />
+          <Button type="submit" variant="outline">
+            <Search aria-hidden="true" data-icon="inline-start" />
+            Buscar
+          </Button>
+        </Form>
+      )}
+      {search && (
+        <p className="text-sm" role="status">
+          {list.total === 0
+            ? "Sin resultados"
+            : list.total === 1
+              ? "1 resultado"
+              : `${count(list.total)} resultados`}{" "}
+          para <span className="font-medium">«{search}»</span>.{" "}
+          <Link
+            href={showArchived ? "/inventario?archivados=1" : "/inventario"}
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Quitar búsqueda
+          </Link>
+        </p>
+      )}
+      {list.exact && list.total > 1 && (
+        <section
+          aria-labelledby="coincidencia-exacta"
+          className="rounded-xl border border-primary/40 bg-card"
+        >
+          <h2
+            id="coincidencia-exacta"
+            className="border-b p-4 text-sm font-medium text-muted-foreground sm:px-5"
+          >
+            Coincidencia exacta de clave o código de barras
+          </h2>
+          <ul>{row(list.exact)}</ul>
+        </section>
+      )}
       {products.length === 0 ? (
-        showArchived ? (
+        search ? (
+          <EmptyState
+            icon={Search}
+            title="No encontramos productos"
+            description={
+              showArchived
+                ? "Ningún producto archivado coincide. Revisa cómo está escrito o busca con menos palabras."
+                : "Ningún producto coincide. Revisa cómo está escrito, busca con menos palabras o mira en los archivados."
+            }
+          />
+        ) : showArchived ? (
           <EmptyState
             icon={Package}
             title="No hay productos archivados"
@@ -172,40 +277,7 @@ export default async function InventarioPage({
                 : `${count(first)}–${count(last)} de ${count(list.total)} productos`}
             </p>
           </div>
-          <ul className="divide-y">
-            {products.map((product) => (
-              <li
-                key={product.id}
-                className="flex items-center gap-3 p-4 sm:px-5"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                    {[product.sku, product.category, product.brand]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                {showArchived && canReactivate && (
-                  <ReactivateProduct
-                    productId={product.id}
-                    name={product.name}
-                  />
-                )}
-                {!showArchived && canEdit && (
-                  <Button asChild variant="ghost">
-                    <Link
-                      href={`/inventario/${product.id}/editar`}
-                      aria-label={`Editar ${product.name}`}
-                    >
-                      <Pencil aria-hidden="true" />
-                      <span className="hidden sm:inline">Editar</span>
-                    </Link>
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+          <ul className="divide-y">{products.map(row)}</ul>
           {list.pageCount > 1 && (
             <nav
               aria-label="Páginas de la lista"

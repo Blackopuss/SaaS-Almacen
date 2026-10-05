@@ -245,18 +245,85 @@ export const PRODUCT_PAGE_SIZE = 25;
 
 export type ProductPage = {
   items: ProductSummary[];
-  /** Products of the company with that status, in every page. */
+  /** Products that match, in every page. */
   total: number;
   /** Page actually returned (1-based); a page past the end becomes the last. */
   page: number;
   pageSize: number;
   pageCount: number;
+  /** The search as it was applied (trimmed and bounded); "" without one. */
+  search: string;
+  /**
+   * The product whose code (SKU) or barcode is exactly what was searched,
+   * if any: what a scanner or a typed code is looking for, wherever it
+   * falls in the list.
+   */
+  exact: ProductSummary | null;
 };
 
+/** Longest search accepted and how many words of it are used. */
+const SEARCH_MAX_LENGTH = 100;
+const SEARCH_MAX_TERMS = 6;
+
+/** What a person typed in the search box, without control characters or extra spaces. */
+export function normalizeSearch(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, SEARCH_MAX_LENGTH)
+    .trim();
+}
+
+/** `%`, `_` and `\` are text to find, not wildcards. */
+const literal = (term: string) => term.replace(/[\\%_]/g, "\\$&");
+
+const SUMMARY_SELECT = {
+  id: true,
+  sku: true,
+  name: true,
+  barcode: true,
+  unitCode: true,
+  quantityStep: true,
+  createdAt: true,
+  category: { select: { name: true } },
+  brand: { select: { name: true } },
+} as const;
+
+type SummaryRow = {
+  id: string;
+  sku: string;
+  name: string;
+  barcode: string | null;
+  unitCode: string;
+  quantityStep: { toString(): string };
+  createdAt: Date;
+  category: { name: string } | null;
+  brand: { name: string } | null;
+};
+
+const toSummary = (row: SummaryRow): ProductSummary => ({
+  id: row.id,
+  sku: row.sku,
+  name: row.name,
+  category: row.category?.name ?? null,
+  brand: row.brand?.name ?? null,
+  barcode: row.barcode,
+  unitCode: row.unitCode,
+  quantityStep: row.quantityStep.toString(),
+  createdAt: row.createdAt,
+});
+
 /**
- * One page of the catalog, by name (INV-10). The database counts and cuts
- * the page with the index of company, status and name; the list is never
- * loaded whole, whatever the size of the catalog.
+ * One page of the catalog, by name (INV-10), optionally narrowed by a
+ * search (INV-11): every word typed must appear in the name, the code
+ * (SKU) or the barcode, without distinguishing capitals or accents.
+ *
+ * The database counts, filters and cuts the page inside one index (company,
+ * status, name, SKU, barcode); the catalog is never loaded whole. The SKU,
+ * unique in the company, breaks ties between equal names so pages never
+ * overlap.
  */
 export async function listProducts(
   actor: CatalogActor,
@@ -264,6 +331,7 @@ export async function listProducts(
     status?: "ACTIVE" | "ARCHIVED";
     page?: number;
     pageSize?: number;
+    search?: string;
   } = {},
 ): Promise<ProductPage> {
   await assertModulePermission(
@@ -271,46 +339,54 @@ export async function listProducts(
     actor.userId,
     "inventory.product.read",
   );
-  const status = options.status === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
+  const status: "ACTIVE" | "ARCHIVED" =
+    options.status === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
   const pageSize = clampInteger(options.pageSize, 1, 100, PRODUCT_PAGE_SIZE);
+  const search = normalizeSearch(options.search);
+  const where = {
+    status,
+    AND: search
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, SEARCH_MAX_TERMS)
+      .map((term) => {
+        const contains = literal(term);
+        return {
+          OR: [
+            { name: { contains } },
+            { sku: { contains } },
+            { barcode: { contains } },
+          ],
+        };
+      }),
+  };
   const client = forOrganization(actor.organizationId);
-  const total = await client.product.count({ where: { status } });
+  const [total, exact] = await Promise.all([
+    client.product.count({ where }),
+    search
+      ? client.product.findFirst({
+          where: { status, OR: [{ sku: search }, { barcode: search }] },
+          select: SUMMARY_SELECT,
+        })
+      : null,
+  ]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const page = clampInteger(options.page, 1, pageCount, 1);
   const rows = await client.product.findMany({
-    where: { status },
-    // The id breaks ties between equal names so pages never overlap.
-    orderBy: [{ name: "asc" }, { id: "asc" }],
+    where,
+    orderBy: [{ name: "asc" }, { sku: "asc" }],
     skip: (page - 1) * pageSize,
     take: pageSize,
-    select: {
-      id: true,
-      sku: true,
-      name: true,
-      barcode: true,
-      unitCode: true,
-      quantityStep: true,
-      createdAt: true,
-      category: { select: { name: true } },
-      brand: { select: { name: true } },
-    },
+    select: SUMMARY_SELECT,
   });
   return {
-    items: rows.map((row) => ({
-      id: row.id,
-      sku: row.sku,
-      name: row.name,
-      category: row.category?.name ?? null,
-      brand: row.brand?.name ?? null,
-      barcode: row.barcode,
-      unitCode: row.unitCode,
-      quantityStep: row.quantityStep.toString(),
-      createdAt: row.createdAt,
-    })),
+    items: rows.map(toSummary),
     total,
     page,
     pageSize,
     pageCount,
+    search,
+    exact: exact ? toSummary(exact) : null,
   };
 }
 
