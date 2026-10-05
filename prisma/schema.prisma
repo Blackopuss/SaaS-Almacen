@@ -142,6 +142,7 @@ model Organization {
   stockCountLines      StockCountLine[]
   stockCountCaptures   StockCountCapture[]
   jobs                 Job[]
+  storedFiles          StoredFile[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -971,4 +972,31 @@ model Job {
   @@index([status, runAt])
   @@index([organizationId, type, createdAt])
   @@map("job")
+}
+
+/// A private file of a company (IMP-02): what it uploaded to import, what
+/// was generated for it to download. The row says whose it is; the bytes
+/// live in the file storage under a key that starts with the company.
+model StoredFile {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// What it is for: "import_source", "export". Decides who may read it.
+  purpose         String       @db.VarChar(40)
+  /// Name shown to people; never used as a path.
+  name            String       @db.VarChar(160)
+  /// Decided by the server from the extension, not by the browser.
+  contentType     String       @db.VarChar(100)
+  size            Int
+  sha256          String       @db.Char(64)
+  /// Where the bytes are in the storage: "<organizationId>/<id>".
+  storageKey      String       @db.VarChar(100)
+  createdByUserId String       @db.Char(36)
+  createdAt       DateTime     @default(now()) @db.DateTime(3)
+  /// Set when it was removed; the bytes are gone, the row stays as a trace.
+  deletedAt       DateTime?    @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, purpose, createdAt])
+  @@map("stored_file")
 }

@@ -48,6 +48,7 @@ export const TENANT_MODELS = [
   "StockMinimum",
   "StockMovement",
   "StockMovementLine",
+  "StoredFile",
   "Subscription",
   "SubscriptionItem",
 ] as const;

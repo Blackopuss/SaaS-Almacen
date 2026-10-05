@@ -1,4 +1,6 @@
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -9,6 +11,8 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 process.env.DATABASE_NAME = process.env.DATABASE_TEST_NAME ?? "almacen_test";
 // Emails are captured in memory so tests can read them (PLT-03).
 process.env.MAIL_DRIVER = "memory";
+// Private files of tests go to a throwaway folder, never to ./storage.
+process.env.FILE_STORAGE_DIR = path.join(tmpdir(), "almacen-test-storage");
 
 const src = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 

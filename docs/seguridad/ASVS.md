@@ -18,7 +18,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V3 | Cookies seguras | Cumple | ADR 0003 «Sesiones, cookies y CSRF». |
 | V3 | CSRF / origen | Cumple | Revisión de origen de Better Auth forzada en todos los entornos; Server Actions con revisión de origen de Next. |
 | V4 API y servicios web | Superficie HTTP mínima | Cumple | Lista de permitidos `/api/auth` (`http.ts`, `http-surface.int.test.ts`). |
-| V5 Manejo de archivos | Importación y descargas | Pendiente | IMP-01/02, IMP-11. |
+| V5 Manejo de archivos | Importación y descargas | Parcial | Archivos privados por empresa fuera de la raíz web, tipo y tamaño decididos por el servidor, descarga por enlace firmado de 5 min ligado a sesión y empresa (ADR 0014, `files.int.test.ts`). Falta: lectura segura del contenido (IMP-04) y exportación protegida contra fórmulas (IMP-11). |
 | V6 Autenticación | Política de contraseñas (12–128, sin reglas de composición, pegar permitido) | Cumple | `register.ts`, `password.ts`. |
 | V6 | Almacenamiento de contraseñas | Cumple | scrypt con parámetros OWASP (`password.ts`, ADR 0003). |
 | V6 | Sin enumeración de cuentas (mensajes y tiempos) | Cumple | Respuestas neutrales; hash simulado; correos después de responder (PLT16-03). |

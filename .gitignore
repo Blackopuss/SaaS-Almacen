@@ -55,3 +55,6 @@ __pycache__/
 
 # local outbox and other machine-local data
 /.local/
+
+# private files of companies in development (IMP-02)
+/storage

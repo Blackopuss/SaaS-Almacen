@@ -93,6 +93,7 @@ const tenantData = {
     "src/modules/**/*.{ts,tsx}",
     "src/platform/catalog/**/*.{ts,tsx}",
     "src/platform/contacts/**/*.{ts,tsx}",
+    "src/platform/files/**/*.{ts,tsx}",
     "src/platform/locations/**/*.{ts,tsx}",
   ],
   rules: {

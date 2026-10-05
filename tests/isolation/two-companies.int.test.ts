@@ -230,6 +230,19 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.storedFile.create({
+      data: {
+        id: newId(),
+        organizationId,
+        purpose: "import_source",
+        name: "productos.csv",
+        contentType: "text/csv",
+        size: 3,
+        sha256: "0".repeat(64),
+        storageKey: `${organizationId}/prueba`,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     await db.job.create({
       data: {
         id: newId(),

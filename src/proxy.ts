@@ -18,6 +18,7 @@ const PROTECTED = [
   "/activa-dos-pasos",
   "/crear-empresa",
   "/interno",
+  "/api/archivos",
 ];
 
 export default function proxy(request: NextRequest) {
