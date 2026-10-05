@@ -307,11 +307,20 @@ En todo momento tus existencias siguen iguales: capturar no mueve nada. Aplicar 
 
 Un movimiento en otra ubicación, o anterior a que contaras ese producto, no aparece como «posterior».
 
+**F16. Aplicar un conteo**
+
+1. En un conteo abierto con productos contados aparece «Aplicar conteo». Ábrelo: te dice cuántos productos se ajustarán y pide el motivo (obligatorio).
+2. Aplica. Deberías ver: el conteo queda «Aplicado», sin captura ni botones, con el enlace «Ver el ajuste en Movimientos»; en el historial hay un solo «Ajuste» con una línea por producto distinto, tu motivo y la referencia «Conteo de <ubicación>»; las existencias quedan como lo contado (menos o más lo que se haya movido después de contar).
+3. Da doble clic al aplicar, o abre el conteo en dos pestañas y aplica en ambas: debe quedar un solo ajuste.
+4. Si todo coincidía, se cierra sin ajuste («Todo coincidía»).
+5. Con un producto en conflicto (F15) el botón no aparece hasta recontarlo.
+6. El ajuste se puede reversar desde Movimientos como cualquier otro; el conteo sigue aplicado y no vuelve a ajustar.
+7. Queda en la bitácora («Aplicó un conteo físico») con el motivo.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Aplicar las diferencias de un conteo como ajustes (hoy solo se captura y se compara).
 - Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores.
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).

@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { dec, formatDecimal, newId, type Decimal } from "@/lib";
+import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import {
   pluralizeName,
@@ -668,6 +669,8 @@ export type CountLine = {
 export type CountDetail = CountSummary & {
   locationId: string;
   closedByName: string | null;
+  /** Adjustment written when it was applied with differences (INV-33). */
+  appliedMovementId: string | null;
   lines: CountLine[];
   /** Lines whose count differs from the system. */
   differences: number;
@@ -700,6 +703,7 @@ export async function getCount(
       startedByUserId: true,
       closedAt: true,
       closedByUserId: true,
+      appliedMovementId: true,
       location: { select: locationSelect },
       lines: {
         orderBy: [{ countedAt: "desc" }, { id: "desc" }],
@@ -865,6 +869,7 @@ export async function getCount(
     closedByName: count.closedByUserId
       ? (names.get(count.closedByUserId) ?? null)
       : null,
+    appliedMovementId: count.appliedMovementId,
     products: lines.length,
     lines,
     differences: lines.filter((line) => line.difference !== "0").length,
@@ -918,5 +923,325 @@ function sinceCounted(
       unitCode,
     ),
     conflict: target.isNegative(),
+  };
+}
+
+/** A balance beyond this is a mistake, not stock. */
+const MAX_BALANCE = "999999999999.999";
+
+const applySchema = z.object({
+  countId: z.string().trim().min(1).max(36),
+  /** Why stock is being corrected: always required (FUN-07). */
+  reason: z
+    .string()
+    .trim()
+    .regex(
+      /^[^\u0000-\u001f\u007f]*$/,
+      "Quita los saltos de línea o tabuladores.",
+    )
+    .min(
+      5,
+      "Escribe el motivo, por ejemplo: conteo de cierre de mes o revisión por faltante.",
+    )
+    .max(500, "El motivo es demasiado largo (máximo 500 caracteres)."),
+});
+
+export type ApplyCountResult =
+  | {
+      ok: true;
+      /** Null when nothing differed: the count closed without adjusting. */
+      movementId: string | null;
+      /** Products whose stock was corrected. */
+      adjusted: number;
+      /** «Conteo aplicado: se ajustaron 3 productos.» */
+      summary: string;
+      /** It had already been applied: nothing was written now. */
+      repeated?: true;
+    }
+  | (Failure<"reason"> & {
+      /** Products that must be counted again before applying. */
+      conflicts?: string[];
+    });
+
+/**
+ * Applies a count (INV-33): every difference becomes a line of one
+ * adjustment, with the reason, and the count is closed for good.
+ *
+ * Applying twice never adjusts twice: the count is locked and read again
+ * inside the transaction — an applied one only answers what it did — and
+ * the adjustment carries a key derived from the count, which the database
+ * keeps unique.
+ *
+ * What moved after each product was counted is respected (INV-32): the
+ * line adds or takes the difference found then; it does not force today's
+ * balance to what was counted.
+ */
+export async function applyCount(
+  actor: InventoryActor,
+  input: { countId: string; reason: string },
+): Promise<ApplyCountResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(organizationId, userId, "inventory.count.apply");
+  // Applying writes adjustments: it takes that permission too (matrix).
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.adjustment.create",
+  );
+  const parsed = applySchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]!;
+    return {
+      ok: false,
+      reason: "invalid",
+      field: issue.path[0] === "reason" ? "reason" : undefined,
+      error: issue.message,
+    };
+  }
+  const data = parsed.data;
+  const client = forOrganization(organizationId);
+
+  // Products are locked before the count (the order every movement and
+  // capture uses), so they have to be known first. If a capture adds a
+  // product in between, the check inside notices and this starts over.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const known = await client.stockCountLine.findMany({
+      where: { countId: data.countId },
+      take: COUNT_MAX_LINES,
+      select: { productId: true },
+    });
+    try {
+      const result = await client.$transaction(
+        async (tx) => {
+          const locked = new Set(
+            await lockRows(
+              tx,
+              "product",
+              known.map((line) => line.productId),
+            ),
+          );
+          const [countId] = await lockRows(tx, "stockCount", [data.countId]);
+          const count = countId
+            ? await tx.stockCount.findFirst({
+                where: { id: countId },
+                select: {
+                  id: true,
+                  status: true,
+                  locationId: true,
+                  appliedMovementId: true,
+                  location: { select: { name: true } },
+                  lines: {
+                    take: COUNT_MAX_LINES,
+                    orderBy: [{ countedAt: "asc" }, { id: "asc" }],
+                    select: {
+                      productId: true,
+                      systemQuantity: true,
+                      unitCode: true,
+                      product: { select: { name: true } },
+                      captures: {
+                        take: MAX_CAPTURES,
+                        select: { baseQuantity: true },
+                      },
+                    },
+                  },
+                },
+              })
+            : null;
+          if (!count) return reject("not_found", "Este conteo ya no existe.");
+          if (count.status === "APPLIED") {
+            const adjusted = count.appliedMovementId
+              ? await tx.stockMovementLine.count({
+                  where: { movementId: count.appliedMovementId },
+                })
+              : 0;
+            return {
+              ok: true as const,
+              movementId: count.appliedMovementId,
+              adjusted,
+              repeated: true as const,
+              summary: "Este conteo ya estaba aplicado. No se ajustó de nuevo.",
+            };
+          }
+          if (count.status !== "OPEN") return reject("not_allowed", NOT_OPEN);
+          if (count.lines.length === 0) {
+            return reject(
+              "not_allowed",
+              "Este conteo no tiene productos contados: no hay nada que aplicar.",
+            );
+          }
+          if (count.lines.some((line) => !locked.has(line.productId))) {
+            // Someone captured another product meanwhile: start over.
+            return "retry" as const;
+          }
+
+          const balances = new Map(
+            (
+              await tx.stockBalance.findMany({
+                where: {
+                  locationId: count.locationId,
+                  productId: { in: [...locked] },
+                },
+                select: { id: true, productId: true, quantity: true },
+              })
+            ).map((balance) => [balance.productId, balance]),
+          );
+          const conflicts: string[] = [];
+          const adjustments: {
+            productId: string;
+            unitCode: string;
+            direction: "IN" | "OUT";
+            amount: string;
+            balanceId: string | null;
+          }[] = [];
+          for (const line of count.lines) {
+            const counted = line.captures.reduce(
+              (sum, capture) => sum.plus(capture.baseQuantity.toString()),
+              dec(0),
+            );
+            const difference = counted.minus(line.systemQuantity.toString());
+            if (difference.isZero()) continue;
+            const balance = balances.get(line.productId);
+            const target = dec(balance?.quantity.toString() ?? 0).plus(
+              difference,
+            );
+            if (target.isNegative() || target.greaterThan(MAX_BALANCE)) {
+              conflicts.push(line.product.name);
+              continue;
+            }
+            adjustments.push({
+              productId: line.productId,
+              unitCode: line.unitCode,
+              direction: difference.isPositive() ? "IN" : "OUT",
+              amount: difference.abs().toString(),
+              balanceId: balance?.id ?? null,
+            });
+          }
+          if (conflicts.length > 0) {
+            throw new Rejected<"reason">({
+              ok: false,
+              reason: "not_allowed",
+              error:
+                conflicts.length === 1
+                  ? `${conflicts[0]} se movió después de contarlo y su diferencia ya no cabe. Vuelve a contarlo antes de aplicar.`
+                  : `${conflicts.length} productos se movieron después de contarlos y su diferencia ya no cabe. Vuelve a contarlos antes de aplicar.`,
+              conflicts,
+            } as Failure<"reason">);
+          }
+
+          let movementId: string | null = null;
+          if (adjustments.length > 0) {
+            movementId = newId();
+            await tx.stockMovement.create({
+              data: {
+                id: movementId,
+                organizationId,
+                type: "ADJUSTMENT",
+                reason: data.reason,
+                reference: `Conteo de ${count.location.name}`.slice(0, 120),
+                // One adjustment per count, also for the database.
+                idempotencyKey: `count-${count.id}`,
+                createdByUserId: userId,
+              },
+            });
+            await tx.stockMovementLine.createMany({
+              data: adjustments.map((adjustment, index) => ({
+                id: newId(),
+                organizationId,
+                movementId: movementId!,
+                lineNumber: index + 1,
+                productId: adjustment.productId,
+                locationId: count.locationId,
+                direction: adjustment.direction,
+                // The difference, in the product's unit: that is what moves.
+                capturedQuantity: adjustment.amount,
+                factor: "1",
+                baseQuantity: adjustment.amount,
+                unitCode: adjustment.unitCode,
+              })),
+            });
+            for (const adjustment of adjustments) {
+              if (adjustment.direction === "OUT") {
+                const changed = await tx.stockBalance.updateMany({
+                  where: {
+                    id: adjustment.balanceId ?? "",
+                    quantity: { gte: adjustment.amount },
+                  },
+                  data: { quantity: { decrement: adjustment.amount } },
+                });
+                if (changed.count !== 1) {
+                  throw new Error(
+                    `Balance of ${adjustment.productId} changed under its lock`,
+                  );
+                }
+              } else if (adjustment.balanceId) {
+                await tx.stockBalance.updateMany({
+                  where: { id: adjustment.balanceId },
+                  data: { quantity: { increment: adjustment.amount } },
+                });
+              } else {
+                await tx.stockBalance.create({
+                  data: {
+                    id: newId(),
+                    organizationId,
+                    productId: adjustment.productId,
+                    locationId: count.locationId,
+                    quantity: adjustment.amount,
+                  },
+                });
+              }
+            }
+          }
+
+          await tx.stockCount.updateMany({
+            where: { id: count.id },
+            data: {
+              status: "APPLIED",
+              openLocationId: null,
+              closedAt: new Date(),
+              closedByUserId: userId,
+              appliedMovementId: movementId,
+            },
+          });
+          await recordAuditEvent(tx, {
+            organizationId,
+            actorUserId: userId,
+            action: "inventory.count_applied",
+            target: { type: "stock_count", id: count.id },
+            reason: data.reason,
+            metadata: {
+              ubicacion: count.location.name,
+              productosContados: count.lines.length,
+              productosAjustados: adjustments.length,
+              movementId,
+            },
+          });
+
+          const n = adjustments.length;
+          return {
+            ok: true as const,
+            movementId,
+            adjusted: n,
+            summary:
+              n === 0
+                ? "Conteo aplicado: todo coincidía, no hubo nada que ajustar."
+                : n === 1
+                  ? "Conteo aplicado: se ajustó 1 producto."
+                  : `Conteo aplicado: se ajustaron ${n.toLocaleString("es-MX")} productos.`,
+          };
+        },
+        // A long count writes many lines: give it room.
+        { ...LOCKING_TRANSACTION, timeout: 60_000, maxWait: 15_000 },
+      );
+      if (result !== "retry") return result;
+    } catch (error) {
+      if (error instanceof Rejected) return error.result as ApplyCountResult;
+      throw error;
+    }
+  }
+  return {
+    ok: false,
+    reason: "not_allowed",
+    error:
+      "El conteo sigue recibiendo capturas. Espera a que terminen e inténtalo de nuevo.",
   };
 }

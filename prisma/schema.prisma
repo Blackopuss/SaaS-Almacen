@@ -743,6 +743,7 @@ model StockMovement {
   createdByUserId    String              @db.Char(36)
   createdAt          DateTime            @default(now()) @db.DateTime(3)
   lines              StockMovementLine[]
+  appliedCount       StockCount?
 
   @@unique([organizationId, id])
   @@unique([organizationId, idempotencyKey])
@@ -851,24 +852,29 @@ enum StockCountStatus {
 /// they find; the system compares it with its balance. Capturing never
 /// changes stock: only applying the count does (INV-33).
 model StockCount {
-  id              String           @id @db.Char(36)
-  organizationId  String           @db.Char(36)
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  locationId      String           @db.Char(36)
-  location        Location         @relation(fields: [organizationId, locationId], references: [organizationId, id], onDelete: Restrict)
-  status          StockCountStatus @default(OPEN)
+  id                String           @id @db.Char(36)
+  organizationId    String           @db.Char(36)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  locationId        String           @db.Char(36)
+  location          Location         @relation(fields: [organizationId, locationId], references: [organizationId, id], onDelete: Restrict)
+  status            StockCountStatus @default(OPEN)
   /// The location while the count is open, null afterwards: the unique
   /// index below allows one open count per location.
-  openLocationId  String?          @db.Char(36)
-  note            String?          @db.VarChar(200)
-  startedAt       DateTime         @default(now()) @db.DateTime(3)
-  startedByUserId String           @db.Char(36)
-  closedAt        DateTime?        @db.DateTime(3)
-  closedByUserId  String?          @db.Char(36)
-  lines           StockCountLine[]
+  openLocationId    String?          @db.Char(36)
+  note              String?          @db.VarChar(200)
+  startedAt         DateTime         @default(now()) @db.DateTime(3)
+  startedByUserId   String           @db.Char(36)
+  closedAt          DateTime?        @db.DateTime(3)
+  closedByUserId    String?          @db.Char(36)
+  /// The adjustment that applied its differences (INV-33); null when it
+  /// was applied without differences, cancelled or still open.
+  appliedMovementId String?          @db.Char(36)
+  appliedMovement   StockMovement?   @relation(fields: [organizationId, appliedMovementId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  lines             StockCountLine[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, openLocationId])
+  @@unique([organizationId, appliedMovementId])
   @@index([organizationId, status, startedAt])
   @@map("stock_count")
 }

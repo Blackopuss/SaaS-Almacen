@@ -16,7 +16,7 @@ import { getCount } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
 import { CaptureForm } from "./capture-form";
-import { CancelCount, RemoveCapture } from "./count-controls";
+import { ApplyCount, CancelCount, RemoveCapture } from "./count-controls";
 
 export const metadata: Metadata = { title: "Conteo" };
 
@@ -68,6 +68,14 @@ export default async function ConteoPage({
     moduleState === "active" &&
     access.allows("inventory.count.update") &&
     access.can("inventory.product.read");
+  // Applying writes adjustments: it takes both permissions (INV-33).
+  const canApply =
+    open &&
+    moduleState === "active" &&
+    count.lines.length > 0 &&
+    count.conflicts === 0 &&
+    access.allows("inventory.count.apply") &&
+    access.allows("inventory.adjustment.create");
   const person = (name: string | null) =>
     name ?? "alguien que ya no está en el equipo";
 
@@ -78,7 +86,19 @@ export default async function ConteoPage({
       <PageHeader
         title={`Conteo de ${count.location}`}
         description={count.note ?? undefined}
-        actions={canCapture ? <CancelCount countId={count.id} /> : undefined}
+        actions={
+          canCapture || canApply ? (
+            <>
+              {canApply && (
+                <ApplyCount
+                  countId={count.id}
+                  differences={count.differences}
+                />
+              )}
+              {canCapture && <CancelCount countId={count.id} />}
+            </>
+          ) : undefined
+        }
       />
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Badge variant={open ? "default" : "secondary"}>
@@ -102,6 +122,23 @@ export default async function ConteoPage({
         )}
       </p>
 
+      {count.status === "APPLIED" && (
+        <p className="text-sm">
+          {count.appliedMovementId ? (
+            <>
+              Sus diferencias se aplicaron como un ajuste.{" "}
+              <Link
+                href={`/movimientos?registrado=${count.appliedMovementId}`}
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Ver el ajuste en Movimientos
+              </Link>
+            </>
+          ) : (
+            "Todo coincidía: se cerró sin ajustar existencias."
+          )}
+        </p>
+      )}
       {count.conflicts > 0 && (
         <div
           role="alert"
@@ -280,7 +317,8 @@ export default async function ConteoPage({
         <p className="text-sm text-muted-foreground">
           Capturar no cambia tus existencias. Cada diferencia se compara con lo
           que el sistema tenía al contar ese producto; lo que se mueva después
-          se respeta y se muestra aquí.
+          se respeta y se muestra aquí. Al terminar, «Aplicar conteo» registra
+          las diferencias como un ajuste.
         </p>
       )}
     </PageContainer>

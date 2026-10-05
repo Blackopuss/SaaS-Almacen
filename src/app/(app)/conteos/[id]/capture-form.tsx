@@ -38,7 +38,10 @@ export function CaptureForm({ countId }: { countId: string }) {
     warning?: boolean;
   } | null>(null);
   const [searching, startSearch] = useTransition();
-  const [saving, startSave] = useTransition();
+  // Not a transition: one would stay pending until the list repaints, and
+  // a capture typed meanwhile — a reader is that fast — would be dropped.
+  const [saving, setSaving] = useState(false);
+  const busy = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(0);
 
@@ -121,40 +124,44 @@ export function CaptureForm({ countId }: { countId: string }) {
     }, 300);
   }
 
-  function save() {
-    if (!product || saving) return;
+  async function save() {
+    // Only a capture still on its way holds the next one back.
+    if (!product || busy.current) return;
+    busy.current = true;
+    setSaving(true);
     setError(null);
-    startSave(async () => {
-      try {
-        const result = await captureCountAction(
-          countId,
-          product.id,
-          capture,
-          quantity,
-        );
-        if (!result.ok) {
-          setError(result.error);
-          if (result.field !== "productId") quantityRef.current?.focus();
-          return;
-        }
-        setNotice({
-          text: result.mixed
-            ? `${result.summary} Capturaste empaques y sueltos: revisa que no se hayan contado dos veces.`
-            : result.summary,
-          warning: result.mixed,
-        });
-        latest.current++;
-        setProduct(null);
-        setQuantity("");
-        setPreview(null);
-        // Ready for the next product.
-        requestAnimationFrame(() => searchRef.current?.focus());
-      } catch {
-        setError(
-          "No pudimos guardar la captura. Revisa tu conexión e inténtalo de nuevo.",
-        );
+    try {
+      const result = await captureCountAction(
+        countId,
+        product.id,
+        capture,
+        quantity,
+      );
+      if (!result.ok) {
+        setError(result.error);
+        if (result.field !== "productId") quantityRef.current?.focus();
+        return;
       }
-    });
+      setNotice({
+        text: result.mixed
+          ? `${result.summary} Capturaste empaques y sueltos: revisa que no se hayan contado dos veces.`
+          : result.summary,
+        warning: result.mixed,
+      });
+      latest.current++;
+      setProduct(null);
+      setQuantity("");
+      setPreview(null);
+      // Ready for the next product.
+      requestAnimationFrame(() => searchRef.current?.focus());
+    } catch {
+      setError(
+        "No pudimos guardar la captura. Revisa tu conexión e inténtalo de nuevo.",
+      );
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
   }
 
   const chosen =
@@ -247,7 +254,7 @@ export function CaptureForm({ countId }: { countId: string }) {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            save();
+            void save();
           }}
           noValidate
           className="max-w-xl space-y-3"

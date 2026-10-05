@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  applyCountAction: {
+    input: "id de conteo y motivo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el conteo se busca solo en esa empresa",
+    coveredBy: "tests/inventory/count-apply.int.test.ts",
+  },
   openCountAction: {
     input: "id de ubicación y nota",
     identity:

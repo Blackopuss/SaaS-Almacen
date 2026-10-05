@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Trash2 } from "lucide-react";
+import { ClipboardCheck, Loader2, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -16,7 +16,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { cancelCountAction, removeCaptureAction } from "../actions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import {
+  applyCountAction,
+  cancelCountAction,
+  removeCaptureAction,
+} from "../actions";
 
 /** Takes back one capture of an open count. */
 export function RemoveCapture({
@@ -105,6 +112,104 @@ export function CancelCount({ countId }: { countId: string }) {
             {pending ? "Cancelando…" : "Cancelar conteo"}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Applies the count after asking why (INV-33). */
+export function ApplyCount({
+  countId,
+  differences,
+}: {
+  countId: string;
+  /** Products whose stock will be corrected. */
+  differences: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function apply() {
+    setError(null);
+    startTransition(async () => {
+      const result = await applyCountAction(countId, reason);
+      if (result.ok) {
+        toast.success(result.summary);
+        setOpen(false);
+      } else {
+        setError(result.error);
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <ClipboardCheck aria-hidden="true" data-icon="inline-start" />
+          Aplicar conteo
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Aplicar este conteo?</DialogTitle>
+          <DialogDescription>
+            {differences === 0
+              ? "Todo coincide: el conteo se cerrará sin cambiar existencias."
+              : differences === 1
+                ? "Se ajustarán las existencias de 1 producto con su diferencia. Queda como un ajuste en el historial."
+                : `Se ajustarán las existencias de ${differences} productos con sus diferencias. Queda como un solo ajuste en el historial.`}{" "}
+            Después ya no se podrá capturar más en este conteo.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            apply();
+          }}
+          noValidate
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="apply-reason">Motivo</Label>
+            <Input
+              id="apply-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              maxLength={500}
+              autoComplete="off"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? "apply-error" : "apply-hint"}
+            />
+            <p id="apply-hint" className="text-sm text-muted-foreground">
+              Obligatorio. Por ejemplo: conteo de cierre de mes.
+            </p>
+          </div>
+          {error && (
+            <p
+              id="apply-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Todavía no
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending && (
+                <Loader2 aria-hidden="true" className="animate-spin" />
+              )}
+              {pending ? "Aplicando…" : "Aplicar conteo"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

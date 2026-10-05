@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
 import {
+  applyCount,
   cancelCount,
   captureCount,
   openCount,
@@ -223,6 +224,37 @@ export async function cancelCountAction(
     revalidatePath("/conteos");
     revalidatePath(`/conteos/${String(countId)}`);
     return { ok: true };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+export type ApplyCountState =
+  { ok: true; summary: string } | { ok: false; error: string };
+
+/**
+ * Applies a count: its differences become one adjustment, with the reason
+ * (INV-33). Sending it twice adjusts once.
+ */
+export async function applyCountAction(
+  countId: string,
+  reason: string,
+): Promise<ApplyCountState> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await applyCount(
+      { organizationId: organization.id, userId: user.id },
+      { countId: String(countId), reason: String(reason ?? "").slice(0, 600) },
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath("/conteos");
+    revalidatePath(`/conteos/${String(countId)}`);
+    revalidatePath("/movimientos");
+    revalidatePath("/inventario");
+    return { ok: true, summary: result.summary };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };
