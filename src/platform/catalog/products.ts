@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { newId } from "@/lib";
+import { isMultipleOf, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import { consumeQuota, releaseQuota } from "@/platform/entitlements";
@@ -621,6 +621,36 @@ export async function updateProduct(
           fieldErrors: {},
           formError: "No hay cambios que guardar.",
         });
+      }
+      // The first movement fixes the unit (INV-15): the stock already
+      // recorded is in it. The precision may only become finer, so every
+      // quantity recorded stays valid.
+      if (changed.includes("unit") || changed.includes("step")) {
+        const moved = await tx.stockMovementLine.findFirst({
+          where: { productId: id },
+          select: { id: true },
+        });
+        if (moved && changed.includes("unit")) {
+          throw new Rejected({
+            ok: false,
+            reason: "invalid",
+            fieldErrors: {
+              unit: "Este producto ya tiene movimientos: su unidad ya no se puede cambiar.",
+            },
+          });
+        }
+        if (
+          moved &&
+          !isMultipleOf(current.quantityStep.toString(), rule.quantityStep)
+        ) {
+          throw new Rejected({
+            ok: false,
+            reason: "invalid",
+            fieldErrors: {
+              step: "Este producto ya tiene movimientos: su precisión solo puede hacerse más fina (por ejemplo, de 0.1 a 0.01).",
+            },
+          });
+        }
       }
 
       const sameSku = await tx.product.findFirst({

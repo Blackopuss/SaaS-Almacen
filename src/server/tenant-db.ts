@@ -38,6 +38,9 @@ export const TENANT_MODELS = [
   "ProductCategory",
   "ProductPresentation",
   "QuotaUsage",
+  "StockBalance",
+  "StockMovement",
+  "StockMovementLine",
   "Subscription",
   "SubscriptionItem",
 ] as const;

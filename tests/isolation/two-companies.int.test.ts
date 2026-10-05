@@ -184,6 +184,43 @@ beforeAll(async () => {
     await db.quotaUsage.create({
       data: { id: newId(), organizationId, key: "active_products", taken: 1 },
     });
+    // Stock (INV-15): a movement with one line and its balance.
+    const location = await db.location.findFirstOrThrow({
+      where: { organizationId, isDefault: true },
+    });
+    const movementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: movementId,
+        organizationId,
+        type: "ENTRY",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.stockMovementLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        movementId,
+        lineNumber: 1,
+        productId,
+        locationId: location.id,
+        direction: "IN",
+        capturedQuantity: "5",
+        factor: "1",
+        baseQuantity: "5",
+        unitCode: "piece",
+      },
+    });
+    await db.stockBalance.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        locationId: location.id,
+        quantity: "5",
+      },
+    });
     await db.entitlement.create({
       data: {
         id: newId(),
