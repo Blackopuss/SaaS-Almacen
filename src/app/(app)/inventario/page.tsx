@@ -262,6 +262,14 @@ export default async function InventarioPage({
         >
           {showArchived ? "Ver productos activos" : "Ver productos archivados"}
         </Link>
+        {!showArchived && access.allows("inventory.import.create") && (
+          <Link
+            href="/inventario/importar"
+            className="ml-4 inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Importar desde Excel
+          </Link>
+        )}
         {lowCount !== null && (
           <Link
             href="/inventario/bajas"

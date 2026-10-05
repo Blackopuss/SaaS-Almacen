@@ -17,3 +17,5 @@ export type {
   StoreFileResult,
   StoredFileContent,
 } from "./files";
+export { buildCsv, buildXlsx, neutralizeFormula } from "./spreadsheet";
+export type { Cell, Sheet } from "./spreadsheet";

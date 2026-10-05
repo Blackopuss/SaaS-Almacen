@@ -37,6 +37,7 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
 | `/inicio` | Resumen del día: existencias bajas, últimos movimientos y uso del plan | Todos (cada bloque según permiso) |
 | `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
+| `/inventario/importar` | Plantilla para importar el catálogo desde Excel | Titular, Administrador, Almacén |
 | `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
 | `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/nuevo` | Alta de producto | Titular, Administrador, Almacén |
@@ -327,6 +328,16 @@ En la terminal, `npm run stock:reconcile` revisa que las existencias de cada pro
 Al entrar ahora llegas a `/inicio` (también es el primer elemento del menú; en el celular la barra inferior es Inicio, Inventario, Movimientos, Conteos y «Más», donde quedó Ubicaciones).
 
 Deberías ver, según tu rol: «Existencias bajas» con los cinco productos más vacíos y el enlace «Ver todas»; «Uso de tu plan» con productos activos y personas (solo titular y administrador); «Últimos movimientos» con los cinco más recientes; y los botones «Registrar entrada» y «Salida rápida» si puedes registrar. Una persona sin rol ve solo el aviso de que pida uno.
+
+### G. Importación desde Excel
+
+**G1. Plantilla**
+
+1. `/inventario` → «Importar desde Excel» (lo ven titular, administrador y almacén).
+2. Descarga «Plantilla de Excel (.xlsx)» y «Plantilla CSV» y ábrelas.
+3. Deberías ver: los títulos de las 13 columnas, cuatro productos de ejemplo (por pieza con caja de 100, por metro con rollo, por kilogramo con saco y uno sin presentación) y, en Excel, la hoja «Instrucciones» con qué poner en cada columna y la lista de unidades válidas.
+
+Dime si falta alguna columna de las que tiene tu Excel actual, o si algún título o ejemplo no se entiende. Subir el archivo y revisarlo llega en los pasos siguientes.
 
 ## 4. Lo que todavía no existe
 

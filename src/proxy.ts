@@ -19,6 +19,7 @@ const PROTECTED = [
   "/crear-empresa",
   "/interno",
   "/api/archivos",
+  "/api/importaciones",
 ];
 
 export default function proxy(request: NextRequest) {
