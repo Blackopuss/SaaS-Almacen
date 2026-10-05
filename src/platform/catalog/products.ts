@@ -240,21 +240,49 @@ export type ProductSummary = {
   createdAt: Date;
 };
 
-/** Latest products of the company, active or archived (a paginated list arrives with INV-10). */
-export async function listRecentProducts(
+/** Products shown per page of the list. */
+export const PRODUCT_PAGE_SIZE = 25;
+
+export type ProductPage = {
+  items: ProductSummary[];
+  /** Products of the company with that status, in every page. */
+  total: number;
+  /** Page actually returned (1-based); a page past the end becomes the last. */
+  page: number;
+  pageSize: number;
+  pageCount: number;
+};
+
+/**
+ * One page of the catalog, by name (INV-10). The database counts and cuts
+ * the page with the index of company, status and name; the list is never
+ * loaded whole, whatever the size of the catalog.
+ */
+export async function listProducts(
   actor: CatalogActor,
-  limit = 10,
-  status: "ACTIVE" | "ARCHIVED" = "ACTIVE",
-): Promise<ProductSummary[]> {
+  options: {
+    status?: "ACTIVE" | "ARCHIVED";
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<ProductPage> {
   await assertModulePermission(
     actor.organizationId,
     actor.userId,
     "inventory.product.read",
   );
-  const rows = await forOrganization(actor.organizationId).product.findMany({
+  const status = options.status === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
+  const pageSize = clampInteger(options.pageSize, 1, 100, PRODUCT_PAGE_SIZE);
+  const client = forOrganization(actor.organizationId);
+  const total = await client.product.count({ where: { status } });
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const page = clampInteger(options.page, 1, pageCount, 1);
+  const rows = await client.product.findMany({
     where: { status },
-    orderBy: { updatedAt: "desc" },
-    take: Math.min(Math.max(limit, 1), 50),
+    // The id breaks ties between equal names so pages never overlap.
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
     select: {
       id: true,
       sku: true,
@@ -267,17 +295,34 @@ export async function listRecentProducts(
       brand: { select: { name: true } },
     },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    sku: row.sku,
-    name: row.name,
-    category: row.category?.name ?? null,
-    brand: row.brand?.name ?? null,
-    barcode: row.barcode,
-    unitCode: row.unitCode,
-    quantityStep: row.quantityStep.toString(),
-    createdAt: row.createdAt,
-  }));
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      sku: row.sku,
+      name: row.name,
+      category: row.category?.name ?? null,
+      brand: row.brand?.name ?? null,
+      barcode: row.barcode,
+      unitCode: row.unitCode,
+      quantityStep: row.quantityStep.toString(),
+      createdAt: row.createdAt,
+    })),
+    total,
+    page,
+    pageSize,
+    pageCount,
+  };
+}
+
+/** A whole number inside the range; anything else becomes the fallback or the nearest bound. */
+function clampInteger(
+  value: number | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (value === undefined || !Number.isSafeInteger(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
 }
 
 /** Names of categories and brands, for suggestions in forms. */

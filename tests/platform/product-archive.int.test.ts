@@ -9,7 +9,7 @@ import {
   archiveProduct,
   createProduct,
   getProduct,
-  listRecentProducts,
+  listProducts,
   reactivateProduct,
   updateProduct,
   type CatalogActor,
@@ -144,11 +144,13 @@ describe("archiveProduct", () => {
     const id = await newProduct(actor, "LISTA-1");
     await newProduct(actor, "LISTA-2");
     await archiveProduct(actor, id);
-    expect((await listRecentProducts(actor)).map((p) => p.sku)).toEqual([
+    expect((await listProducts(actor)).items.map((p) => p.sku)).toEqual([
       "LISTA-2",
     ]);
     expect(
-      (await listRecentProducts(actor, 10, "ARCHIVED")).map((p) => p.sku),
+      (await listProducts(actor, { status: "ARCHIVED" })).items.map(
+        (p) => p.sku,
+      ),
     ).toEqual(["LISTA-1"]);
   });
 

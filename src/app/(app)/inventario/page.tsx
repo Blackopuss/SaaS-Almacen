@@ -1,4 +1,11 @@
-import { CircleCheck, Package, Pencil, Plus } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  Package,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -12,13 +19,13 @@ import {
 } from "@/components";
 import { Button } from "@/components/ui/button";
 import { getModuleAccess } from "@/platform/billing";
-import { listRecentProducts } from "@/platform/catalog";
+import { listProducts } from "@/platform/catalog";
 
 import { ReactivateProduct } from "./product-status";
 
 export const metadata: Metadata = { title: "Inventario" };
 
-/** Catalog of the company. The paginated list and search arrive with INV-10/11. */
+/** Catalog of the company, one page at a time (INV-10). Search arrives with INV-11. */
 export default async function InventarioPage({
   searchParams,
 }: PageProps<"/inventario">) {
@@ -39,7 +46,8 @@ export default async function InventarioPage({
     );
   }
 
-  const { creado, guardado, archivado, archivados } = await searchParams;
+  const { creado, guardado, archivado, archivados, pagina } =
+    await searchParams;
   const showArchived = archivados === "1";
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
   const saved = typeof guardado === "string" ? guardado.slice(0, 64) : "";
@@ -48,11 +56,24 @@ export default async function InventarioPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const products = await listRecentProducts(
-    actor,
-    showArchived ? 50 : 10,
-    showArchived ? "ARCHIVED" : "ACTIVE",
-  );
+  const requested =
+    typeof pagina === "string" && /^\d{1,6}$/.test(pagina) ? Number(pagina) : 1;
+  const list = await listProducts(actor, {
+    status: showArchived ? "ARCHIVED" : "ACTIVE",
+    page: requested,
+  });
+  const products = list.items;
+  const first = (list.page - 1) * list.pageSize + 1;
+  const last = first + products.length - 1;
+  const count = (n: number) => n.toLocaleString("es-MX");
+  /** Address of a page of this same list; the first one stays clean. */
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams();
+    if (showArchived) params.set("archivados", "1");
+    if (page > 1) params.set("pagina", String(page));
+    const query = params.toString();
+    return query ? `/inventario?${query}` : "/inventario";
+  };
   const canReactivate = access.allows("inventory.product.reactivate");
   // Shown only to who may add products, and only while the plan allows it.
   const addButton = access.allows("inventory.product.create") ? (
@@ -138,14 +159,19 @@ export default async function InventarioPage({
         )
       ) : (
         <section
-          aria-labelledby="recientes"
+          aria-labelledby="lista-productos"
           className="rounded-xl border bg-card"
         >
-          <h2 id="recientes" className="border-b p-4 font-medium sm:px-5">
-            {showArchived
-              ? "Productos archivados"
-              : "Productos agregados recientemente"}
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b p-4 sm:px-5">
+            <h2 id="lista-productos" className="font-medium">
+              {showArchived ? "Productos archivados" : "Productos"}
+            </h2>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {list.total === 1
+                ? "1 producto"
+                : `${count(first)}–${count(last)} de ${count(list.total)} productos`}
+            </p>
+          </div>
           <ul className="divide-y">
             {products.map((product) => (
               <li
@@ -180,6 +206,36 @@ export default async function InventarioPage({
               </li>
             ))}
           </ul>
+          {list.pageCount > 1 && (
+            <nav
+              aria-label="Páginas de la lista"
+              className="flex items-center justify-between gap-3 border-t p-4 sm:px-5"
+            >
+              {list.page > 1 ? (
+                <Button asChild variant="outline">
+                  <Link href={pageHref(list.page - 1)} rel="prev">
+                    <ChevronLeft aria-hidden="true" data-icon="inline-start" />
+                    Anterior
+                  </Link>
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Página {count(list.page)} de {count(list.pageCount)}
+              </p>
+              {list.page < list.pageCount ? (
+                <Button asChild variant="outline">
+                  <Link href={pageHref(list.page + 1)} rel="next">
+                    Siguiente
+                    <ChevronRight aria-hidden="true" data-icon="inline-end" />
+                  </Link>
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+            </nav>
+          )}
         </section>
       )}
     </PageContainer>

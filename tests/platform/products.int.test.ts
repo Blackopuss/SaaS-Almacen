@@ -10,7 +10,7 @@ import { provisionCompany } from "@/platform/billing";
 import {
   createProduct,
   listProductGroups,
-  listRecentProducts,
+  listProducts,
 } from "@/platform/catalog";
 import { getQuotaUsage, invalidateEntitlements } from "@/platform/entitlements";
 import { createOrganization } from "@/platform/tenancy";
@@ -302,7 +302,7 @@ describe("who can create products", () => {
         role,
       ).rejects.toMatchObject({ code: "permission_denied" });
       // They can still look at the catalog.
-      expect((await listRecentProducts(actor)).length).toBe(2);
+      expect((await listProducts(actor)).items.length).toBe(2);
     }
     expect(await used(owner.organizationId)).toBe(2);
   });
@@ -328,7 +328,7 @@ describe("who can create products", () => {
     await expect(createProduct(actor, tornillo())).rejects.toMatchObject({
       code: "module_read_only",
     });
-    expect(await listRecentProducts(actor)).toHaveLength(1);
+    expect((await listProducts(actor)).items).toHaveLength(1);
   });
 
   it("someone of another company cannot create or see products here", async () => {
@@ -342,27 +342,14 @@ describe("who can create products", () => {
     await expect(createProduct(intruder, tornillo())).rejects.toMatchObject({
       code: "permission_denied",
     });
-    await expect(listRecentProducts(intruder)).rejects.toMatchObject({
+    await expect(listProducts(intruder)).rejects.toMatchObject({
       code: "permission_denied",
     });
-    expect(await listRecentProducts(theirs)).toEqual([]);
+    expect((await listProducts(theirs)).items).toEqual([]);
     // Each company counts its own products.
     await createProduct(theirs, tornillo("PROPIO-1"));
     expect(await used(mine.organizationId)).toBe(1);
     expect(await used(theirs.organizationId)).toBe(1);
-  });
-});
-
-describe("listRecentProducts", () => {
-  it("returns the latest active products with their groups", async () => {
-    const actor = await company();
-    for (const sku of ["A-1", "A-2", "A-3"]) {
-      await createProduct(actor, { ...tornillo(sku), category: "Tornillería" });
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-    const recent = await listRecentProducts(actor, 2);
-    expect(recent.map((p) => p.sku)).toEqual(["A-3", "A-2"]);
-    expect(recent[0]).toMatchObject({ category: "Tornillería", brand: null });
   });
 });
 
