@@ -102,3 +102,11 @@ export {
   type SaveMappingResult,
   type StartImportResult,
 } from "./imports";
+export {
+  validateImport,
+  validateImportRows,
+  type ImportIssue,
+  type ImportValidation,
+  type RowsValidation,
+  type ValidImportRow,
+} from "./import-validation";

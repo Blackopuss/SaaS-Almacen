@@ -11,6 +11,7 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { IMPORT_COLUMNS, getImport } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
@@ -284,12 +285,21 @@ export default async function ImportacionPage({
                   aria-hidden="true"
                   className="mt-0.5 size-4 shrink-0 text-success"
                 />
-                Todavía no se importó nada. El siguiente paso revisa cada fila y
-                te muestra los errores antes de confirmar.
+                Todavía no se importó nada. Revisa ahora cada fila y te muestra
+                los errores antes de confirmar.
               </>
             )}
           </p>
         </section>
+      )}
+      {detail.status === "READY" && (
+        <p>
+          <Button asChild>
+            <Link href={`/inventario/importar/${detail.id}/revision`}>
+              Revisar las filas
+            </Link>
+          </Button>
+        </p>
       )}
     </PageContainer>
   );

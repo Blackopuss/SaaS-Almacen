@@ -349,6 +349,15 @@ Dime si falta alguna columna de las que tiene tu Excel actual, o si algún títu
 
 Subir y mapear no cambia tu inventario. Dime qué títulos de tu Excel real no se reconocieron solos, para agregarlos.
 
+**G3. Revisar las filas**
+
+1. Con las columnas guardadas, «Revisar las filas».
+2. Con la plantilla tal como se descarga deberías ver «Las 4 filas están correctas» y cómo se entiende cada una («3 cajas × 100 = 300 piezas en General», «12 sacos × 50 = 600 kilogramos en General»).
+3. Mete errores a propósito en tu archivo y súbelo de nuevo: una unidad que no existe («rollo»), una clave vacía, media pieza (`1.5`), una ubicación que no has creado, la misma clave dos veces, un contenido de presentación sin nombre. Deberías ver una tabla con **fila, columna (con el título de tu archivo), lo que dice la celda y el problema**, y arriba cuántas filas están bien y cuántas no.
+4. Una misma clave puede repetirse solo para dar la existencia de otra ubicación (misma clave, nombre y unidad; distinta ubicación).
+
+Revisar no importa nada: puedes corregir y volver a subir las veces que quieras. Dime qué mensajes no se entienden.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
