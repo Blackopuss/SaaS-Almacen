@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  checkConfirmationAction: {
+    input: "clave de la confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo responde por movimientos confirmados por la misma persona",
+    coveredBy: "tests/inventory/lost-answer.int.test.ts",
+  },
   registerExitAction: {
     input:
       "id de producto, id de ubicación, cantidad, forma de captura, referencia y nota (sin factor ni saldo)",

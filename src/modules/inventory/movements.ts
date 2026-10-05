@@ -856,3 +856,29 @@ export async function getInitialBalanceState(
     capturedLocationIds: [...new Set(lines.map((line) => line.locationId))],
   };
 }
+
+/**
+ * Whether a confirmation of this person was registered (INV-22). The
+ * screen asks when the answer of a confirmation never arrived — the
+ * connection dropped — to know if it must be sent again. Only the person
+ * who confirmed gets an answer, and only inside their company.
+ */
+export async function findConfirmation(
+  actor: InventoryActor,
+  idempotencyKey: string,
+): Promise<{ movementId: string } | null> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.movement.read",
+  );
+  const key = String(idempotencyKey ?? "").trim();
+  if (!IDEMPOTENCY_KEY.test(key)) return null;
+  const movement = await forOrganization(
+    actor.organizationId,
+  ).stockMovement.findFirst({
+    where: { idempotencyKey: key, createdByUserId: actor.userId },
+    select: { id: true },
+  });
+  return movement ? { movementId: movement.id } : null;
+}

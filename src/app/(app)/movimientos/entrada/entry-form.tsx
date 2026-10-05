@@ -1,7 +1,8 @@
 "use client";
 
-import { CircleAlert, Equal, Loader2 } from "lucide-react";
+import { CircleAlert, Equal, Loader2, WifiOff } from "lucide-react";
 import Link from "next/link";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormField } from "@/components";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 
 import {
+  checkConfirmationAction,
   previewEntryAction,
   registerEntryAction,
   registerExitAction,
@@ -79,12 +81,77 @@ export function EntryForm({
    */
   idempotencyKey: string;
 }) {
+  const router = useRouter();
+  /** What is happening when a confirmation got no answer. */
+  const [lost, setLost] = useState<"checking" | "unknown" | "missing" | null>(
+    null,
+  );
+
+  /** Asks the server, with patience, whether this confirmation exists. */
+  async function findOut(): Promise<"registered" | "missing" | "unknown"> {
+    setLost("checking");
+    for (const wait of [0, 1500, 3000, 6000, 10000]) {
+      if (wait > 0) await waitOrOnline(wait);
+      try {
+        const check = await checkConfirmationAction(idempotencyKey);
+        if (check.registered && check.movementId) {
+          router.push(
+            mode === "initial"
+              ? `/movimientos/saldo-inicial?guardado=${check.movementId}`
+              : `/movimientos?registrado=${check.movementId}`,
+          );
+          return "registered";
+        }
+        setLost("missing");
+        return "missing";
+      } catch {
+        // Still unreachable: wait and ask again.
+      }
+    }
+    setLost("unknown");
+    return "unknown";
+  }
+
+  async function resolveLostAnswer(
+    formData: FormData,
+  ): Promise<EntryFormState> {
+    const text = (name: string) => String(formData.get(name) ?? "");
+    const values = {
+      locationId: text("locationId"),
+      quantity: text("quantity"),
+      capture: text("capture") || "base",
+      reference: text("reference"),
+      reason: text("reason"),
+    };
+    const outcome = await findOut();
+    // The form itself says it below, next to what was typed.
+    if (outcome === "missing") setLost(null);
+    return {
+      fieldErrors: {},
+      formError:
+        outcome === "missing"
+          ? "Se perdió la conexión y este movimiento no se registró. Puedes enviarlo de nuevo: no se duplicará."
+          : undefined,
+      values,
+    };
+  }
+
   // React resets a form after its action; the answers count how many came
   // back so the select is rebuilt showing what the person had chosen.
   const [answers, setAnswers] = useState(0);
   const [state, formAction, pending] = useActionState(
     async (prev: EntryFormState, formData: FormData) => {
-      const next = await MODES[mode].action(productId, prev, formData);
+      let next: EntryFormState;
+      try {
+        next = await MODES[mode].action(productId, prev, formData);
+      } catch (error) {
+        // Navigation after a success travels as an error: let it through.
+        unstable_rethrow(error);
+        // No answer arrived (the connection dropped, or the server could
+        // not reply): find out whether the movement was registered before
+        // letting the person send it again (INV-22).
+        next = await resolveLostAnswer(formData);
+      }
       setAnswers((count) => count + 1);
       return next;
     },
@@ -132,6 +199,49 @@ export function EntryForm({
   return (
     <form action={formAction} noValidate className="max-w-xl space-y-5">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      {lost && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-foreground"
+        >
+          {lost === "checking" ? (
+            <Loader2
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 animate-spin"
+            />
+          ) : (
+            <WifiOff
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-warning"
+            />
+          )}
+          {lost === "missing" ? (
+            <p>
+              <span className="font-medium">
+                Este movimiento no se registró.
+              </span>{" "}
+              Ya hay conexión: puedes enviarlo de nuevo, no se duplicará.
+            </p>
+          ) : lost === "checking" ? (
+            <p>
+              <span className="font-medium">Verificando estado…</span> Se perdió
+              la conexión al confirmar. Estamos revisando si el movimiento se
+              registró; no cierres esta pantalla.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p>
+                <span className="font-medium">Seguimos sin conexión.</span> No
+                sabemos todavía si el movimiento se registró. Cuando vuelva tu
+                internet, verifica antes de capturarlo otra vez.
+              </p>
+              <Button type="button" variant="outline" onClick={() => findOut()}>
+                Verificar de nuevo
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {state.formError && (
         <div
           role="alert"
@@ -263,7 +373,10 @@ export function EntryForm({
         )}
       </FormField>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
+        <Button
+          type="submit"
+          disabled={pending || lost === "checking" || lost === "unknown"}
+        >
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
           {pending ? texts.busy : texts.submit}
         </Button>
@@ -273,4 +386,17 @@ export function EntryForm({
       </div>
     </form>
   );
+}
+
+/** Waits up to `ms`, or less if the browser says the connection is back. */
+function waitOrOnline(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    window.addEventListener("online", done);
+  });
 }

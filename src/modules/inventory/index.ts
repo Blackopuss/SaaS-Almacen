@@ -3,6 +3,7 @@
 export { inventoryModule } from "./contract";
 export {
   MOVEMENT_TYPE_LABELS,
+  findConfirmation,
   formatStock,
   getInitialBalanceState,
   getStockByLocation,

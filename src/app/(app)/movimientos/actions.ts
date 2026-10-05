@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
 import {
+  findConfirmation,
   registerEntry,
   registerExit,
   registerInitialBalance,
@@ -165,6 +166,33 @@ export async function previewEntryAction(
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+export type ConfirmationCheck = { registered: boolean; movementId?: string };
+
+/**
+ * Tells the form whether a confirmation whose answer never arrived was
+ * registered (INV-22). It only reads; the key identifies a confirmation of
+ * the person of the session.
+ */
+export async function checkConfirmationAction(
+  idempotencyKey: string,
+): Promise<ConfirmationCheck> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const found = await findConfirmation(
+      { organizationId: organization.id, userId: user.id },
+      String(idempotencyKey),
+    );
+    return found
+      ? { registered: true, movementId: found.movementId }
+      : { registered: false };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { registered: false };
     }
     throw error;
   }
