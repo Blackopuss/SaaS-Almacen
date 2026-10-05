@@ -22,11 +22,11 @@ import {
 import { getModuleAccess } from "@/platform/billing";
 import {
   getProduct,
-  getUnit,
   listPresentations,
   listProducts,
-  unitsOfDimension,
 } from "@/platform/catalog";
+
+import { captureOptions } from "../capture-options";
 
 import { EntryForm } from "./entry-form";
 
@@ -217,39 +217,7 @@ export default async function EntradaPage({
       ? listPresentations(actor, product.id)
       : [],
   ]);
-  const unit = getUnit(product.unitCode);
   const total = totals[product.id];
-  // "0.010" → 2 decimals; "1" → none. Text only: quantities are never floats.
-  const decimals = (product.quantityStep.split(".")[1] ?? "").replace(
-    /0+$/,
-    "",
-  ).length;
-
-  const capital = (text: string) =>
-    text.charAt(0).toUpperCase() + text.slice(1);
-  /** Ways to count what arrives; the content of a box is only shown here. */
-  const captures = [
-    {
-      value: "base",
-      label: capital(unit.plural),
-      hint:
-        decimals === 0
-          ? `En ${unit.plural}, sin fracciones.`
-          : `En ${unit.plural}, hasta ${decimals} ${decimals === 1 ? "decimal" : "decimales"}.`,
-    },
-    ...presentations.map((presentation) => ({
-      value: `p:${presentation.id}`,
-      label: presentation.label,
-      hint: `${presentation.label}. Se capturan completas.`,
-    })),
-    ...unitsOfDimension(unit.dimension)
-      .filter((other) => other.code !== unit.code)
-      .map((other) => ({
-        value: `u:${other.code}`,
-        label: capital(other.plural),
-        hint: `En ${other.plural}; se guarda en ${unit.plural}.`,
-      })),
-  ];
 
   return (
     <PageContainer>
@@ -268,7 +236,7 @@ export default async function EntradaPage({
       </p>
       <EntryForm
         productId={product.id}
-        captures={captures}
+        captures={captureOptions(product, presentations)}
         locations={locations.map((location) => ({
           id: location.id,
           label: stock[location.id]

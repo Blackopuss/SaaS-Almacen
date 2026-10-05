@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   ArrowUpFromLine,
   CircleCheck,
+  ClipboardList,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -65,6 +66,21 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const openingButton = access.allows("inventory.opening.create") ? (
+    <Button asChild variant="outline">
+      <Link href="/movimientos/saldo-inicial">
+        <ClipboardList aria-hidden="true" data-icon="inline-start" />
+        Saldo inicial
+      </Link>
+    </Button>
+  ) : undefined;
+  const actions =
+    entryButton || openingButton ? (
+      <>
+        {entryButton}
+        {openingButton}
+      </>
+    ) : undefined;
 
   return (
     <PageContainer>
@@ -72,7 +88,7 @@ export default async function MovimientosPage({
       <PageHeader
         title="Movimientos"
         description="Entradas, salidas, reubicaciones y ajustes."
-        actions={entryButton}
+        actions={actions}
       />
       {justRegistered && (
         <div
@@ -101,7 +117,9 @@ export default async function MovimientosPage({
           icon={ArrowLeftRight}
           title="Sin movimientos registrados"
           description="Cada entrada, salida o reubicación aparecerá aquí con su autor y motivo."
-          action={entryButton}
+          action={
+            actions && <div className="flex flex-wrap gap-2">{actions}</div>
+          }
         />
       ) : (
         <section

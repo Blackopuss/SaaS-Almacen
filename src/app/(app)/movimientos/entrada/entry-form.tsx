@@ -12,9 +12,28 @@ import { NativeSelect } from "@/components/ui/native-select";
 import {
   previewEntryAction,
   registerEntryAction,
+  registerInitialBalanceAction,
   type EntryFormState,
   type EntryPreview,
 } from "../actions";
+
+/** Texts of the two uses of the form: an entry, or the initial balance. */
+const MODES = {
+  entry: {
+    quantity: "¿Cuánto entra?",
+    location: "¿Dónde lo guardas?",
+    submit: "Registrar entrada",
+    busy: "Registrando…",
+    cancel: "/movimientos",
+  },
+  initial: {
+    quantity: "¿Cuánto hay hoy?",
+    location: "¿Dónde está?",
+    submit: "Guardar saldo inicial",
+    busy: "Guardando…",
+    cancel: "/movimientos/saldo-inicial",
+  },
+} as const;
 
 /**
  * Form of an entry (INV-16/17): how much, counted in what, where, and an
@@ -22,11 +41,13 @@ import {
  * the server answers what it is in the product's unit before confirming.
  */
 export function EntryForm({
+  mode = "entry",
   productId,
   captures,
   locations,
   defaultLocationId,
 }: {
+  mode?: keyof typeof MODES;
   productId: string;
   /**
    * Ways to count what arrives, built in the server: the product's unit
@@ -42,7 +63,9 @@ export function EntryForm({
   const [answers, setAnswers] = useState(0);
   const [state, formAction, pending] = useActionState(
     async (prev: EntryFormState, formData: FormData) => {
-      const next = await registerEntryAction(productId, prev, formData);
+      const next = await (
+        mode === "initial" ? registerInitialBalanceAction : registerEntryAction
+      )(productId, prev, formData);
       setAnswers((count) => count + 1);
       return next;
     },
@@ -85,6 +108,7 @@ export function EntryForm({
 
   const chosen =
     captures.find((option) => option.value === capture) ?? captures[0];
+  const texts = MODES[mode];
 
   return (
     <form action={formAction} noValidate className="max-w-xl space-y-5">
@@ -102,7 +126,7 @@ export function EntryForm({
       )}
       <FormField
         id="quantity"
-        label="¿Cuánto entra?"
+        label={texts.quantity}
         hint={chosen?.hint}
         error={state.fieldErrors.quantity}
       >
@@ -165,7 +189,7 @@ export function EntryForm({
       </div>
       <FormField
         id="locationId"
-        label="¿Dónde lo guardas?"
+        label={texts.location}
         error={state.fieldErrors.locationId}
       >
         {(control) => (
@@ -183,23 +207,25 @@ export function EntryForm({
           </NativeSelect>
         )}
       </FormField>
-      <FormField
-        id="reference"
-        label="Referencia (opcional)"
-        hint="Remisión, factura o nota con la que llegó."
-        error={state.fieldErrors.reference}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            name="reference"
-            autoComplete="off"
-            defaultValue={state.values.reference}
-            key={`reference-${state.values.reference}`}
-            maxLength={120}
-          />
-        )}
-      </FormField>
+      {mode === "entry" && (
+        <FormField
+          id="reference"
+          label="Referencia (opcional)"
+          hint="Remisión, factura o nota con la que llegó."
+          error={state.fieldErrors.reference}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="reference"
+              autoComplete="off"
+              defaultValue={state.values.reference}
+              key={`reference-${state.values.reference}`}
+              maxLength={120}
+            />
+          )}
+        </FormField>
+      )}
       <FormField
         id="reason"
         label="Nota (opcional)"
@@ -219,10 +245,10 @@ export function EntryForm({
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
-          {pending ? "Registrando…" : "Registrar entrada"}
+          {pending ? texts.busy : texts.submit}
         </Button>
         <Button asChild variant="outline">
-          <Link href="/movimientos">Cancelar</Link>
+          <Link href={texts.cancel}>Cancelar</Link>
         </Button>
       </div>
     </form>

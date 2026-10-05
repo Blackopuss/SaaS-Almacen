@@ -4,11 +4,14 @@ export { inventoryModule } from "./contract";
 export {
   MOVEMENT_TYPE_LABELS,
   formatStock,
+  getInitialBalanceState,
   getStockByLocation,
   getStockTotals,
+  listProductsWithoutStock,
   listRecentMovements,
   listStockLocations,
   registerEntry,
+  registerInitialBalance,
 } from "./movements";
 export type {
   EntryField,
@@ -17,6 +20,7 @@ export type {
   MovementResult,
   MovementSummary,
   MovementType,
+  PendingInitialBalance,
 } from "./movements";
 export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";

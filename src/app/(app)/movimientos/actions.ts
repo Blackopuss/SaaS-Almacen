@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
-import { registerEntry, type EntryField } from "@/modules/inventory";
+import {
+  registerEntry,
+  registerInitialBalance,
+  type EntryField,
+} from "@/modules/inventory";
 import { previewConversion, type Capture } from "@/platform/catalog";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
@@ -41,6 +45,24 @@ function captureFields(capture: string): {
  */
 export async function registerEntryAction(
   productId: string,
+  prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  return receive("entry", productId, prev, formData);
+}
+
+/** Registers the initial balance of a product in a location (INV-18). */
+export async function registerInitialBalanceAction(
+  productId: string,
+  prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  return receive("initial", productId, prev, formData);
+}
+
+async function receive(
+  kind: "entry" | "initial",
+  productId: string,
   _prev: EntryFormState,
   formData: FormData,
 ): Promise<EntryFormState> {
@@ -55,7 +77,9 @@ export async function registerEntryAction(
   };
   let result;
   try {
-    result = await registerEntry(
+    result = await (
+      kind === "initial" ? registerInitialBalance : registerEntry
+    )(
       { organizationId: organization.id, userId: user.id },
       {
         productId: String(productId),
@@ -82,7 +106,11 @@ export async function registerEntryAction(
   }
   revalidatePath("/movimientos");
   revalidatePath("/inventario");
-  redirect(`/movimientos?entrada=${result.movementId}`);
+  redirect(
+    kind === "initial"
+      ? `/movimientos/saldo-inicial?guardado=${result.movementId}`
+      : `/movimientos?entrada=${result.movementId}`,
+  );
 }
 
 export type EntryPreview =

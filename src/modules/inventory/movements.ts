@@ -133,12 +133,40 @@ export async function registerEntry(
   actor: InventoryActor,
   input: EntryInput,
 ): Promise<MovementResult> {
-  const { organizationId, userId } = actor;
   await assertModulePermission(
-    organizationId,
-    userId,
+    actor.organizationId,
+    actor.userId,
     "inventory.entry.create",
   );
+  return receive(actor, input, "ENTRY");
+}
+
+/**
+ * Registers what there already was of a product when the business started
+ * using the system (INV-18). It is a movement like any other — the balance
+ * is never typed in — with two rules of its own: it comes before any other
+ * movement of the product, and each location gets it once. Later
+ * differences are corrected with an adjustment.
+ */
+export async function registerInitialBalance(
+  actor: InventoryActor,
+  input: EntryInput,
+): Promise<MovementResult> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.opening.create",
+  );
+  return receive(actor, input, "INITIAL");
+}
+
+/** An entry or an initial balance: stock that is added to a location. */
+async function receive(
+  actor: InventoryActor,
+  input: EntryInput,
+  type: "ENTRY" | "INITIAL",
+): Promise<MovementResult> {
+  const { organizationId, userId } = actor;
 
   const parsed = entrySchema.safeParse(input);
   if (!parsed.success) {
@@ -186,7 +214,9 @@ export async function registerEntry(
         return reject(
           "not_allowed",
           "productId",
-          "Este producto está archivado. Reactívalo para registrar entradas.",
+          type === "INITIAL"
+            ? "Este producto está archivado. Reactívalo para registrar su saldo inicial."
+            : "Este producto está archivado. Reactívalo para registrar entradas.",
         );
       }
 
@@ -216,6 +246,29 @@ export async function registerEntry(
       const { conversion } = resolved;
       const unitCode = resolved.product.unitCode;
 
+      if (type === "INITIAL") {
+        // The product is locked: what we read here cannot change under us.
+        const earlier = await tx.stockMovementLine.findMany({
+          where: { productId: product.id },
+          take: 500,
+          select: { locationId: true, movement: { select: { type: true } } },
+        });
+        if (earlier.some((line) => line.movement.type !== "INITIAL")) {
+          return reject(
+            "not_allowed",
+            "productId",
+            "Este producto ya tiene movimientos: su saldo inicial ya no se captura. Usa una entrada, o un ajuste si la cantidad no coincide.",
+          );
+        }
+        if (earlier.some((line) => line.locationId === location.id)) {
+          return reject(
+            "not_allowed",
+            "locationId",
+            `Ya capturaste el saldo inicial de este producto en «${location.name}». Elige otra ubicación.`,
+          );
+        }
+      }
+
       const current = await tx.stockBalance.findFirst({
         where: { productId: product.id, locationId: location.id },
         select: { id: true, quantity: true },
@@ -236,7 +289,7 @@ export async function registerEntry(
         data: {
           id: movementId,
           organizationId,
-          type: "ENTRY",
+          type,
           reason: data.reason,
           reference: data.reference,
           createdByUserId: userId,
@@ -283,11 +336,18 @@ export async function registerEntry(
         ok: true as const,
         movementId,
         // «3 cajas × 100 = 300 piezas» when it was not captured as is.
-        summary: `${verb} ${entered} de ${product.name} a ${location.name}${
-          conversion.presentation || conversion.capturedUnitCode
-            ? ` (${conversion.preview})`
-            : ""
-        }. Ahora hay ${formatStock(balance.toString(), unitCode)} ahí.`,
+        summary:
+          type === "INITIAL"
+            ? `Saldo inicial de ${product.name} en ${location.name}: ${entered}${
+                conversion.presentation || conversion.capturedUnitCode
+                  ? ` (${conversion.preview})`
+                  : ""
+              }.`
+            : `${verb} ${entered} de ${product.name} a ${location.name}${
+                conversion.presentation || conversion.capturedUnitCode
+                  ? ` (${conversion.preview})`
+                  : ""
+              }. Ahora hay ${formatStock(balance.toString(), unitCode)} ahí.`,
       };
     });
   } catch (error) {
@@ -525,4 +585,73 @@ export async function listStockLocations(
         Number(b.isDefault) - Number(a.isDefault) ||
         compareLocationNames(a.path, b.path),
     );
+}
+
+export type PendingInitialBalance = {
+  items: { id: string; sku: string; name: string; unitCode: string }[];
+  /** Active products that have no movement at all. */
+  total: number;
+  page: number;
+  pageCount: number;
+};
+
+/**
+ * Active products without any movement, by name: the ones whose initial
+ * balance can still be captured (INV-18). Paged by the database.
+ */
+export async function listProductsWithoutStock(
+  actor: InventoryActor,
+  options: { page?: number; pageSize?: number } = {},
+): Promise<PendingInitialBalance> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.stock.read",
+  );
+  const pageSize = Math.min(
+    Math.max(Math.trunc(options.pageSize ?? 25), 1),
+    100,
+  );
+  const where = { status: "ACTIVE" as const, movementLines: { none: {} } };
+  const client = forOrganization(actor.organizationId);
+  const total = await client.product.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const requested = Number.isSafeInteger(options.page)
+    ? Number(options.page)
+    : 1;
+  const page = Math.min(Math.max(requested, 1), pageCount);
+  const items = await client.product.findMany({
+    where,
+    orderBy: [{ name: "asc" }, { sku: "asc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    select: { id: true, sku: true, name: true, unitCode: true },
+  });
+  return { items, total, page, pageCount };
+}
+
+/**
+ * Whether the initial balance of a product can still be captured, and the
+ * locations that already have it.
+ */
+export async function getInitialBalanceState(
+  actor: InventoryActor,
+  productId: string,
+): Promise<{ open: boolean; capturedLocationIds: string[] }> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.stock.read",
+  );
+  const lines = await forOrganization(
+    actor.organizationId,
+  ).stockMovementLine.findMany({
+    where: { productId: String(productId) },
+    take: 500,
+    select: { locationId: true, movement: { select: { type: true } } },
+  });
+  return {
+    open: lines.every((line) => line.movement.type === "INITIAL"),
+    capturedLocationIds: [...new Set(lines.map((line) => line.locationId))],
+  };
 }
