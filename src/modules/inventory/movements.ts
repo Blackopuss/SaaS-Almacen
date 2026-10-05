@@ -4,7 +4,12 @@ import { z } from "zod";
 
 import { dec, formatDecimal, newId } from "@/lib";
 import { assertModulePermission } from "@/platform/billing";
-import { getUnit, resolveConversion } from "@/platform/catalog";
+import {
+  getUnit,
+  pluralizeName,
+  resolveConversion,
+  type Capture,
+} from "@/platform/catalog";
 import { compareLocationNames, formatLocationPath } from "@/platform/locations";
 import { forOrganization, lockRows } from "@/server";
 
@@ -45,6 +50,24 @@ const entrySchema = z.object({
     .optional()
     .transform((value) => value || null),
   quantity: z.string().trim().min(1, "Escribe la cantidad que entra."),
+  /**
+   * How the quantity was captured (INV-17): a presentation of the product
+   * («3 cajas») or another unit of the same kind («275 centímetros»).
+   * Neither = the product's own unit. Only the id or the code travels: the
+   * content of the presentation is always read here, never received.
+   */
+  presentationId: z
+    .string()
+    .trim()
+    .max(36)
+    .optional()
+    .transform((value) => value || null),
+  unitCode: z
+    .string()
+    .trim()
+    .max(12)
+    .optional()
+    .transform((value) => value || null),
   reference: optionalText(
     120,
     "La referencia es demasiado larga (máximo 120 caracteres).",
@@ -103,7 +126,8 @@ export function formatStock(quantity: string, unitCode: string): string {
 
 /**
  * Registers stock that arrives, captured in the product's own unit
- * (INV-16). The movement and the balance are written together.
+ * (INV-16), in one of its presentations or in another unit of the same
+ * kind (INV-17). The movement and the balance are written together.
  */
 export async function registerEntry(
   actor: InventoryActor,
@@ -126,6 +150,24 @@ export async function registerEntry(
     return { ok: false, reason: "invalid", fieldErrors };
   }
   const data = parsed.data;
+  if (data.presentationId && data.unitCode) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {
+        quantity: "Elige una sola forma de capturar: presentación o unidad.",
+      },
+    };
+  }
+  const capture: Capture = data.presentationId
+    ? {
+        kind: "presentation",
+        quantity: data.quantity,
+        presentationId: data.presentationId,
+      }
+    : data.unitCode
+      ? { kind: "unit", quantity: data.quantity, unitCode: data.unitCode }
+      : { kind: "base", quantity: data.quantity };
 
   try {
     return await forOrganization(organizationId).$transaction(async (tx) => {
@@ -169,10 +211,7 @@ export async function registerEntry(
 
       // The quantity is validated with the rule of the product: nothing is
       // rounded and the factor never comes from the browser (INV-09).
-      const resolved = await resolveConversion(tx, product.id, {
-        kind: "base",
-        quantity: data.quantity,
-      });
+      const resolved = await resolveConversion(tx, product.id, capture);
       if (!resolved.ok) return reject("invalid", "quantity", resolved.error);
       const { conversion } = resolved;
       const unitCode = resolved.product.unitCode;
@@ -243,7 +282,12 @@ export async function registerEntry(
       return {
         ok: true as const,
         movementId,
-        summary: `${verb} ${entered} de ${product.name} a ${location.name}. Ahora hay ${formatStock(balance.toString(), unitCode)} ahí.`,
+        // «3 cajas × 100 = 300 piezas» when it was not captured as is.
+        summary: `${verb} ${entered} de ${product.name} a ${location.name}${
+          conversion.presentation || conversion.capturedUnitCode
+            ? ` (${conversion.preview})`
+            : ""
+        }. Ahora hay ${formatStock(balance.toString(), unitCode)} ahí.`,
       };
     });
   } catch (error) {
@@ -327,6 +371,11 @@ export type MovementSummary = {
     direction: "IN" | "OUT";
     /** In the product's unit: «300 piezas». */
     quantity: string;
+    /**
+     * How it was captured when not in the product's unit, with the content
+     * the presentation had then: «3 cajas de 100», «275 centímetros».
+     */
+    captured: string | null;
   }[];
 };
 
@@ -364,6 +413,10 @@ export async function listRecentMovements(
           direction: true,
           baseQuantity: true,
           unitCode: true,
+          capturedQuantity: true,
+          capturedUnitCode: true,
+          factor: true,
+          presentation: { select: { name: true } },
           product: { select: { name: true, sku: true } },
         },
       },
@@ -426,6 +479,14 @@ export async function listRecentMovements(
       location: paths.get(line.locationId) ?? "",
       direction: line.direction,
       quantity: formatStock(line.baseQuantity.toString(), line.unitCode),
+      captured: line.presentation
+        ? `${formatDecimal(line.capturedQuantity.toString())} ${pluralizeName(
+            line.presentation.name,
+            dec(line.capturedQuantity.toString()),
+          )} de ${formatDecimal(line.factor.toString())}`
+        : line.capturedUnitCode
+          ? formatStock(line.capturedQuantity.toString(), line.capturedUnitCode)
+          : null,
     })),
   }));
 }

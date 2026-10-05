@@ -1,50 +1,90 @@
 "use client";
 
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert, Equal, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormField } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 
-import { registerEntryAction, type EntryFormState } from "../actions";
+import {
+  previewEntryAction,
+  registerEntryAction,
+  type EntryFormState,
+  type EntryPreview,
+} from "../actions";
 
-/** Form of a simple entry (INV-16): where, how much and an optional note. */
+/**
+ * Form of an entry (INV-16/17): how much, counted in what, where, and an
+ * optional note. When the quantity is counted in boxes or in another unit,
+ * the server answers what it is in the product's unit before confirming.
+ */
 export function EntryForm({
   productId,
-  unitPlural,
-  quantityHint,
+  captures,
   locations,
   defaultLocationId,
 }: {
   productId: string;
-  /** «piezas», «metros»: the unit the quantity is captured in. */
-  unitPlural: string;
-  quantityHint: string;
-  /** Built in the server: path of the location and what it holds today. */
+  /**
+   * Ways to count what arrives, built in the server: the product's unit
+   * first ("base"), then its presentations and compatible units.
+   */
+  captures: { value: string; label: string; hint: string }[];
+  /** Path of each location and what it holds today. */
   locations: { id: string; label: string }[];
   defaultLocationId: string;
 }) {
+  // React resets a form after its action; the answers count how many came
+  // back so the select is rebuilt showing what the person had chosen.
+  const [answers, setAnswers] = useState(0);
   const [state, formAction, pending] = useActionState(
-    registerEntryAction.bind(null, productId),
+    async (prev: EntryFormState, formData: FormData) => {
+      const next = await registerEntryAction(productId, prev, formData);
+      setAnswers((count) => count + 1);
+      return next;
+    },
     {
       fieldErrors: {},
       values: {
         locationId: defaultLocationId,
         quantity: "",
+        capture: "base",
         reference: "",
         reason: "",
       },
     } satisfies EntryFormState,
   );
   const quantityRef = useRef<HTMLInputElement>(null);
+  const [capture, setCapture] = useState(state.values.capture);
+  const [preview, setPreview] = useState<EntryPreview | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(0);
 
   // After a refusal, take the person back to the quantity when it is the problem.
   useEffect(() => {
     if (state.fieldErrors.quantity) quantityRef.current?.focus();
   }, [state]);
+
+  /** Asks the server for the equivalence a moment after the person stops typing. */
+  function askPreview(nextCapture: string, quantity: string) {
+    if (timer.current) clearTimeout(timer.current);
+    const request = ++latest.current;
+    if (nextCapture === "base" || quantity.trim() === "") {
+      setPreview(null);
+      return;
+    }
+    timer.current = setTimeout(async () => {
+      const result = await previewEntryAction(productId, nextCapture, quantity);
+      // Only the answer to what is on screen now counts.
+      if (request === latest.current) setPreview(result);
+    }, 300);
+  }
+
+  const chosen =
+    captures.find((option) => option.value === capture) ?? captures[0];
 
   return (
     <form action={formAction} noValidate className="max-w-xl space-y-5">
@@ -62,8 +102,8 @@ export function EntryForm({
       )}
       <FormField
         id="quantity"
-        label={`¿Cuánto entra? (${unitPlural})`}
-        hint={quantityHint}
+        label="¿Cuánto entra?"
+        hint={chosen?.hint}
         error={state.fieldErrors.quantity}
       >
         {(control) => (
@@ -75,12 +115,54 @@ export function EntryForm({
             autoComplete="off"
             defaultValue={state.values.quantity}
             key={`quantity-${state.values.quantity}`}
+            onChange={(event) => askPreview(capture, event.target.value)}
             maxLength={20}
             required
             autoFocus
           />
         )}
       </FormField>
+      {captures.length > 1 ? (
+        <FormField id="capture" label="¿En qué lo cuentas?">
+          {(control) => (
+            <NativeSelect
+              {...control}
+              name="capture"
+              defaultValue={capture}
+              key={`capture-${answers}`}
+              onChange={(event) => {
+                setCapture(event.target.value);
+                askPreview(
+                  event.target.value,
+                  quantityRef.current?.value ?? "",
+                );
+              }}
+            >
+              {captures.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </FormField>
+      ) : (
+        <input type="hidden" name="capture" value="base" />
+      )}
+      <div aria-live="polite">
+        {preview?.ok && (
+          <p className="flex items-start gap-2 rounded-lg border bg-muted p-3 text-sm font-medium">
+            <Equal
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            />
+            {preview.preview}
+          </p>
+        )}
+        {preview && !preview.ok && (
+          <p className="text-sm text-muted-foreground">{preview.error}</p>
+        )}
+      </div>
       <FormField
         id="locationId"
         label="¿Dónde lo guardas?"

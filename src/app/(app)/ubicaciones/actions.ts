@@ -93,11 +93,10 @@ export async function createLocationAction(
     kind: text(formData, "kind"),
     parentId: text(formData, "parentId"),
   };
-  return formState(await change((actor) => createLocation(actor, values)), {
-    ...values,
-    // Ready for the next one in the same place.
-    name: "",
-  });
+  const result = await change((actor) => createLocation(actor, values));
+  // After adding, ready for the next one in the same place; after a
+  // refusal, what was typed stays.
+  return formState(result, result.ok ? { ...values, name: "" } : values);
 }
 
 /** Renames a location. Its id is bound by the page and looked for only

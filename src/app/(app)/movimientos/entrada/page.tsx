@@ -20,7 +20,13 @@ import {
   listStockLocations,
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
-import { getProduct, getUnit, listProducts } from "@/platform/catalog";
+import {
+  getProduct,
+  getUnit,
+  listPresentations,
+  listProducts,
+  unitsOfDimension,
+} from "@/platform/catalog";
 
 import { EntryForm } from "./entry-form";
 
@@ -30,8 +36,8 @@ const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /**
- * Entry of stock (INV-16): first the product is found, then the quantity
- * and the location are captured.
+ * Entry of stock (INV-16/17): first the product is found, then the
+ * quantity (in its unit, a presentation or another unit) and the location.
  */
 export default async function EntradaPage({
   searchParams,
@@ -203,10 +209,13 @@ export default async function EntradaPage({
       </PageContainer>
     );
   }
-  const [locations, stock, totals] = await Promise.all([
+  const [locations, stock, totals, presentations] = await Promise.all([
     listStockLocations(actor),
     getStockByLocation(actor, product.id),
     getStockTotals(actor, [product.id]),
+    access.can("inventory.presentation.read")
+      ? listPresentations(actor, product.id)
+      : [],
   ]);
   const unit = getUnit(product.unitCode);
   const total = totals[product.id];
@@ -215,6 +224,32 @@ export default async function EntradaPage({
     /0+$/,
     "",
   ).length;
+
+  const capital = (text: string) =>
+    text.charAt(0).toUpperCase() + text.slice(1);
+  /** Ways to count what arrives; the content of a box is only shown here. */
+  const captures = [
+    {
+      value: "base",
+      label: capital(unit.plural),
+      hint:
+        decimals === 0
+          ? `En ${unit.plural}, sin fracciones.`
+          : `En ${unit.plural}, hasta ${decimals} ${decimals === 1 ? "decimal" : "decimales"}.`,
+    },
+    ...presentations.map((presentation) => ({
+      value: `p:${presentation.id}`,
+      label: presentation.label,
+      hint: `${presentation.label}. Se capturan completas.`,
+    })),
+    ...unitsOfDimension(unit.dimension)
+      .filter((other) => other.code !== unit.code)
+      .map((other) => ({
+        value: `u:${other.code}`,
+        label: capital(other.plural),
+        hint: `En ${other.plural}; se guarda en ${unit.plural}.`,
+      })),
+  ];
 
   return (
     <PageContainer>
@@ -233,12 +268,7 @@ export default async function EntradaPage({
       </p>
       <EntryForm
         productId={product.id}
-        unitPlural={unit.plural}
-        quantityHint={
-          decimals === 0
-            ? "Solo números enteros, sin fracciones."
-            : `Admite hasta ${decimals} ${decimals === 1 ? "decimal" : "decimales"}.`
-        }
+        captures={captures}
         locations={locations.map((location) => ({
           id: location.id,
           label: stock[location.id]

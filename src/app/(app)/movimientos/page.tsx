@@ -149,6 +149,11 @@ export default async function MovimientosPage({
                         <span className="font-medium tabular-nums">
                           {line.quantity}
                         </span>{" "}
+                        {line.captured && (
+                          <span className="text-muted-foreground">
+                            ({line.captured}){" "}
+                          </span>
+                        )}
                         de {line.productName}{" "}
                         <span className="text-muted-foreground">
                           ({line.sku}) · {line.location}

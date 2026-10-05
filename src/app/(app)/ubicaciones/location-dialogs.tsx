@@ -93,9 +93,13 @@ export function AddLocationDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [placeId, setPlaceId] = useState(insideId);
+  // React resets a form after its action; the answers count how many came
+  // back so the select is rebuilt showing the place the person had chosen.
+  const [answers, setAnswers] = useState(0);
   const [state, formAction, pending] = useActionState(
     async (prev: LocationFormState, formData: FormData) => {
       const next = await createLocationAction(prev, formData);
+      setAnswers((count) => count + 1);
       if (next.done) {
         toast.success("Ubicación agregada.");
         setOpen(false);
@@ -148,7 +152,8 @@ export function AddLocationDialog({
               <NativeSelect
                 {...control}
                 name="parentId"
-                value={placeId}
+                defaultValue={placeId}
+                key={`place-${answers}`}
                 onChange={(event) => setPlaceId(event.target.value)}
               >
                 {places.map((option) => (
@@ -174,7 +179,7 @@ export function AddLocationDialog({
                     : kinds[0]?.value
                 }
                 // The kinds depend on the place: start over when it changes.
-                key={`${placeId}-${state.values.kind}`}
+                key={`${placeId}-${state.values.kind}-${answers}`}
               >
                 {kinds.map((kind) => (
                   <option key={kind.value} value={kind.value}>

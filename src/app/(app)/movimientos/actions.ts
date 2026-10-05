@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { isAppError } from "@/lib";
 import { registerEntry, type EntryField } from "@/modules/inventory";
+import { previewConversion, type Capture } from "@/platform/catalog";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
 export type EntryFormState = {
@@ -13,10 +14,25 @@ export type EntryFormState = {
   values: {
     locationId: string;
     quantity: string;
+    /** "base", "p:<presentation id>" or "u:<unit code>". */
+    capture: string;
     reference: string;
     reason: string;
   };
 };
+
+/**
+ * How the quantity is captured, as the form sends it. Only an id or a code
+ * travels; the content of a presentation is always read in the server.
+ */
+function captureFields(capture: string): {
+  presentationId?: string;
+  unitCode?: string;
+} {
+  if (capture.startsWith("p:")) return { presentationId: capture.slice(2) };
+  if (capture.startsWith("u:")) return { unitCode: capture.slice(2) };
+  return {};
+}
 
 /**
  * Registers an entry. The product id is bound by the page and looked for
@@ -33,6 +49,7 @@ export async function registerEntryAction(
   const values = {
     locationId: text("locationId"),
     quantity: text("quantity"),
+    capture: text("capture") || "base",
     reference: text("reference"),
     reason: text("reason"),
   };
@@ -40,7 +57,14 @@ export async function registerEntryAction(
   try {
     result = await registerEntry(
       { organizationId: organization.id, userId: user.id },
-      { productId: String(productId), ...values },
+      {
+        productId: String(productId),
+        locationId: values.locationId,
+        quantity: values.quantity,
+        reference: values.reference,
+        reason: values.reason,
+        ...captureFields(values.capture),
+      },
     );
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
@@ -59,4 +83,45 @@ export async function registerEntryAction(
   revalidatePath("/movimientos");
   revalidatePath("/inventario");
   redirect(`/movimientos?entrada=${result.movementId}`);
+}
+
+export type EntryPreview =
+  { ok: true; preview: string } | { ok: false; error: string };
+
+/**
+ * «3 cajas × 100 = 300 piezas», computed in the server with the current
+ * content of the presentation, to show before confirming. Writes nothing.
+ */
+export async function previewEntryAction(
+  productId: string,
+  capture: string,
+  quantity: string,
+): Promise<EntryPreview> {
+  const { user, organization } = await requireOrganizationContext();
+  const fields = captureFields(String(capture));
+  const typed = String(quantity).slice(0, 40);
+  const request: Capture = fields.presentationId
+    ? {
+        kind: "presentation",
+        quantity: typed,
+        presentationId: fields.presentationId,
+      }
+    : fields.unitCode
+      ? { kind: "unit", quantity: typed, unitCode: fields.unitCode }
+      : { kind: "base", quantity: typed };
+  try {
+    const result = await previewConversion(
+      { organizationId: organization.id, userId: user.id },
+      String(productId),
+      request,
+    );
+    return result.ok
+      ? { ok: true, preview: result.preview }
+      : { ok: false, error: result.error };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }

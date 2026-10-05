@@ -13,7 +13,12 @@ import {
 import { moduleRegistry } from "@/modules/registry";
 import type { Role } from "@/platform/authorization";
 import { provisionCompany } from "@/platform/billing";
-import { archiveProduct, createProduct } from "@/platform/catalog";
+import {
+  archiveProduct,
+  changePresentationFactor,
+  createPresentation,
+  createProduct,
+} from "@/platform/catalog";
 import { invalidateEntitlements } from "@/platform/entitlements";
 import {
   archiveLocation,
@@ -27,6 +32,7 @@ import { migratorConnection } from "../setup/test-db";
 
 // INV-16: a simple entry in the product's unit. The movement and the
 // balance are written in the same transaction.
+// INV-17: an entry captured in a presentation or in another unit.
 
 const stamp = Date.now();
 let counter = 0;
@@ -588,5 +594,257 @@ describe("the list of movements", () => {
       "Bodega › Estante 2",
       "Bodega › Estante 10",
     ]);
+  });
+});
+
+describe("an entry captured in a presentation (UNI-01)", () => {
+  async function withBox() {
+    const own = await company();
+    const screws = await product(own, { name: "Tornillo" });
+    const box = await createPresentation(own, screws, {
+      name: "Caja",
+      factor: "100",
+    });
+    if (!box.ok) throw new Error("presentation setup failed");
+    return { own, screws, box: box.presentationId };
+  }
+
+  /** What each line of the product kept, in order. */
+  async function kept(own: InventoryActor, productId: string) {
+    const lines = await forOrganization(
+      own.organizationId,
+    ).stockMovementLine.findMany({
+      where: { productId },
+      orderBy: { id: "asc" },
+      include: { presentationVersion: true, presentation: true },
+    });
+    return lines.map((l) => ({
+      captured: l.capturedQuantity.toString(),
+      in: l.presentation?.name ?? l.capturedUnitCode ?? null,
+      version: l.presentationVersion?.version ?? null,
+      factor: l.factor.toString(),
+      base: l.baseQuantity.toString(),
+    }));
+  }
+
+  it("3 boxes of 100 are 300 pieces", async () => {
+    const { own, screws, box } = await withBox();
+    expect(
+      await registerEntry(own, {
+        productId: screws,
+        quantity: "3",
+        presentationId: box,
+      }),
+    ).toMatchObject({
+      ok: true,
+      summary:
+        "Entraron 300 piezas de Tornillo a General (3 cajas × 100 = 300 piezas). Ahora hay 300 piezas ahí.",
+    });
+    expect(await kept(own, screws)).toEqual([
+      { captured: "3", in: "Caja", version: 1, factor: "100", base: "300" },
+    ]);
+    expect(await getStockTotals(own, [screws])).toEqual({ [screws]: "300" });
+    // Loose pieces add to the same balance: boxes are not a second stock.
+    await registerEntry(own, { productId: screws, quantity: "25" });
+    expect(await getStockTotals(own, [screws])).toEqual({ [screws]: "325" });
+    expect(await reconcileStock(own.organizationId)).toEqual([]);
+  });
+
+  it("uses the content the box has when it enters, and keeps the earlier lines", async () => {
+    const { own, screws, box } = await withBox();
+    await registerEntry(own, {
+      productId: screws,
+      quantity: "3",
+      presentationId: box,
+    });
+    const changed = await changePresentationFactor(own, box, {
+      factor: "120",
+      reason: "El proveedor cambió la caja",
+    });
+    expect(changed.ok).toBe(true);
+    expect(
+      await registerEntry(own, {
+        productId: screws,
+        quantity: "1",
+        presentationId: box,
+      }),
+    ).toMatchObject({
+      ok: true,
+      summary:
+        "Entraron 120 piezas de Tornillo a General (1 caja × 120 = 120 piezas). Ahora hay 420 piezas ahí.",
+    });
+    expect(await kept(own, screws)).toEqual([
+      { captured: "3", in: "Caja", version: 1, factor: "100", base: "300" },
+      { captured: "1", in: "Caja", version: 2, factor: "120", base: "120" },
+    ]);
+    // The history reads each entry with the content of its moment.
+    const list = await listRecentMovements(own);
+    expect(
+      list.map((m) => m.lines.map((l) => `${l.quantity} · ${l.captured}`)),
+    ).toEqual([
+      ["120 piezas · 1 caja de 120"],
+      ["300 piezas · 3 cajas de 100"],
+    ]);
+    expect(await reconcileStock(own.organizationId)).toEqual([]);
+  });
+
+  it("the content never comes from the request", async () => {
+    const { own, screws, box } = await withBox();
+    // Whatever else is sent, only the id of the presentation counts.
+    const forged = {
+      productId: screws,
+      quantity: "2",
+      presentationId: box,
+      factor: "5000",
+      baseQuantity: "10000",
+      capturedQuantity: "9",
+    };
+    expect(await registerEntry(own, forged)).toMatchObject({ ok: true });
+    expect(await kept(own, screws)).toEqual([
+      { captured: "2", in: "Caja", version: 1, factor: "100", base: "200" },
+    ]);
+  });
+
+  it("boxes are counted whole and belong to their product", async () => {
+    const { own, screws, box } = await withBox();
+    const other = await product(own, { name: "Clavo" });
+    const theirs = await withBox();
+    const cases: [object, string][] = [
+      [
+        { productId: screws, quantity: "2.5", presentationId: box },
+        "Las presentaciones se capturan completas. Para una parte de caja, captura en piezas.",
+      ],
+      [
+        { productId: screws, quantity: "0", presentationId: box },
+        "La cantidad debe ser mayor que cero.",
+      ],
+      // The box of another product, of another company, or one that is not.
+      [
+        { productId: other, quantity: "1", presentationId: box },
+        "Esa presentación no existe para este producto.",
+      ],
+      [
+        { productId: screws, quantity: "1", presentationId: theirs.box },
+        "Esa presentación no existe para este producto.",
+      ],
+      [
+        { productId: screws, quantity: "1", presentationId: newId() },
+        "Esa presentación no existe para este producto.",
+      ],
+      [
+        {
+          productId: screws,
+          quantity: "1",
+          presentationId: box,
+          unitCode: "dozen",
+        },
+        "Elige una sola forma de capturar: presentación o unidad.",
+      ],
+    ];
+    for (const [input, message] of cases) {
+      expect(
+        await registerEntry(own, input as Parameters<typeof registerEntry>[1]),
+        JSON.stringify(input),
+      ).toMatchObject({
+        ok: false,
+        reason: "invalid",
+        fieldErrors: { quantity: message },
+      });
+    }
+    expect(await kept(own, screws)).toEqual([]);
+    expect(await kept(own, other)).toEqual([]);
+    expect(await kept(theirs.own, theirs.screws)).toEqual([]);
+  });
+});
+
+describe("an entry captured in another unit", () => {
+  it("converts between units of the same kind and refuses the rest", async () => {
+    const own = await company();
+    const cable = await product(own, {
+      name: "Cable",
+      unit: "m",
+      step: "0.01",
+    });
+    const screws = await product(own, { name: "Tornillo" });
+    expect(
+      await registerEntry(own, {
+        productId: cable,
+        quantity: "275",
+        unitCode: "cm",
+      }),
+    ).toMatchObject({
+      ok: true,
+      summary:
+        "Entraron 2.75 metros de Cable a General (275 centímetros = 2.75 metros). Ahora hay 2.75 metros ahí.",
+    });
+    expect(
+      await registerEntry(own, {
+        productId: screws,
+        quantity: "3",
+        unitCode: "dozen",
+      }),
+    ).toMatchObject({
+      ok: true,
+      summary:
+        "Entraron 36 piezas de Tornillo a General (3 docenas = 36 piezas). Ahora hay 36 piezas ahí.",
+    });
+    // The product's own unit sent as "another unit" is just the unit.
+    expect(
+      await registerEntry(own, {
+        productId: cable,
+        quantity: "1.25",
+        unitCode: "m",
+      }),
+    ).toMatchObject({
+      ok: true,
+      summary:
+        "Entraron 1.25 metros de Cable a General. Ahora hay 4 metros ahí.",
+    });
+    const lines = await forOrganization(
+      own.organizationId,
+    ).stockMovementLine.findMany({
+      where: { productId: { in: [cable, screws] } },
+      orderBy: { id: "asc" },
+    });
+    expect(
+      lines.map((l) => [
+        l.capturedQuantity.toString(),
+        l.capturedUnitCode,
+        l.factor.toString(),
+        l.baseQuantity.toString(),
+        l.unitCode,
+      ]),
+    ).toEqual([
+      ["275", "cm", "0.01", "2.75", "m"],
+      ["3", "dozen", "12", "36", "piece"],
+      ["1.25", null, "1", "1.25", "m"],
+    ]);
+    expect((await listRecentMovements(own))[2]?.lines[0]?.captured).toBe(
+      "275 centímetros",
+    );
+
+    for (const [input, message] of [
+      // Kilograms are not pieces; 5 mm do not fit hundredths of a meter.
+      [
+        { productId: screws, quantity: "2", unitCode: "kg" },
+        "No se puede convertir de kilogramos a piezas: miden cosas distintas.",
+      ],
+      [{ productId: cable, quantity: "5", unitCode: "mm" }, null],
+      [{ productId: cable, quantity: "5", unitCode: "leguas" }, null],
+    ] as const) {
+      const result = await registerEntry(own, input);
+      expect(result, JSON.stringify(input)).toMatchObject({
+        ok: false,
+        reason: "invalid",
+      });
+      if (message) {
+        expect(!result.ok && result.fieldErrors.quantity).toBe(message);
+      }
+    }
+    expect(await getStockTotals(own, [cable, screws])).toEqual({
+      [cable]: "4",
+      [screws]: "36",
+    });
+    expect(await reconcileStock(own.organizationId)).toEqual([]);
   });
 });
