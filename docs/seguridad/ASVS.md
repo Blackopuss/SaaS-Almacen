@@ -7,10 +7,12 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | Capítulo ASVS 5.0 | Tema | Estado | Evidencia o paso |
 | --- | --- | --- | --- |
 | V1 Codificación y sanitización | Salida escapada en HTML | Cumple | React escapa por defecto; sin `dangerouslySetInnerHTML` con datos de usuario. |
-| V1 | Consultas parametrizadas | Cumple | Prisma; SQL directo solo en `throttle.ts` con parámetros; prohibido en el cliente de empresa (`tenant-db.ts`). |
+| V1 | Consultas parametrizadas | Cumple | Prisma; SQL directo solo en `throttle.ts` y `lockRows` (tabla de una lista fija, valores como parámetros); prohibido en el cliente de empresa (`tenant-db.ts`). Comodines de `LIKE` escapados en búsquedas (INV-11, INV-27). |
 | V2 Validación y lógica de negocio | Validación en servidor con mensajes claros | Cumple | Zod en servicios (`register.ts`, `recovery.ts`, `organizations.ts`). |
 | V2 | Límites anti-automatización | Cumple | `throttle.ts` (cuenta e IP); desafío MFA limitado; pruebas en `throttle.int.test.ts`. |
-| V2 | Concurrencia en operaciones críticas | Parcial | Alta de empresa con bloqueo de fila; inventario y cupos en INV/MOD. |
+| V2 | Concurrencia en operaciones críticas | Cumple | Alta de empresa, cupos y equipo con bloqueo de fila; inventario con candado por producto en orden fijo, lectura tras el candado (READ COMMITTED), resta condicionada y `CHECK` (`REVISION_INV.md`). |
+| V2 | Operaciones que no se duplican al reintentar | Cumple | Clave de confirmación única por empresa en cada movimiento; conteos aplicados una sola vez (`idempotency.int.test.ts`, `count-apply.int.test.ts`). |
+| V2 | Integridad de datos de negocio | Cumple | Saldos derivados de movimientos inmutables; cantidades con decimal exacto y regla por producto; reconciliación `npm run stock:reconcile` (sin programar todavía: INV-S03). |
 | V3 Seguridad del frontend web | Cabeceras (framing, nosniff, referrer, HSTS) | Cumple | `next.config.ts`; `verify:ui`. |
 | V3 | CSP de scripts con nonce | Pendiente | PLT16-04, antes del piloto. |
 | V3 | Cookies seguras | Cumple | ADR 0003 «Sesiones, cookies y CSRF». |

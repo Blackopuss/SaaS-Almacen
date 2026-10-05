@@ -246,7 +246,7 @@ describe("applyCount", () => {
     expect(await adjustments(actor)).toBe(before + 1);
     expect(
       await db.stockMovement.count({
-        where: { idempotencyKey: `count-${countId}` },
+        where: { idempotencyKey: `count:${countId}` },
       }),
     ).toBe(1);
     expect(await reconcileStock(actor.organizationId)).toEqual([]);
@@ -402,6 +402,32 @@ describe("applyCount", () => {
       await applyCount(actor, { countId: cancelled.countId, reason: REASON }),
     ).toMatchObject({ ok: false, reason: "not_allowed" });
     expect(await cancelled.stock("Tornillo")).toBe("40");
+  });
+
+  it("nobody can take the count's key beforehand with another movement", async () => {
+    const { countId, products, stock } = await scene(
+      actor,
+      { Tornillo: "40" },
+      { Tornillo: "39" },
+    );
+    // The key of the count's adjustment is not one a form may send.
+    for (const idempotencyKey of [`count:${countId}`, `count-${countId}`]) {
+      await registerExit(actor, {
+        productId: products.Tornillo!,
+        quantity: "1",
+        idempotencyKey,
+      });
+    }
+    expect(
+      await db.stockMovement.count({
+        where: { idempotencyKey: `count:${countId}` },
+      }),
+    ).toBe(0);
+    expect(await applyCount(actor, { countId, reason: REASON })).toMatchObject({
+      ok: true,
+      adjusted: 1,
+    });
+    expect(Number(await stock("Tornillo"))).toBeLessThan(40);
   });
 
   it("the location is free for a new count after applying", async () => {

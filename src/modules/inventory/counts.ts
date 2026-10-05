@@ -970,7 +970,7 @@ export type ApplyCountResult =
  * Applying twice never adjusts twice: the count is locked and read again
  * inside the transaction — an applied one only answers what it did — and
  * the adjustment carries a key derived from the count, which the database
- * keeps unique.
+ * keeps unique and no form can send.
  *
  * What moved after each product was counted is respected (INV-32): the
  * line adds or takes the difference found then; it does not force today's
@@ -1138,8 +1138,10 @@ export async function applyCount(
                 type: "ADJUSTMENT",
                 reason: data.reason,
                 reference: `Conteo de ${count.location.name}`.slice(0, 120),
-                // One adjustment per count, also for the database.
-                idempotencyKey: `count-${count.id}`,
+                // One adjustment per count, also for the database. The
+                // colon keeps it apart from the keys forms send (letters,
+                // digits, "-" and "_"): nobody can take it beforehand.
+                idempotencyKey: `count:${count.id}`,
                 createdByUserId: userId,
               },
             });
