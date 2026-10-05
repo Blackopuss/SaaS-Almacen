@@ -18,7 +18,7 @@ import {
   getStockTotals,
   listStockLocations,
 } from "@/modules/inventory";
-import { getModuleAccess } from "@/platform/billing";
+import type { ModuleAccess } from "@/platform/billing";
 import {
   getProduct,
   listPresentations,
@@ -54,17 +54,19 @@ const KINDS = {
 /**
  * Screen of an entry (INV-16/17) or an exit (INV-19): first the product is
  * found, then the quantity (in its unit, a presentation or another unit)
- * and the location are captured.
+ * and the location are captured. The page resolves the person's access
+ * and hands it over; what it allows is decided here.
  */
 export async function MovementScreen({
   kind,
+  access,
   searchParams,
 }: {
   kind: keyof typeof KINDS;
+  access: ModuleAccess;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const texts = KINDS[kind];
-  const access = await getModuleAccess();
   const back = (
     <Link href="/movimientos" className={linkClass}>
       <ChevronLeft aria-hidden="true" className="size-4" />
