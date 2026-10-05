@@ -138,7 +138,7 @@ export async function registerEntry(
     actor.userId,
     "inventory.entry.create",
   );
-  return receive(actor, input, "ENTRY");
+  return post(actor, input, "ENTRY");
 }
 
 /**
@@ -157,23 +157,68 @@ export async function registerInitialBalance(
     actor.userId,
     "inventory.opening.create",
   );
-  return receive(actor, input, "INITIAL");
+  return post(actor, input, "INITIAL");
 }
 
-/** An entry or an initial balance: stock that is added to a location. */
-async function receive(
+/**
+ * Registers stock that leaves a location (INV-19). It never takes more
+ * than the location holds: stock does not go below zero (MOV-01).
+ */
+export async function registerExit(
   actor: InventoryActor,
   input: EntryInput,
-  type: "ENTRY" | "INITIAL",
+): Promise<MovementResult> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.exit.create",
+  );
+  return post(actor, input, "EXIT");
+}
+
+/** Texts that change with the kind of movement. */
+const KINDS = {
+  ENTRY: {
+    direction: "IN",
+    missingQuantity: "Escribe la cantidad que entra.",
+    archived:
+      "Este producto está archivado. Reactívalo para registrar entradas.",
+  },
+  INITIAL: {
+    direction: "IN",
+    missingQuantity: "Escribe cuánto hay.",
+    archived:
+      "Este producto está archivado. Reactívalo para registrar su saldo inicial.",
+  },
+  EXIT: {
+    direction: "OUT",
+    missingQuantity: "Escribe la cantidad que sale.",
+    archived:
+      "Este producto está archivado. Reactívalo para registrar salidas.",
+  },
+} as const;
+
+/**
+ * One product, one location, in or out: the movement, its line and the
+ * balance, in one transaction. Callers have checked the permission.
+ */
+async function post(
+  actor: InventoryActor,
+  input: EntryInput,
+  type: keyof typeof KINDS,
 ): Promise<MovementResult> {
   const { organizationId, userId } = actor;
+  const kind = KINDS[type];
 
   const parsed = entrySchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Partial<Record<EntryField, string>> = {};
     for (const issue of parsed.error.issues) {
       const field = issue.path[0] as EntryField;
-      fieldErrors[field] ??= issue.message;
+      fieldErrors[field] ??=
+        field === "quantity" && issue.code === "too_small"
+          ? kind.missingQuantity
+          : issue.message;
     }
     return { ok: false, reason: "invalid", fieldErrors };
   }
@@ -211,13 +256,7 @@ async function receive(
         return reject("not_found", "productId", "Este producto ya no existe.");
       }
       if (product.status !== "ACTIVE") {
-        return reject(
-          "not_allowed",
-          "productId",
-          type === "INITIAL"
-            ? "Este producto está archivado. Reactívalo para registrar su saldo inicial."
-            : "Este producto está archivado. Reactívalo para registrar entradas.",
-        );
+        return reject("not_allowed", "productId", kind.archived);
       }
 
       const location = await tx.location.findFirst({
@@ -245,6 +284,11 @@ async function receive(
       if (!resolved.ok) return reject("invalid", "quantity", resolved.error);
       const { conversion } = resolved;
       const unitCode = resolved.product.unitCode;
+      const base = conversion.baseQuantity;
+      const how =
+        conversion.presentation || conversion.capturedUnitCode
+          ? ` (${conversion.preview})`
+          : "";
 
       if (type === "INITIAL") {
         // The product is locked: what we read here cannot change under us.
@@ -273,9 +317,19 @@ async function receive(
         where: { productId: product.id, locationId: location.id },
         select: { id: true, quantity: true },
       });
-      const balance = dec(current?.quantity.toString() ?? 0).plus(
-        conversion.baseQuantity,
-      );
+      const before = dec(current?.quantity.toString() ?? 0);
+      const balance =
+        kind.direction === "IN" ? before.plus(base) : before.minus(base);
+      if (balance.isNegative()) {
+        // MOV-01: a location never gives more than it holds.
+        return reject(
+          "invalid",
+          "quantity",
+          before.isZero()
+            ? `No hay existencias de ${product.name} en ${location.name}.`
+            : `Solo hay ${formatStock(before.toString(), unitCode)} en ${location.name}: no pueden salir ${formatStock(base.toString(), unitCode)}.`,
+        );
+      }
       if (balance.greaterThan(MAX_BALANCE)) {
         return reject(
           "invalid",
@@ -303,20 +357,30 @@ async function receive(
           lineNumber: 1,
           productId: product.id,
           locationId: location.id,
-          direction: "IN",
+          direction: kind.direction,
           capturedQuantity: conversion.capturedQuantity.toString(),
           capturedUnitCode: conversion.capturedUnitCode,
           presentationId: conversion.presentation?.id ?? null,
           presentationVersionId: conversion.presentation?.versionId ?? null,
           factor: conversion.factor.toString(),
-          baseQuantity: conversion.baseQuantity.toString(),
+          baseQuantity: base.toString(),
           unitCode,
         },
       });
-      if (current) {
+      if (kind.direction === "OUT") {
+        // The condition repeats the check in the same statement that
+        // changes the balance; the CHECK of the table is the last defense.
+        const taken = await tx.stockBalance.updateMany({
+          where: { id: current?.id ?? "", quantity: { gte: base.toString() } },
+          data: { quantity: { decrement: base.toString() } },
+        });
+        if (taken.count !== 1) {
+          throw new Error(`Balance of ${product.id} changed under its lock`);
+        }
+      } else if (current) {
         await tx.stockBalance.updateMany({
           where: { id: current.id },
-          data: { quantity: { increment: conversion.baseQuantity.toString() } },
+          data: { quantity: { increment: base.toString() } },
         });
       } else {
         await tx.stockBalance.create({
@@ -325,29 +389,24 @@ async function receive(
             organizationId,
             productId: product.id,
             locationId: location.id,
-            quantity: conversion.baseQuantity.toString(),
+            quantity: base.toString(),
           },
         });
       }
 
-      const entered = formatStock(conversion.baseQuantity.toString(), unitCode);
-      const verb = conversion.baseQuantity.equals(1) ? "Entró" : "Entraron";
+      const moved = formatStock(base.toString(), unitCode);
+      const left = formatStock(balance.toString(), unitCode);
+      const one = base.equals(1);
       return {
         ok: true as const,
         movementId,
         // «3 cajas × 100 = 300 piezas» when it was not captured as is.
         summary:
           type === "INITIAL"
-            ? `Saldo inicial de ${product.name} en ${location.name}: ${entered}${
-                conversion.presentation || conversion.capturedUnitCode
-                  ? ` (${conversion.preview})`
-                  : ""
-              }.`
-            : `${verb} ${entered} de ${product.name} a ${location.name}${
-                conversion.presentation || conversion.capturedUnitCode
-                  ? ` (${conversion.preview})`
-                  : ""
-              }. Ahora hay ${formatStock(balance.toString(), unitCode)} ahí.`,
+            ? `Saldo inicial de ${product.name} en ${location.name}: ${moved}${how}.`
+            : type === "EXIT"
+              ? `${one ? "Salió" : "Salieron"} ${moved} de ${product.name} de ${location.name}${how}. ${balance.equals(1) ? "Queda" : "Quedan"} ${left} ahí.`
+              : `${one ? "Entró" : "Entraron"} ${moved} de ${product.name} a ${location.name}${how}. Ahora hay ${left} ahí.`,
       };
     });
   } catch (error) {

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   registerEntry,
+  registerExit,
   registerInitialBalance,
   type EntryField,
 } from "@/modules/inventory";
@@ -51,6 +52,15 @@ export async function registerEntryAction(
   return receive("entry", productId, prev, formData);
 }
 
+/** Registers an exit; the service refuses more than the location holds (INV-19). */
+export async function registerExitAction(
+  productId: string,
+  prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  return receive("exit", productId, prev, formData);
+}
+
 /** Registers the initial balance of a product in a location (INV-18). */
 export async function registerInitialBalanceAction(
   productId: string,
@@ -60,8 +70,14 @@ export async function registerInitialBalanceAction(
   return receive("initial", productId, prev, formData);
 }
 
+const SERVICES = {
+  entry: registerEntry,
+  exit: registerExit,
+  initial: registerInitialBalance,
+} as const;
+
 async function receive(
-  kind: "entry" | "initial",
+  kind: keyof typeof SERVICES,
   productId: string,
   _prev: EntryFormState,
   formData: FormData,
@@ -77,9 +93,7 @@ async function receive(
   };
   let result;
   try {
-    result = await (
-      kind === "initial" ? registerInitialBalance : registerEntry
-    )(
+    result = await SERVICES[kind](
       { organizationId: organization.id, userId: user.id },
       {
         productId: String(productId),
@@ -109,7 +123,7 @@ async function receive(
   redirect(
     kind === "initial"
       ? `/movimientos/saldo-inicial?guardado=${result.movementId}`
-      : `/movimientos?entrada=${result.movementId}`,
+      : `/movimientos?registrado=${result.movementId}`,
   );
 }
 

@@ -18,6 +18,13 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  registerExitAction: {
+    input:
+      "id de producto, id de ubicación, cantidad, forma de captura, referencia y nota (sin factor ni saldo)",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); producto y ubicación se buscan solo en esa empresa",
+    coveredBy: "tests/inventory/exits.int.test.ts",
+  },
   registerInitialBalanceAction: {
     input:
       "id de producto, id de ubicación, cantidad, forma de captura y nota (sin factor ni saldo)",

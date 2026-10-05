@@ -12,23 +12,37 @@ import { NativeSelect } from "@/components/ui/native-select";
 import {
   previewEntryAction,
   registerEntryAction,
+  registerExitAction,
   registerInitialBalanceAction,
   type EntryFormState,
   type EntryPreview,
 } from "../actions";
 
-/** Texts of the two uses of the form: an entry, or the initial balance. */
+/** Texts and action of each use of the form. */
 const MODES = {
   entry: {
+    action: registerEntryAction,
     quantity: "¿Cuánto entra?",
     location: "¿Dónde lo guardas?",
+    reference: "Remisión, factura o nota con la que llegó.",
     submit: "Registrar entrada",
     busy: "Registrando…",
     cancel: "/movimientos",
   },
+  exit: {
+    action: registerExitAction,
+    quantity: "¿Cuánto sale?",
+    location: "¿De dónde sale?",
+    reference: "Nota de venta, pedido o a quién se entregó.",
+    submit: "Registrar salida",
+    busy: "Registrando…",
+    cancel: "/movimientos",
+  },
   initial: {
+    action: registerInitialBalanceAction,
     quantity: "¿Cuánto hay hoy?",
     location: "¿Dónde está?",
+    reference: null,
     submit: "Guardar saldo inicial",
     busy: "Guardando…",
     cancel: "/movimientos/saldo-inicial",
@@ -63,9 +77,7 @@ export function EntryForm({
   const [answers, setAnswers] = useState(0);
   const [state, formAction, pending] = useActionState(
     async (prev: EntryFormState, formData: FormData) => {
-      const next = await (
-        mode === "initial" ? registerInitialBalanceAction : registerEntryAction
-      )(productId, prev, formData);
+      const next = await MODES[mode].action(productId, prev, formData);
       setAnswers((count) => count + 1);
       return next;
     },
@@ -207,11 +219,11 @@ export function EntryForm({
           </NativeSelect>
         )}
       </FormField>
-      {mode === "entry" && (
+      {texts.reference && (
         <FormField
           id="reference"
           label="Referencia (opcional)"
-          hint="Remisión, factura o nota con la que llegó."
+          hint={texts.reference}
           error={state.fieldErrors.reference}
         >
           {(control) => (

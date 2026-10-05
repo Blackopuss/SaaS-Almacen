@@ -11,6 +11,7 @@ export {
   listRecentMovements,
   listStockLocations,
   registerEntry,
+  registerExit,
   registerInitialBalance,
 } from "./movements";
 export type {

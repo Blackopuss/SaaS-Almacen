@@ -48,12 +48,12 @@ export default async function MovimientosPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const { entrada } = await searchParams;
+  const { registrado } = await searchParams;
   const [movements, registered] = await Promise.all([
     listRecentMovements(actor, { limit: 30 }),
     // The notice is built from the stored movement, never from the address.
-    typeof entrada === "string" && entrada
-      ? listRecentMovements(actor, { movementId: entrada.slice(0, 36) })
+    typeof registrado === "string" && registrado
+      ? listRecentMovements(actor, { movementId: registrado.slice(0, 36) })
       : [],
   ]);
   const justRegistered = registered[0];
@@ -66,6 +66,14 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const exitButton = access.allows("inventory.exit.create") ? (
+    <Button asChild variant="outline">
+      <Link href="/movimientos/salida">
+        <ArrowUpFromLine aria-hidden="true" data-icon="inline-start" />
+        Registrar salida
+      </Link>
+    </Button>
+  ) : undefined;
   const openingButton = access.allows("inventory.opening.create") ? (
     <Button asChild variant="outline">
       <Link href="/movimientos/saldo-inicial">
@@ -75,9 +83,10 @@ export default async function MovimientosPage({
     </Button>
   ) : undefined;
   const actions =
-    entryButton || openingButton ? (
+    entryButton || exitButton || openingButton ? (
       <>
         {entryButton}
+        {exitButton}
         {openingButton}
       </>
     ) : undefined;
