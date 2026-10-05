@@ -14,6 +14,7 @@ export {
   registerEntry,
   registerExit,
   registerInitialBalance,
+  registerTransfer,
 } from "./movements";
 export type {
   EntryField,
@@ -23,6 +24,9 @@ export type {
   MovementSummary,
   MovementType,
   PendingInitialBalance,
+  TransferField,
+  TransferInput,
+  TransferResult,
 } from "./movements";
 export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";

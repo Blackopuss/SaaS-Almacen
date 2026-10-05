@@ -16,6 +16,7 @@ import {
   registerEntryAction,
   registerExitAction,
   registerInitialBalanceAction,
+  registerTransferAction,
   type EntryFormState,
   type EntryPreview,
 } from "../actions";
@@ -40,6 +41,15 @@ const MODES = {
     busy: "Registrando…",
     cancel: "/movimientos",
   },
+  transfer: {
+    action: registerTransferAction,
+    quantity: "¿Cuánto se mueve?",
+    location: "¿De dónde sale?",
+    reference: null,
+    submit: "Reubicar",
+    busy: "Reubicando…",
+    cancel: "/movimientos",
+  },
   initial: {
     action: registerInitialBalanceAction,
     quantity: "¿Cuánto hay hoy?",
@@ -62,6 +72,7 @@ export function EntryForm({
   captures,
   locations,
   defaultLocationId,
+  destinations,
   idempotencyKey,
 }: {
   mode?: keyof typeof MODES;
@@ -74,6 +85,8 @@ export function EntryForm({
   /** Path of each location and what it holds today. */
   locations: { id: string; label: string }[];
   defaultLocationId: string;
+  /** Where it can go, for a relocation (INV-23): every active location. */
+  destinations?: { id: string; label: string }[];
   /**
    * Key of this confirmation, created by the server with the screen. It
    * travels again if the person retries, so a repeat never writes a second
@@ -122,6 +135,7 @@ export function EntryForm({
       capture: text("capture") || "base",
       reference: text("reference"),
       reason: text("reason"),
+      toLocationId: text("toLocationId"),
     };
     const outcome = await findOut();
     // The form itself says it below, next to what was typed.
@@ -337,6 +351,29 @@ export function EntryForm({
           </NativeSelect>
         )}
       </FormField>
+      {destinations && (
+        <FormField
+          id="toLocationId"
+          label="¿A dónde va?"
+          error={state.fieldErrors.toLocationId}
+        >
+          {(control) => (
+            <NativeSelect
+              {...control}
+              name="toLocationId"
+              defaultValue={state.values.toLocationId ?? ""}
+              key={`destination-${state.values.toLocationId ?? ""}-${answers}`}
+            >
+              <option value="">Elige una ubicación</option>
+              {destinations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.label}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </FormField>
+      )}
       {texts.reference && (
         <FormField
           id="reference"

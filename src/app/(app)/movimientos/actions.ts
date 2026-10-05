@@ -9,13 +9,14 @@ import {
   registerEntry,
   registerExit,
   registerInitialBalance,
+  registerTransfer,
   type EntryField,
 } from "@/modules/inventory";
 import { previewConversion, type Capture } from "@/platform/catalog";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
 export type EntryFormState = {
-  fieldErrors: Partial<Record<EntryField, string>>;
+  fieldErrors: Partial<Record<EntryField | "toLocationId", string>>;
   formError?: string;
   values: {
     locationId: string;
@@ -24,6 +25,8 @@ export type EntryFormState = {
     capture: string;
     reference: string;
     reason: string;
+    /** Destination of a relocation (INV-23). */
+    toLocationId?: string;
   };
 };
 
@@ -196,4 +199,52 @@ export async function checkConfirmationAction(
     }
     throw error;
   }
+}
+
+/** Moves stock of a product between two locations (INV-23). */
+export async function registerTransferAction(
+  productId: string,
+  _prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const text = (name: string) => String(formData.get(name) ?? "");
+  const values = {
+    locationId: text("locationId"),
+    toLocationId: text("toLocationId"),
+    quantity: text("quantity"),
+    capture: text("capture") || "base",
+    reference: "",
+    reason: text("reason"),
+  };
+  let result;
+  try {
+    result = await registerTransfer(
+      { organizationId: organization.id, userId: user.id },
+      {
+        productId: String(productId),
+        locationId: values.locationId,
+        toLocationId: values.toLocationId,
+        quantity: values.quantity,
+        reason: values.reason,
+        idempotencyKey: text("idempotencyKey"),
+        ...captureFields(values.capture),
+      },
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { fieldErrors: {}, formError: error.message, values };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError ?? result.fieldErrors.productId,
+      values,
+    };
+  }
+  revalidatePath("/movimientos");
+  revalidatePath("/inventario");
+  redirect(`/movimientos?registrado=${result.movementId}`);
 }

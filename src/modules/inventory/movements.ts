@@ -882,3 +882,349 @@ export async function findConfirmation(
   });
   return movement ? { movementId: movement.id } : null;
 }
+
+const transferSchema = entrySchema.extend({
+  /** Where it leaves from; for a relocation it must be chosen. */
+  locationId: z.string().trim().min(1, "Elige de dónde sale.").max(36),
+  toLocationId: z.string().trim().min(1, "Elige a dónde va.").max(36),
+});
+
+export type TransferInput = z.input<typeof transferSchema>;
+export type TransferField = keyof TransferInput;
+
+export type TransferResult =
+  | { ok: true; movementId: string; summary: string; repeated?: true }
+  | {
+      ok: false;
+      reason: "invalid" | "not_found" | "not_allowed";
+      fieldErrors: Partial<Record<TransferField, string>>;
+      formError?: string;
+    };
+
+class TransferRejected extends Error {
+  constructor(readonly result: Extract<TransferResult, { ok: false }>) {
+    super("transfer rejected");
+  }
+}
+
+const refuse = (
+  reason: "invalid" | "not_found" | "not_allowed",
+  field: TransferField | null,
+  error: string,
+): never => {
+  throw new TransferRejected({
+    ok: false,
+    reason,
+    fieldErrors: field ? { [field]: error } : {},
+    formError: field ? undefined : error,
+  });
+};
+
+/**
+ * Moves stock of a product from one location to another (INV-23). It is
+ * one movement with two lines — what leaves and what arrives — written
+ * with both balances in a single transaction: the total of the product
+ * never changes, and there is no moment in which the stock is in neither
+ * place or in both.
+ */
+export async function registerTransfer(
+  actor: InventoryActor,
+  input: TransferInput,
+): Promise<TransferResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.transfer.create",
+  );
+
+  const parsed = transferSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<TransferField, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0] as TransferField;
+      fieldErrors[field] ??=
+        field === "quantity" && issue.code === "too_small"
+          ? "Escribe la cantidad que se mueve."
+          : issue.message;
+    }
+    const { idempotencyKey: keyProblem, ...rest } = fieldErrors;
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: rest,
+      formError: keyProblem,
+    };
+  }
+  const data = parsed.data;
+  if (data.locationId === data.toLocationId) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {
+        toLocationId: "Elige una ubicación distinta a la de origen.",
+      },
+    };
+  }
+  if (data.presentationId && data.unitCode) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {
+        quantity: "Elige una sola forma de capturar: presentación o unidad.",
+      },
+    };
+  }
+  const capture: Capture = data.presentationId
+    ? {
+        kind: "presentation",
+        quantity: data.quantity,
+        presentationId: data.presentationId,
+      }
+    : data.unitCode
+      ? { kind: "unit", quantity: data.quantity, unitCode: data.unitCode }
+      : { kind: "base", quantity: data.quantity };
+
+  try {
+    return await forOrganization(organizationId).$transaction(async (tx) => {
+      // Same order as every movement: the product, then the locations
+      // (both at once; `lockRows` takes them in id order).
+      const [productId] = await lockRows(tx, "product", [data.productId]);
+      await lockRows(tx, "location", [data.locationId, data.toLocationId]);
+
+      if (data.idempotencyKey) {
+        const replay = await tx.stockMovement.findFirst({
+          where: { idempotencyKey: data.idempotencyKey },
+          select: {
+            id: true,
+            type: true,
+            createdByUserId: true,
+            lines: {
+              orderBy: { lineNumber: "asc" },
+              select: {
+                productId: true,
+                locationId: true,
+                capturedQuantity: true,
+                capturedUnitCode: true,
+                presentationId: true,
+                baseQuantity: true,
+                unitCode: true,
+                product: { select: { name: true } },
+                location: { select: { name: true } },
+              },
+            },
+          },
+        });
+        if (replay) {
+          const [out, into] = replay.lines;
+          let sameQuantity = false;
+          try {
+            sameQuantity =
+              !!out &&
+              dec(data.quantity.replace(/,(?=\d{3}(\D|$))/g, "")).equals(
+                out.capturedQuantity.toString(),
+              );
+          } catch {
+            sameQuantity = false;
+          }
+          if (
+            !out ||
+            !into ||
+            replay.type !== "TRANSFER" ||
+            replay.createdByUserId !== userId ||
+            out.productId !== data.productId ||
+            out.locationId !== data.locationId ||
+            into.locationId !== data.toLocationId ||
+            (out.presentationId ?? null) !== data.presentationId ||
+            (out.capturedUnitCode ?? null) !== data.unitCode ||
+            !sameQuantity
+          ) {
+            return refuse("not_allowed", null, KEY_REUSED);
+          }
+          return {
+            ok: true as const,
+            movementId: replay.id,
+            repeated: true as const,
+            summary: `Este movimiento ya estaba registrado: ${formatStock(out.baseQuantity.toString(), out.unitCode)} de ${out.product.name} de ${out.location.name} a ${into.location.name}. No se registró de nuevo.`,
+          };
+        }
+      }
+
+      const product = productId
+        ? await tx.product.findFirst({
+            where: { id: productId },
+            select: { id: true, name: true, status: true },
+          })
+        : null;
+      if (!product) {
+        return refuse("not_found", "productId", "Este producto ya no existe.");
+      }
+      if (product.status !== "ACTIVE") {
+        return refuse(
+          "not_allowed",
+          "productId",
+          "Este producto está archivado. Reactívalo para reubicarlo.",
+        );
+      }
+
+      const places = await tx.location.findMany({
+        where: { id: { in: [data.locationId, data.toLocationId] } },
+        select: { id: true, name: true, archivedAt: true },
+      });
+      const from = places.find((place) => place.id === data.locationId);
+      const to = places.find((place) => place.id === data.toLocationId);
+      if (!from) {
+        return refuse(
+          "not_found",
+          "locationId",
+          "Esa ubicación ya no existe. Elige otra.",
+        );
+      }
+      if (!to) {
+        return refuse(
+          "not_found",
+          "toLocationId",
+          "Esa ubicación ya no existe. Elige otra.",
+        );
+      }
+      if (to.archivedAt) {
+        return refuse(
+          "not_allowed",
+          "toLocationId",
+          `«${to.name}» está archivada. Elige otra ubicación.`,
+        );
+      }
+
+      const resolved = await resolveConversion(tx, product.id, capture);
+      if (!resolved.ok) return refuse("invalid", "quantity", resolved.error);
+      const { conversion } = resolved;
+      const unitCode = resolved.product.unitCode;
+      const base = conversion.baseQuantity;
+
+      const balances = await tx.stockBalance.findMany({
+        where: {
+          productId: product.id,
+          locationId: { in: [from.id, to.id] },
+        },
+        select: { id: true, locationId: true, quantity: true },
+      });
+      const source = balances.find((b) => b.locationId === from.id);
+      const target = balances.find((b) => b.locationId === to.id);
+      const inSource = dec(source?.quantity.toString() ?? 0);
+      const inTarget = dec(target?.quantity.toString() ?? 0);
+      if (inSource.lessThan(base)) {
+        // MOV-01 also holds here: a location never gives more than it has.
+        return refuse(
+          "invalid",
+          "quantity",
+          inSource.isZero()
+            ? `No hay existencias de ${product.name} en ${from.name}.`
+            : `Solo hay ${formatStock(inSource.toString(), unitCode)} en ${from.name}: no se pueden mover ${formatStock(base.toString(), unitCode)}.`,
+        );
+      }
+      const leftInSource = inSource.minus(base);
+      const nowInTarget = inTarget.plus(base);
+      if (nowInTarget.greaterThan(MAX_BALANCE)) {
+        return refuse(
+          "invalid",
+          "quantity",
+          "Con esa cantidad el saldo sería demasiado grande. Revisa lo que escribiste.",
+        );
+      }
+
+      const movementId = newId();
+      await tx.stockMovement.create({
+        data: {
+          id: movementId,
+          organizationId,
+          type: "TRANSFER",
+          reason: data.reason,
+          reference: data.reference,
+          idempotencyKey: data.idempotencyKey,
+          createdByUserId: userId,
+        },
+      });
+      const line = {
+        organizationId,
+        movementId,
+        productId: product.id,
+        capturedQuantity: conversion.capturedQuantity.toString(),
+        capturedUnitCode: conversion.capturedUnitCode,
+        presentationId: conversion.presentation?.id ?? null,
+        presentationVersionId: conversion.presentation?.versionId ?? null,
+        factor: conversion.factor.toString(),
+        baseQuantity: base.toString(),
+        unitCode,
+      };
+      await tx.stockMovementLine.create({
+        data: {
+          ...line,
+          id: newId(),
+          lineNumber: 1,
+          locationId: from.id,
+          direction: "OUT",
+        },
+      });
+      await tx.stockMovementLine.create({
+        data: {
+          ...line,
+          id: newId(),
+          lineNumber: 2,
+          locationId: to.id,
+          direction: "IN",
+        },
+      });
+
+      const taken = await tx.stockBalance.updateMany({
+        where: { id: source?.id ?? "", quantity: { gte: base.toString() } },
+        data: { quantity: { decrement: base.toString() } },
+      });
+      if (taken.count !== 1) {
+        throw new Error(`Balance of ${product.id} changed under its lock`);
+      }
+      if (target) {
+        await tx.stockBalance.updateMany({
+          where: { id: target.id },
+          data: { quantity: { increment: base.toString() } },
+        });
+      } else {
+        await tx.stockBalance.create({
+          data: {
+            id: newId(),
+            organizationId,
+            productId: product.id,
+            locationId: to.id,
+            quantity: base.toString(),
+          },
+        });
+      }
+
+      const how =
+        conversion.presentation || conversion.capturedUnitCode
+          ? ` (${conversion.preview})`
+          : "";
+      return {
+        ok: true as const,
+        movementId,
+        summary: `${base.equals(1) ? "Se movió" : "Se movieron"} ${formatStock(base.toString(), unitCode)} de ${product.name} de ${from.name} a ${to.name}${how}. ${leftInSource.equals(1) ? "Queda" : "Quedan"} ${formatStock(leftInSource.toString(), unitCode)} en ${from.name} y hay ${formatStock(nowInTarget.toString(), unitCode)} en ${to.name}.`,
+      };
+    }, LOCKING_TRANSACTION);
+  } catch (error) {
+    if (error instanceof TransferRejected) return error.result;
+    if (
+      data.idempotencyKey &&
+      (error as { code?: string }).code === "P2002" &&
+      JSON.stringify((error as { meta?: unknown }).meta ?? "").includes(
+        "idempotencyKey",
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "not_allowed",
+        fieldErrors: {},
+        formError: KEY_REUSED,
+      };
+    }
+    throw error;
+  }
+}

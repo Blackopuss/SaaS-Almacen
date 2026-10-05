@@ -50,6 +50,14 @@ const KINDS = {
     searchLabel: "Buscar el producto que sale",
     archived: "Reactívalo en Inventario para registrar salidas.",
   },
+  transfer: {
+    path: "/movimientos/reubicar",
+    permission: "inventory.transfer.create",
+    title: "Reubicar",
+    find: "Busca el producto que vas a cambiar de lugar.",
+    searchLabel: "Buscar el producto que se reubica",
+    archived: "Reactívalo en Inventario para reubicarlo.",
+  },
 } as const;
 
 /**
@@ -250,9 +258,29 @@ export async function MovementScreen({
   const holding = (id: string) =>
     formatStock(stock[id] ?? "0", product.unitCode);
 
-  if (kind === "exit") {
+  if (kind === "exit" || kind === "transfer") {
     // Stock only leaves from where there is some.
     const sources = locations.filter((location) => stock[location.id]);
+    if (kind === "transfer" && sources.length > 0 && locations.length < 2) {
+      return (
+        <PageContainer>
+          {another}
+          {header}
+          <EmptyState
+            icon={Package}
+            title="Solo tienes una ubicación"
+            description="Para reubicar necesitas al menos dos. Crea zonas, pasillos o estantes en Ubicaciones."
+            action={
+              access.allows("inventory.location.create") ? (
+                <Button asChild variant="outline">
+                  <Link href="/ubicaciones">Ir a Ubicaciones</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        </PageContainer>
+      );
+    }
     if (sources.length === 0) {
       return (
         <PageContainer>
@@ -261,7 +289,11 @@ export async function MovementScreen({
           <EmptyState
             icon={Package}
             title="No hay existencias de este producto"
-            description="No hay nada que sacar. Si acaba de llegar, registra primero su entrada."
+            description={
+              kind === "transfer"
+                ? "No hay nada que mover. Si acaba de llegar, registra primero su entrada."
+                : "No hay nada que sacar. Si acaba de llegar, registra primero su entrada."
+            }
             action={
               access.allows("inventory.entry.create") ? (
                 <Button asChild variant="outline">
@@ -284,7 +316,17 @@ export async function MovementScreen({
         </p>
         <EntryForm
           idempotencyKey={newId()}
-          mode="exit"
+          mode={kind}
+          destinations={
+            kind === "transfer"
+              ? locations.map((location) => ({
+                  id: location.id,
+                  label: stock[location.id]
+                    ? `${location.path} — hay ${holding(location.id)}`
+                    : location.path,
+                }))
+              : undefined
+          }
           productId={product.id}
           captures={captureOptions(product, presentations)}
           locations={sources.map((location) => ({

@@ -74,6 +74,14 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const transferButton = access.allows("inventory.transfer.create") ? (
+    <Button asChild variant="outline">
+      <Link href="/movimientos/reubicar">
+        <ArrowLeftRight aria-hidden="true" data-icon="inline-start" />
+        Reubicar
+      </Link>
+    </Button>
+  ) : undefined;
   const openingButton = access.allows("inventory.opening.create") ? (
     <Button asChild variant="outline">
       <Link href="/movimientos/saldo-inicial">
@@ -83,10 +91,11 @@ export default async function MovimientosPage({
     </Button>
   ) : undefined;
   const actions =
-    entryButton || exitButton || openingButton ? (
+    entryButton || exitButton || transferButton || openingButton ? (
       <>
         {entryButton}
         {exitButton}
+        {transferButton}
         {openingButton}
       </>
     ) : undefined;
@@ -110,13 +119,25 @@ export default async function MovimientosPage({
           />
           <p>
             {justRegistered.typeLabel} registrada:{" "}
-            {justRegistered.lines.map((line, index) => (
-              <span key={index}>
-                {index > 0 && "; "}
-                <span className="font-medium">{line.quantity}</span> de{" "}
-                {line.productName} en {line.location}
+            {justRegistered.type === "TRANSFER" &&
+            justRegistered.lines.length === 2 ? (
+              <span>
+                <span className="font-medium">
+                  {justRegistered.lines[0]!.quantity}
+                </span>{" "}
+                de {justRegistered.lines[0]!.productName}, de{" "}
+                {justRegistered.lines[0]!.location} a{" "}
+                {justRegistered.lines[1]!.location}
               </span>
-            ))}
+            ) : (
+              justRegistered.lines.map((line, index) => (
+                <span key={index}>
+                  {index > 0 && "; "}
+                  <span className="font-medium">{line.quantity}</span> de{" "}
+                  {line.productName} en {line.location}
+                </span>
+              ))
+            )}
             .
           </p>
         </div>
