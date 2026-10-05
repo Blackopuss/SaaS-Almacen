@@ -221,6 +221,15 @@ beforeAll(async () => {
         quantity: "5",
       },
     });
+    await db.stockMinimum.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        quantity: "2",
+        updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     await db.entitlement.create({
       data: {
         id: newId(),

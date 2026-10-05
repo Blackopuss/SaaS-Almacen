@@ -41,6 +41,7 @@ export const TENANT_MODELS = [
   "ProductPresentation",
   "QuotaUsage",
   "StockBalance",
+  "StockMinimum",
   "StockMovement",
   "StockMovementLine",
   "Subscription",

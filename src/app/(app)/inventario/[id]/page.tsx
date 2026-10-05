@@ -19,10 +19,17 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib";
-import { getProductStock, listRecentMovements } from "@/modules/inventory";
+import { dec, formatDateTime } from "@/lib";
+import {
+  formatStock,
+  getMinimum,
+  getProductStock,
+  listRecentMovements,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 import { getProduct, getUnit, listPresentations } from "@/platform/catalog";
+
+import { MinimumForm } from "./minimum-form";
 
 export const metadata: Metadata = { title: "Producto" };
 
@@ -68,8 +75,9 @@ export default async function ProductoPage({
   const { id } = await params;
   const product = await getProduct(actor, id);
   if (!product) notFound();
+  const active = product.status === "ACTIVE";
 
-  const [stock, presentations, movements] = await Promise.all([
+  const [stock, presentations, movements, minimum] = await Promise.all([
     access.can("inventory.stock.read")
       ? getProductStock(actor, product.id)
       : null,
@@ -79,9 +87,15 @@ export default async function ProductoPage({
     access.can("inventory.movement.read")
       ? listRecentMovements(actor, { productId: product.id, limit: 8 })
       : [],
+    access.can("inventory.minimum.read") ? getMinimum(actor, product.id) : null,
   ]);
+  // Low = the real balance is at or below the minimum (INV-30).
+  const low =
+    active &&
+    stock !== null &&
+    minimum !== null &&
+    dec(stock.total).lessThanOrEqualTo(minimum);
   const unit = getUnit(product.unitCode);
-  const active = product.status === "ACTIVE";
   const hasStock = stock !== null && stock.locations.length > 0;
 
   const action = (
@@ -168,9 +182,27 @@ export default async function ProductoPage({
             >
               Existencias
             </h2>
-            <p className="text-3xl font-semibold tracking-tight tabular-nums">
-              {stock.totalLabel}
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-3xl font-semibold tracking-tight tabular-nums">
+                {stock.totalLabel}
+              </span>
+              {low && (
+                <Badge
+                  variant={
+                    stock.locations.length === 0 ? "destructive" : "warning"
+                  }
+                >
+                  {stock.locations.length === 0
+                    ? "Agotado"
+                    : "Existencias bajas"}
+                </Badge>
+              )}
             </p>
+            {minimum !== null && (
+              <p className="text-sm text-muted-foreground">
+                Mínimo: {formatStock(minimum, product.unitCode)}
+              </p>
+            )}
             {stock.equivalences.map((equivalence) => (
               <p
                 key={equivalence.presentation}
@@ -219,6 +251,21 @@ export default async function ProductoPage({
           )}
         </section>
       )}
+
+      {active &&
+        moduleState === "active" &&
+        access.allows("inventory.minimum.update") && (
+          <section
+            aria-label="Mínimo del producto"
+            className="rounded-xl border bg-card p-4 sm:p-5"
+          >
+            <MinimumForm
+              productId={product.id}
+              minimum={minimum ?? ""}
+              unit={unit.plural}
+            />
+          </section>
+        )}
 
       <section
         aria-labelledby="ficha"

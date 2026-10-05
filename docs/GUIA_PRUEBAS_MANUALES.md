@@ -36,6 +36,7 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/recuperar-contrasena` | Pedir enlace para cambiar contraseña | Cualquiera |
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
 | `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
+| `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
 | `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/nuevo` | Alta de producto | Titular, Administrador, Almacén |
 | `/inventario/<id>/editar` | Ficha, presentaciones y archivar | Titular, Administrador, Almacén |
@@ -274,11 +275,21 @@ Un lector que «escribe como teclado» teclea el código y manda Enter; no neces
 
 Dime la marca y modelo del lector, y si alguna lectura se perdió, se duplicó o cayó en otro campo. (Simulado con teclado automático pasa en segundos; falta confirmarlo con el aparato.)
 
+**F13. Mínimos y existencias bajas**
+
+1. Abre la ficha de un producto y escribe su «Mínimo» (por ejemplo 10) → «Guardar». Deberías ver «Mínimo: 10 piezas» junto al total.
+2. Registra salidas hasta dejarlo en 10 o menos. Deberías ver la etiqueta «Existencias bajas» en la ficha («Agotado» si queda en cero).
+3. `/inventario` → «Existencias bajas» (muestra cuántos hay). Deberías ver la lista con lo que hay, lo que falta para el mínimo y el botón «Entrada»; primero los más vacíos.
+4. Registra una entrada que lo deje por encima: desaparece de la lista sin hacer nada más.
+5. Borra el mínimo (deja el cuadro vacío y guarda): deja de avisar.
+
+En un producto por piezas, un mínimo de `0.5` debe rechazarse. Los productos archivados no aparecen.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Conteos físicos, mínimos y alertas de existencias bajas.
+- Conteos físicos y avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores.
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).

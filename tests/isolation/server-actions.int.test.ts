@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  setMinimumAction: {
+    input: "id de producto y cantidad mínima (vacía = quitarla)",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el producto se busca solo en esa empresa",
+    coveredBy: "tests/inventory/minimums.int.test.ts",
+  },
   registerQuickExitAction: {
     input:
       "líneas (id de producto, ubicación, cantidad, forma de captura), motivo, referencia y clave de la confirmación",

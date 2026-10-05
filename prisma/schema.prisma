@@ -137,6 +137,7 @@ model Organization {
   stockMovements       StockMovement[]
   stockMovementLines   StockMovementLine[]
   stockBalances        StockBalance[]
+  stockMinimums        StockMinimum[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -603,6 +604,7 @@ model Product {
   presentations  ProductPresentation[]
   movementLines  StockMovementLine[]
   balances       StockBalance[]
+  minimum        StockMinimum?
   status         ProductStatus         @default(ACTIVE)
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   updatedAt      DateTime              @updatedAt @db.DateTime(3)
@@ -808,4 +810,23 @@ model StockBalance {
   @@unique([organizationId, productId, locationId])
   @@index([organizationId, locationId])
   @@map("stock_balance")
+}
+
+/// Lowest stock a company wants of a product, in the product's unit
+/// (INV-30). At or below it the product shows up as low. One per product;
+/// removing the minimum deletes the row.
+model StockMinimum {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId       String       @db.Char(36)
+  product         Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  quantity        Decimal      @db.Decimal(18, 3)
+  /// Person who set it last (an account; not a company row).
+  updatedByUserId String       @db.Char(36)
+  updatedAt       DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, productId])
+  @@map("stock_minimum")
 }

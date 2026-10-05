@@ -20,9 +20,14 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatStock, getStockTotals } from "@/modules/inventory";
+import {
+  countLowStock,
+  formatStock,
+  getStockTotals,
+} from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 import {
   listProductFilterOptions,
@@ -114,6 +119,12 @@ export default async function InventarioPage({
         [...products, ...(list.exact ? [list.exact] : [])].map((p) => p.id),
       )
     : null;
+  const lowCount =
+    !showArchived &&
+    access.can("inventory.minimum.read") &&
+    access.can("inventory.stock.read")
+      ? await countLowStock(actor)
+      : null;
   const canEnter = access.allows("inventory.entry.create");
   const first = (list.page - 1) * list.pageSize + 1;
   const last = first + products.length - 1;
@@ -251,6 +262,22 @@ export default async function InventarioPage({
         >
           {showArchived ? "Ver productos activos" : "Ver productos archivados"}
         </Link>
+        {lowCount !== null && (
+          <Link
+            href="/inventario/bajas"
+            className="ml-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Existencias bajas
+            {lowCount > 0 && (
+              <Badge variant="warning">
+                {lowCount.toLocaleString("es-MX")}
+                <span className="sr-only">
+                  {lowCount === 1 ? " producto" : " productos"}
+                </span>
+              </Badge>
+            )}
+          </Link>
+        )}
       </p>
       {(list.total > 0 || narrowed) && (
         <Form
