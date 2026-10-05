@@ -12,7 +12,9 @@ import { db } from "./db";
  * - checks `organizationId` on every create (callers pass the context's
  *   id explicitly; the types require it) and refuses another company;
  * - refuses moving a row to another company;
- * - refuses models without `organizationId` and raw SQL.
+ * - refuses models without `organizationId` and raw SQL. The one piece of
+ *   SQL the models cannot express, `SELECT … FOR UPDATE`, is offered by
+ *   `lockRows`, which adds the company filter itself.
  *
  * Without a company id there is no client at all. Nested writes through
  * relations are not rewritten: composite keys make the database reject
@@ -171,10 +173,24 @@ function extend(organizationId: string) {
 
 export type TenantDb = ReturnType<typeof extend>;
 
+/** Gives `lockRows` the transaction behind a guarded client; not exported. */
+const TRANSACTION = Symbol("tenant-transaction");
+
+type RawTransaction = {
+  $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T>;
+};
+
 /** Blocks raw SQL on a scoped client (and on its transaction clients). */
-function guard<T extends object>(client: T): T {
+function guard<T extends object>(
+  client: T,
+  organizationId: string,
+  inTransaction = false,
+): T {
   return new Proxy(client, {
     get(target, property, receiver) {
+      if (property === TRANSACTION) {
+        return inTransaction ? { client: target, organizationId } : undefined;
+      }
       if (typeof property === "string" && RAW.test(property)) {
         throw new TenantScopeError(
           "SQL directo no está permitido en el cliente de empresa.",
@@ -188,7 +204,10 @@ function guard<T extends object>(client: T): T {
           typeof input === "function"
             ? original.call(
                 target,
-                (tx: object) => (input as (tx: object) => unknown)(guard(tx)),
+                (tx: object) =>
+                  (input as (tx: object) => unknown)(
+                    guard(tx, organizationId, true),
+                  ),
                 options,
               )
             : original.call(target, input, options);
@@ -203,5 +222,49 @@ export function forOrganization(organizationId: string): TenantDb {
   if (typeof organizationId !== "string" || organizationId.length === 0) {
     throw new TenantScopeError("Consulta de negocio sin contexto de empresa.");
   }
-  return guard(extend(organizationId));
+  return guard(extend(organizationId), organizationId);
+}
+
+/** Tables whose rows a business rule may lock, by their model name. */
+const LOCKABLE = {
+  facility: "facility",
+  location: "location",
+  product: "product",
+} as const;
+
+/**
+ * Locks rows of the company until the transaction ends (`SELECT … FOR
+ * UPDATE`), always in id order so two transactions never wait for each
+ * other in a circle. Returns the ids that exist in this company: rows of
+ * another one are neither locked nor reported.
+ *
+ * Use it to make everything that changes the same thing happen one after
+ * the other (e.g. every stock movement of a product), instead of hoping two
+ * requests do not arrive together.
+ */
+export async function lockRows(
+  tx: object,
+  model: keyof typeof LOCKABLE,
+  ids: readonly string[],
+): Promise<string[]> {
+  const scope = (tx as Record<symbol, unknown>)[TRANSACTION] as
+    { client: RawTransaction; organizationId: string } | undefined;
+  if (!scope) {
+    throw new TenantScopeError(
+      "lockRows necesita el cliente de una transacción de empresa.",
+    );
+  }
+  const table = LOCKABLE[model];
+  if (!table) {
+    throw new TenantScopeError(`${String(model)} no se puede bloquear.`);
+  }
+  const unique = [...new Set(ids.map(String))].sort();
+  if (unique.length === 0) return [];
+  // The table comes from the fixed list above; every value is a parameter.
+  const rows = await scope.client.$queryRawUnsafe<{ id: string }[]>(
+    `SELECT id FROM \`${table}\` WHERE organizationId = ? AND id IN (${unique.map(() => "?").join(", ")}) ORDER BY id FOR UPDATE`,
+    scope.organizationId,
+    ...unique,
+  );
+  return rows.map((row) => row.id);
 }

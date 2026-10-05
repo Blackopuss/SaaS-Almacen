@@ -18,6 +18,13 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  registerEntryAction: {
+    input:
+      "id de producto, id de ubicación, cantidad, referencia y nota (sin factor ni saldo)",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); producto y ubicación se buscan solo en esa empresa",
+    coveredBy: "tests/inventory/entries.int.test.ts",
+  },
   createLocationAction: {
     input: "nombre, tipo e id de la ubicación que la contiene",
     identity:

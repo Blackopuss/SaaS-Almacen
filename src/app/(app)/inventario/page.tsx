@@ -1,4 +1,5 @@
 import {
+  ArrowDownToLine,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -21,6 +22,7 @@ import {
 } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatStock, getStockTotals } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 import {
   listProductFilterOptions,
@@ -105,6 +107,14 @@ export default async function InventarioPage({
       : filters.brands.find((option) => option.id === brand)?.name;
   const search = list.search;
   const products = list.items;
+  // Total of each product on this page (the sum of its locations).
+  const totals = access.can("inventory.stock.read")
+    ? await getStockTotals(
+        actor,
+        [...products, ...(list.exact ? [list.exact] : [])].map((p) => p.id),
+      )
+    : null;
+  const canEnter = access.allows("inventory.entry.create");
   const first = (list.page - 1) * list.pageSize + 1;
   const last = first + products.length - 1;
   const count = (n: number) => n.toLocaleString("es-MX");
@@ -129,9 +139,31 @@ export default async function InventarioPage({
             .filter(Boolean)
             .join(" · ")}
         </p>
+        {/* On a phone the quantity goes under the name; beside it from sm up. */}
+        {totals && (
+          <p className="text-sm font-medium tabular-nums sm:hidden">
+            {formatStock(totals[product.id] ?? "0", product.unitCode)}
+          </p>
+        )}
       </div>
+      {totals && (
+        <p className="hidden shrink-0 text-right text-sm font-medium tabular-nums sm:block">
+          {formatStock(totals[product.id] ?? "0", product.unitCode)}
+        </p>
+      )}
       {showArchived && canReactivate && (
         <ReactivateProduct productId={product.id} name={product.name} />
+      )}
+      {!showArchived && canEnter && (
+        <Button asChild variant="ghost" size="icon">
+          <Link
+            href={`/movimientos/entrada?producto=${product.id}`}
+            aria-label={`Registrar entrada de ${product.name}`}
+            title="Registrar entrada"
+          >
+            <ArrowDownToLine aria-hidden="true" />
+          </Link>
+        </Button>
       )}
       {!showArchived && canEdit && (
         <Button asChild variant="ghost">

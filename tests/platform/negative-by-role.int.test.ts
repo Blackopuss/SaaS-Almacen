@@ -390,6 +390,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       tests: [
         "tests/isolation/two-companies.int.test.ts",
         "tests/platform/location-hierarchy.int.test.ts",
+        "tests/inventory/entries.int.test.ts",
       ],
     },
     "NEG-13": { tests: ["tests/platform/negative-by-role.int.test.ts"] },

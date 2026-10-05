@@ -3,7 +3,7 @@ import { createTestOrganization } from "../setup/organization";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
-import { TenantScopeError, db, forOrganization } from "@/server";
+import { TenantScopeError, db, forOrganization, lockRows } from "@/server";
 
 // PLT-12: business queries need a company context and only ever see or
 // change rows of that company. Membership is today's company-scoped table.
@@ -168,6 +168,62 @@ describe("escape hatches are closed", () => {
     await expect(
       scoped.$transaction(async (tx) => tx.$executeRawUnsafe("SELECT 1")),
     ).rejects.toThrow(TenantScopeError);
+  });
+
+  it("locks rows only of the active company, and only inside a transaction", async () => {
+    const facilityA = await db.facility.findFirstOrThrow({
+      where: { organizationId: orgA },
+    });
+    const facilityB = await db.facility.findFirstOrThrow({
+      where: { organizationId: orgB },
+    });
+    const scoped = forOrganization(orgA);
+    expect(
+      await scoped.$transaction((tx) =>
+        lockRows(tx, "facility", [facilityB.id, facilityA.id, facilityA.id]),
+      ),
+    ).toEqual([facilityA.id]);
+    expect(
+      await scoped.$transaction((tx) => lockRows(tx, "facility", [])),
+    ).toEqual([]);
+    // Outside a transaction a lock would mean nothing.
+    await expect(lockRows(scoped, "facility", [facilityA.id])).rejects.toThrow(
+      TenantScopeError,
+    );
+    await expect(lockRows(db, "facility", [facilityA.id])).rejects.toThrow(
+      TenantScopeError,
+    );
+    // Only the listed tables, and ids are never part of the SQL text.
+    await expect(
+      scoped.$transaction((tx) =>
+        lockRows(tx, "user" as "facility", [facilityA.id]),
+      ),
+    ).rejects.toThrow(TenantScopeError);
+    expect(
+      await scoped.$transaction((tx) =>
+        lockRows(tx, "facility", ["' OR 1=1 --"]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("a locked row makes the second transaction wait for the first", async () => {
+    const facility = await db.facility.findFirstOrThrow({
+      where: { organizationId: orgA },
+    });
+    const order: string[] = [];
+    const first = forOrganization(orgA).$transaction(async (tx) => {
+      await lockRows(tx, "facility", [facility.id]);
+      order.push("first locked");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      order.push("first done");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const second = forOrganization(orgA).$transaction(async (tx) => {
+      await lockRows(tx, "facility", [facility.id]);
+      order.push("second locked");
+    });
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first locked", "first done", "second locked"]);
   });
 
   it("keeps the company filter inside transactions", async () => {
