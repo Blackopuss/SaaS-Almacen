@@ -317,6 +317,10 @@ Un movimiento en otra ubicación, o anterior a que contaras ese producto, no apa
 6. El ajuste se puede reversar desde Movimientos como cualquier otro; el conteo sigue aplicado y no vuelve a ajustar.
 7. Queda en la bitácora («Aplicó un conteo físico») con el motivo.
 
+**F17. Reconciliación (comprobación técnica)**
+
+En la terminal, `npm run stock:reconcile` revisa que las existencias de cada producto en cada ubicación coincidan con la suma de sus movimientos, en todas las empresas. Deberías ver «0 diferencia(s)». Solo lee; si algún día reporta una diferencia, avísame con el texto que imprime: es una falla a investigar, no algo que se corrija solo.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:

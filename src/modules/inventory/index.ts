@@ -79,3 +79,4 @@ export {
   type CountSummary,
   type OpenCountResult,
 } from "./counts";
+export { reconcileCompany, type ReconciliationReport } from "./reconciliation";
