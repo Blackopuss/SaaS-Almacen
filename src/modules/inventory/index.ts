@@ -11,12 +11,14 @@ export {
   listProductsWithoutStock,
   listRecentMovements,
   listStockLocations,
+  registerAdjustment,
   registerEntry,
   registerExit,
   registerInitialBalance,
   registerTransfer,
 } from "./movements";
 export type {
+  AdjustmentInput,
   EntryField,
   EntryInput,
   InventoryActor,

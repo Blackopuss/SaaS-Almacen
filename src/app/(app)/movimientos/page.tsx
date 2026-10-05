@@ -4,6 +4,7 @@ import {
   ArrowUpFromLine,
   CircleCheck,
   ClipboardList,
+  Scale,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -82,6 +83,14 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  const adjustmentButton = access.allows("inventory.adjustment.create") ? (
+    <Button asChild variant="outline">
+      <Link href="/movimientos/ajuste">
+        <Scale aria-hidden="true" data-icon="inline-start" />
+        Ajustar
+      </Link>
+    </Button>
+  ) : undefined;
   const openingButton = access.allows("inventory.opening.create") ? (
     <Button asChild variant="outline">
       <Link href="/movimientos/saldo-inicial">
@@ -91,11 +100,16 @@ export default async function MovimientosPage({
     </Button>
   ) : undefined;
   const actions =
-    entryButton || exitButton || transferButton || openingButton ? (
+    entryButton ||
+    exitButton ||
+    transferButton ||
+    adjustmentButton ||
+    openingButton ? (
       <>
         {entryButton}
         {exitButton}
         {transferButton}
+        {adjustmentButton}
         {openingButton}
       </>
     ) : undefined;
@@ -118,7 +132,10 @@ export default async function MovimientosPage({
             className="mt-0.5 size-4 shrink-0 text-success"
           />
           <p>
-            {justRegistered.typeLabel} registrada:{" "}
+            {justRegistered.type === "ADJUSTMENT"
+              ? "Ajuste registrado"
+              : `${justRegistered.typeLabel} registrada`}
+            :{" "}
             {justRegistered.type === "TRANSFER" &&
             justRegistered.lines.length === 2 ? (
               <span>
@@ -133,8 +150,12 @@ export default async function MovimientosPage({
               justRegistered.lines.map((line, index) => (
                 <span key={index}>
                   {index > 0 && "; "}
-                  <span className="font-medium">{line.quantity}</span> de{" "}
-                  {line.productName} en {line.location}
+                  <span className="font-medium">
+                    {justRegistered.type === "ADJUSTMENT" &&
+                      (line.direction === "IN" ? "+" : "−")}
+                    {line.quantity}
+                  </span>{" "}
+                  de {line.productName} en {line.location}
                 </span>
               ))
             )}

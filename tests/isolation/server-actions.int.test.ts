@@ -18,6 +18,13 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  registerAdjustmentAction: {
+    input:
+      "id de producto, ubicación, cantidad contada, forma de captura, motivo y clave de la confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); producto y ubicación se buscan solo en esa empresa",
+    coveredBy: "tests/inventory/adjustments.int.test.ts",
+  },
   registerTransferAction: {
     input:
       "id de producto, ubicación de origen y de destino, cantidad, forma de captura, nota y clave de la confirmación",

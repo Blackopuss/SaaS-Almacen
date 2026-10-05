@@ -13,6 +13,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import {
   checkConfirmationAction,
   previewEntryAction,
+  registerAdjustmentAction,
   registerEntryAction,
   registerExitAction,
   registerInitialBalanceAction,
@@ -39,6 +40,15 @@ const MODES = {
     reference: "Nota de venta, pedido o a quién se entregó.",
     submit: "Registrar salida",
     busy: "Registrando…",
+    cancel: "/movimientos",
+  },
+  adjustment: {
+    action: registerAdjustmentAction,
+    quantity: "¿Cuánto hay realmente?",
+    location: "¿Dónde lo contaste?",
+    reference: null,
+    submit: "Guardar ajuste",
+    busy: "Guardando…",
     cancel: "/movimientos",
   },
   transfer: {
@@ -395,7 +405,12 @@ export function EntryForm({
       )}
       <FormField
         id="reason"
-        label="Nota (opcional)"
+        label={mode === "adjustment" ? "Motivo" : "Nota (opcional)"}
+        hint={
+          mode === "adjustment"
+            ? "Obligatorio: por qué cambian las existencias. Por ejemplo: merma, producto dañado, conteo físico."
+            : undefined
+        }
         error={state.fieldErrors.reason}
       >
         {(control) => (

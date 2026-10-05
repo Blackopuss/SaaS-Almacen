@@ -50,6 +50,14 @@ const KINDS = {
     searchLabel: "Buscar el producto que sale",
     archived: "Reactívalo en Inventario para registrar salidas.",
   },
+  adjustment: {
+    path: "/movimientos/ajuste",
+    permission: "inventory.adjustment.create",
+    title: "Ajustar existencias",
+    find: "Busca el producto cuya cantidad no coincide.",
+    searchLabel: "Buscar el producto que se ajusta",
+    archived: "Reactívalo en Inventario para ajustar sus existencias.",
+  },
   transfer: {
     path: "/movimientos/reubicar",
     permission: "inventory.transfer.create",
@@ -344,19 +352,23 @@ export async function MovementScreen({
       {another}
       {header}
       <p className="text-sm text-muted-foreground">
-        {total
-          ? `Hoy hay ${formatStock(total, product.unitCode)} en total.`
-          : "Todavía no tiene existencias."}
+        {kind === "adjustment"
+          ? `El sistema tiene ${formatStock(total ?? "0", product.unitCode)} en total. Escribe lo que contaste en una ubicación: se registrará la diferencia, con tu motivo.`
+          : total
+            ? `Hoy hay ${formatStock(total, product.unitCode)} en total.`
+            : "Todavía no tiene existencias."}
       </p>
       <EntryForm
         idempotencyKey={newId()}
+        mode={kind === "adjustment" ? "adjustment" : "entry"}
         productId={product.id}
         captures={captureOptions(product, presentations)}
         locations={locations.map((location) => ({
           id: location.id,
-          label: stock[location.id]
-            ? `${location.path} — hay ${holding(location.id)}`
-            : location.path,
+          label:
+            stock[location.id] || kind === "adjustment"
+              ? `${location.path} — hay ${holding(location.id)}`
+              : location.path,
         }))}
         defaultLocationId={
           locations.find((location) => location.isDefault)?.id ??

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   findConfirmation,
+  registerAdjustment,
   registerEntry,
   registerExit,
   registerInitialBalance,
@@ -74,7 +75,17 @@ export async function registerInitialBalanceAction(
   return receive("initial", productId, prev, formData);
 }
 
+/** Corrects stock to what was counted, with a mandatory reason (INV-24). */
+export async function registerAdjustmentAction(
+  productId: string,
+  prev: EntryFormState,
+  formData: FormData,
+): Promise<EntryFormState> {
+  return receive("adjustment", productId, prev, formData);
+}
+
 const SERVICES = {
+  adjustment: registerAdjustment,
   entry: registerEntry,
   exit: registerExit,
   initial: registerInitialBalance,

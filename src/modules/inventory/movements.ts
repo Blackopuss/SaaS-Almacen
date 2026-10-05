@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { dec, formatDecimal, newId } from "@/lib";
+import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import {
   getUnit,
@@ -1211,6 +1212,281 @@ export async function registerTransfer(
     }, LOCKING_TRANSACTION);
   } catch (error) {
     if (error instanceof TransferRejected) return error.result;
+    if (
+      data.idempotencyKey &&
+      (error as { code?: string }).code === "P2002" &&
+      JSON.stringify((error as { meta?: unknown }).meta ?? "").includes(
+        "idempotencyKey",
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "not_allowed",
+        fieldErrors: {},
+        formError: KEY_REUSED,
+      };
+    }
+    throw error;
+  }
+}
+
+const adjustmentSchema = entrySchema.extend({
+  /** What was really counted; zero is a valid answer. */
+  quantity: z.string().trim().min(1, "Escribe cuánto hay realmente."),
+  /** Why the stock is being corrected: always required (INV-24). */
+  reason: z
+    .string()
+    .trim()
+    .regex(
+      /^[^\u0000-\u001f\u007f]*$/,
+      "Quita los saltos de línea o tabuladores.",
+    )
+    .min(
+      5,
+      "Escribe el motivo del ajuste, por ejemplo: merma, producto dañado o conteo físico.",
+    )
+    .max(500, "El motivo es demasiado largo (máximo 500 caracteres)."),
+});
+
+export type AdjustmentInput = z.input<typeof adjustmentSchema>;
+
+/**
+ * Corrects the stock of a product in a location to what was really
+ * counted (INV-24). The person says how much there is and why; the system
+ * writes the difference as a movement — the balance is never typed over —
+ * and records the correction in the company's audit log, with the
+ * quantity before, the one counted and the reason.
+ */
+export async function registerAdjustment(
+  actor: InventoryActor,
+  input: AdjustmentInput,
+): Promise<MovementResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "inventory.adjustment.create",
+  );
+
+  const parsed = adjustmentSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<EntryField, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0] as EntryField;
+      fieldErrors[field] ??= issue.message;
+    }
+    const { idempotencyKey: keyProblem, ...rest } = fieldErrors;
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: rest,
+      formError: keyProblem,
+    };
+  }
+  const data = parsed.data;
+  if (data.presentationId && data.unitCode) {
+    return {
+      ok: false,
+      reason: "invalid",
+      fieldErrors: {
+        quantity: "Elige una sola forma de capturar: presentación o unidad.",
+      },
+    };
+  }
+  const isZero = /^0+(\.0+)?$/.test(data.quantity);
+  const capture: Capture = data.presentationId
+    ? {
+        kind: "presentation",
+        quantity: data.quantity,
+        presentationId: data.presentationId,
+      }
+    : data.unitCode
+      ? { kind: "unit", quantity: data.quantity, unitCode: data.unitCode }
+      : { kind: "base", quantity: data.quantity };
+
+  try {
+    return await forOrganization(organizationId).$transaction(async (tx) => {
+      const [productId] = await lockRows(tx, "product", [data.productId]);
+      if (data.locationId) await lockRows(tx, "location", [data.locationId]);
+
+      if (data.idempotencyKey) {
+        const replay = await findReplay(tx, data.idempotencyKey);
+        if (replay) {
+          const line = replay.lines[0];
+          if (
+            !line ||
+            replay.type !== "ADJUSTMENT" ||
+            replay.createdByUserId !== userId ||
+            line.productId !== data.productId ||
+            (data.locationId !== null && line.locationId !== data.locationId)
+          ) {
+            return reject("not_allowed", null, KEY_REUSED);
+          }
+          return {
+            ok: true as const,
+            movementId: replay.id,
+            repeated: true as const,
+            summary: `Este ajuste ya estaba registrado: ${formatStock(line.baseQuantity.toString(), line.unitCode)} de ${line.product.name} en ${line.location.name}. No se registró de nuevo.`,
+          };
+        }
+      }
+
+      const product = productId
+        ? await tx.product.findFirst({
+            where: { id: productId },
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              status: true,
+              unitCode: true,
+            },
+          })
+        : null;
+      if (!product) {
+        return reject("not_found", "productId", "Este producto ya no existe.");
+      }
+      if (product.status !== "ACTIVE") {
+        return reject(
+          "not_allowed",
+          "productId",
+          "Este producto está archivado. Reactívalo para ajustar sus existencias.",
+        );
+      }
+      const location = await tx.location.findFirst({
+        where: data.locationId ? { id: data.locationId } : { isDefault: true },
+        select: { id: true, name: true, archivedAt: true },
+      });
+      if (!location) {
+        return reject(
+          "not_found",
+          "locationId",
+          "Esa ubicación ya no existe. Elige otra.",
+        );
+      }
+      if (location.archivedAt) {
+        return reject(
+          "not_allowed",
+          "locationId",
+          `«${location.name}» está archivada. Elige otra ubicación.`,
+        );
+      }
+
+      // What was counted, in the product's unit. Zero needs no conversion.
+      let counted = dec(0);
+      let how = "";
+      if (!isZero) {
+        const resolved = await resolveConversion(tx, product.id, capture);
+        if (!resolved.ok) return reject("invalid", "quantity", resolved.error);
+        counted = resolved.conversion.baseQuantity;
+        if (
+          resolved.conversion.presentation ||
+          resolved.conversion.capturedUnitCode
+        ) {
+          how = ` (${resolved.conversion.preview})`;
+        }
+      }
+      if (counted.greaterThan(MAX_BALANCE)) {
+        return reject(
+          "invalid",
+          "quantity",
+          "Esa cantidad es demasiado grande. Revisa lo que escribiste.",
+        );
+      }
+
+      const unitCode = product.unitCode;
+      const current = await tx.stockBalance.findFirst({
+        where: { productId: product.id, locationId: location.id },
+        select: { id: true, quantity: true },
+      });
+      const before = dec(current?.quantity.toString() ?? 0);
+      const difference = counted.minus(before);
+      if (difference.isZero()) {
+        return reject(
+          "invalid",
+          "quantity",
+          `El sistema ya tiene ${formatStock(before.toString(), unitCode)} en ${location.name}: no hay nada que ajustar.`,
+        );
+      }
+      const direction = difference.isPositive() ? "IN" : "OUT";
+      const amount = difference.abs();
+
+      const movementId = newId();
+      await tx.stockMovement.create({
+        data: {
+          id: movementId,
+          organizationId,
+          type: "ADJUSTMENT",
+          reason: data.reason,
+          reference: data.reference,
+          idempotencyKey: data.idempotencyKey,
+          createdByUserId: userId,
+        },
+      });
+      // The line carries the difference, in the product's unit: that is
+      // what moved. What was counted goes to the audit record below.
+      await tx.stockMovementLine.create({
+        data: {
+          id: newId(),
+          organizationId,
+          movementId,
+          lineNumber: 1,
+          productId: product.id,
+          locationId: location.id,
+          direction,
+          capturedQuantity: amount.toString(),
+          capturedUnitCode: null,
+          presentationId: null,
+          presentationVersionId: null,
+          factor: "1",
+          baseQuantity: amount.toString(),
+          unitCode,
+        },
+      });
+      if (current) {
+        const changed = await tx.stockBalance.updateMany({
+          where: { id: current.id, quantity: before.toString() },
+          data: { quantity: counted.toString() },
+        });
+        if (changed.count !== 1) {
+          throw new Error(`Balance of ${product.id} changed under its lock`);
+        }
+      } else {
+        await tx.stockBalance.create({
+          data: {
+            id: newId(),
+            organizationId,
+            productId: product.id,
+            locationId: location.id,
+            quantity: counted.toString(),
+          },
+        });
+      }
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "inventory.adjusted",
+        target: { type: "product", id: product.id },
+        reason: data.reason,
+        metadata: {
+          sku: product.sku,
+          producto: product.name,
+          ubicacion: location.name,
+          antes: formatStock(before.toString(), unitCode),
+          contado: formatStock(counted.toString(), unitCode),
+          diferencia: `${direction === "IN" ? "+" : "−"}${formatStock(amount.toString(), unitCode)}`,
+          movementId,
+        },
+      });
+
+      return {
+        ok: true as const,
+        movementId,
+        summary: `Ajuste de ${product.name} en ${location.name}: había ${formatStock(before.toString(), unitCode)} y ahora hay ${formatStock(counted.toString(), unitCode)}${how} (${direction === "IN" ? "+" : "−"}${formatStock(amount.toString(), unitCode)}).`,
+      };
+    }, LOCKING_TRANSACTION);
+  } catch (error) {
+    if (error instanceof Rejected) return error.result;
     if (
       data.idempotencyKey &&
       (error as { code?: string }).code === "P2002" &&
