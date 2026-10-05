@@ -264,6 +264,16 @@ En `/movimientos` combina fechas «Desde/Hasta», producto (parte del nombre o l
 
 No cobra, no maneja precios ni genera ticket: solo registra lo que sale.
 
+**F12. Lector de códigos (pendiente de probar con tu lector real)**
+
+Un lector que «escribe como teclado» teclea el código y manda Enter; no necesita configuración. Con productos que tengan código de barras y existencias:
+
+1. `/inventario`: clic en la búsqueda y escanea. Deberías ver el producto como «Coincidencia exacta».
+2. `/movimientos/entrada` (o `/salida`): escanea. Deberías llegar directo al formulario de ese producto con el cursor en la cantidad; teclea la cantidad y Enter para registrar.
+3. `/movimientos/salida-rapida`: escanea 10 productos seguidos, sin esperar entre uno y otro, y repite alguno. Deberías ver una línea por producto en el orden escaneado, el repetido con cantidad 2, y el cursor siempre en la búsqueda. Confirma y toma el tiempo: la meta es menos de 2 minutos para 10 líneas.
+
+Dime la marca y modelo del lector, y si alguna lectura se perdió, se duplicó o cayó en otro campo. (Simulado con teclado automático pasa en segundos; falta confirmarlo con el aparato.)
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:

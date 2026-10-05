@@ -2,6 +2,7 @@ import { newId } from "@/lib";
 import { ChevronLeft, ChevronRight, Package, Search } from "lucide-react";
 import Form from "next/form";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   EmptyState,
@@ -122,6 +123,11 @@ export async function MovementScreen({
       search: typeof q === "string" ? q : "",
       pageSize: 10,
     });
+    // A code read by a scanner (or a SKU typed whole) names one product:
+    // go straight to its form (INV-29).
+    if (list.exact && list.search) {
+      redirect(`${texts.path}?producto=${list.exact.id}`);
+    }
     // What was scanned or typed exactly goes first.
     const products = list.exact
       ? [list.exact, ...list.items.filter((p) => p.id !== list.exact?.id)]

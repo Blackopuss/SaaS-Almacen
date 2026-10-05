@@ -106,14 +106,25 @@ export function QuickExitForm({
     null,
   );
 
+  // A reader types faster than the server answers: what the answers
+  // change is the list as of the last change, not the one of the render
+  // that started the search.
+  const latest = useRef<Line[] | null>(null);
+  const current = () => latest.current ?? lines;
+  function commit(next: Line[]) {
+    latest.current = next;
+    setLines(next);
+  }
+
   function add(product: ExitProduct) {
+    const now = current();
     if (product.locations.length === 0) {
       setNotice(`${product.name} no tiene existencias: no puede salir.`);
       return;
     }
     // Scanned or chosen again: one more of the same, when it is counted
     // in whole units of the product.
-    const again = lines.find(
+    const again = now.find(
       (line) =>
         line.product.id === product.id &&
         line.capture === "base" &&
@@ -121,82 +132,105 @@ export function QuickExitForm({
     );
     if (again) {
       const more = String(BigInt(again.quantity.trim()) + BigInt(1));
-      setLines(
-        lines.map((line) =>
+      commit(
+        now.map((line) =>
           line.key === again.key ? { ...line, quantity: more } : line,
         ),
       );
       setNotice(`${product.name}: ahora van ${more}.`);
       return;
     }
-    if (lines.length >= maxLines) {
+    if (now.length >= maxLines) {
       setNotice(
         `Una salida admite hasta ${maxLines} líneas. Confirma esta y sigue en otra.`,
       );
       return;
     }
-    setLines([...lines, newLine(product)]);
+    commit([...now, newLine(product)]);
     setNotice(`Agregaste ${product.name}.`);
   }
 
-  async function search() {
-    const typed = query.trim();
-    if (typed === "" || searching) return;
+  // Codes wait in line (INV-29): a reader sends the next one before the
+  // previous has an answer, and none may be lost or change places.
+  const queue = useRef<string[]>([]);
+  const draining = useRef(false);
+
+  function enqueue(text: string) {
+    const typed = text.trim().slice(0, 100);
+    searchRef.current?.focus();
+    if (typed === "") return;
+    queue.current.push(typed);
+    setQuery("");
+    if (!draining.current) void drain();
+  }
+
+  async function drain() {
+    draining.current = true;
     setSearching(true);
-    setNotice(null);
     try {
-      const found = await findExitProductsAction(typed);
-      if (found.error) {
-        setCandidates([]);
-        setNotice(found.error);
-      } else if (found.exact) {
-        add(found.exact);
-        setCandidates([]);
-        setQuery("");
-      } else {
-        setCandidates(found.candidates);
-        if (found.candidates.length === 0) {
+      for (
+        let typed = queue.current.shift();
+        typed !== undefined;
+        typed = queue.current.shift()
+      ) {
+        try {
+          const found = await findExitProductsAction(typed);
+          if (found.error) {
+            setCandidates([]);
+            setNotice(found.error);
+          } else if (found.exact) {
+            add(found.exact);
+            setCandidates([]);
+          } else {
+            setCandidates(found.candidates);
+            setNotice(
+              found.candidates.length === 0
+                ? `No encontramos productos activos con «${typed}». Revisa cómo está escrito.`
+                : `Elige el producto de «${typed}».`,
+            );
+          }
+        } catch {
           setNotice(
-            `No encontramos productos activos con «${typed}». Revisa cómo está escrito.`,
+            `No pudimos buscar «${typed}». Revisa tu conexión y vuelve a intentarlo.`,
           );
         }
       }
-    } catch {
-      setNotice("No pudimos buscar. Revisa tu conexión e inténtalo de nuevo.");
     } finally {
+      draining.current = false;
       setSearching(false);
-      searchRef.current?.focus();
     }
   }
 
+  const [choosing, setChoosing] = useState(false);
   async function choose(candidate: ExitCandidate) {
-    setSearching(true);
+    setChoosing(true);
     try {
       const product = await loadExitProductAction(candidate.id);
       if (product) {
         add(product);
         setCandidates([]);
-        setQuery("");
       } else {
         setNotice(`${candidate.name} ya no está disponible.`);
       }
     } catch {
       setNotice("No pudimos agregarlo. Revisa tu conexión.");
     } finally {
-      setSearching(false);
+      setChoosing(false);
       searchRef.current?.focus();
     }
   }
 
   function change(key: string, patch: Partial<Line>) {
-    setLines(
-      lines.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    commit(
+      current().map((line) =>
+        line.key === key ? { ...line, ...patch } : line,
+      ),
     );
     if (lineErrors[key]) setLineErrors(without(lineErrors, key));
   }
 
   function remove(key: string) {
-    setLines(lines.filter((line) => line.key !== key));
+    commit(current().filter((line) => line.key !== key));
     setLineErrors(without(lineErrors, key));
     searchRef.current?.focus();
   }
@@ -289,7 +323,8 @@ export function QuickExitForm({
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
-                void search();
+                // What the box holds now, not what the last render saw.
+                enqueue(event.currentTarget.value);
               }
             }}
             placeholder="Nombre, clave o código de barras"
@@ -303,8 +338,7 @@ export function QuickExitForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() => void search()}
-            disabled={searching}
+            onClick={() => enqueue(query)}
           >
             {searching ? (
               <Loader2
@@ -331,7 +365,7 @@ export function QuickExitForm({
                 <button
                   type="button"
                   onClick={() => void choose(candidate)}
-                  disabled={searching}
+                  disabled={choosing}
                   className="flex min-h-14 w-full items-center gap-3 p-3 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:px-4"
                 >
                   <span className="min-w-0 flex-1">
