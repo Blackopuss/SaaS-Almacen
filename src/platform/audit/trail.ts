@@ -30,6 +30,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
     "Una importación de productos se detuvo antes de terminar",
   "inventory.export_created": "Exportó información a un archivo",
   "inventory.reversed": "Reversó un movimiento",
+  "product_supplier.created": "Vinculó un producto con un proveedor",
+  "product_supplier.updated":
+    "Cambió el vínculo de un producto con un proveedor",
   "supplier.created": "Agregó un proveedor",
   "supplier.updated": "Cambió los datos de un proveedor",
   "product.created": "Creó un producto",

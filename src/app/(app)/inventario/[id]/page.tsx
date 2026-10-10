@@ -26,6 +26,7 @@ import {
   getProductStock,
   listRecentMovements,
 } from "@/modules/inventory";
+import { listSuppliersOfProduct } from "@/modules/purchasing";
 import { getModuleAccess } from "@/platform/billing";
 import { getProduct, getUnit, listPresentations } from "@/platform/catalog";
 
@@ -77,18 +78,27 @@ export default async function ProductoPage({
   if (!product) notFound();
   const active = product.status === "ACTIVE";
 
-  const [stock, presentations, movements, minimum] = await Promise.all([
-    access.can("inventory.stock.read")
-      ? getProductStock(actor, product.id)
-      : null,
-    access.can("inventory.presentation.read")
-      ? listPresentations(actor, product.id)
-      : [],
-    access.can("inventory.movement.read")
-      ? listRecentMovements(actor, { productId: product.id, limit: 8 })
-      : [],
-    access.can("inventory.minimum.read") ? getMinimum(actor, product.id) : null,
-  ]);
+  // Who sells it (CMP-03): only with Compras contracted and for who may
+  // see that side; the costs come only for who may see costs.
+  const showSuppliers =
+    access.moduleState("purchasing") !== "none" &&
+    access.can("purchasing.product_supplier.read");
+  const [stock, presentations, movements, minimum, suppliers] =
+    await Promise.all([
+      access.can("inventory.stock.read")
+        ? getProductStock(actor, product.id)
+        : null,
+      access.can("inventory.presentation.read")
+        ? listPresentations(actor, product.id)
+        : [],
+      access.can("inventory.movement.read")
+        ? listRecentMovements(actor, { productId: product.id, limit: 8 })
+        : [],
+      access.can("inventory.minimum.read")
+        ? getMinimum(actor, product.id)
+        : null,
+      showSuppliers ? listSuppliersOfProduct(actor, product.id) : null,
+    ]);
   // Low = the real balance is at or below the minimum (INV-30).
   const low =
     active &&
@@ -291,6 +301,50 @@ export default async function ProductoPage({
           )}
         </dl>
       </section>
+
+      {suppliers && suppliers.total > 0 && (
+        <section
+          aria-labelledby="proveedores-producto"
+          className="rounded-xl border bg-card"
+        >
+          <h2
+            id="proveedores-producto"
+            className="border-b px-4 py-3 font-medium sm:px-5"
+          >
+            Quién te lo vende
+          </h2>
+          <ul className="divide-y">
+            {suppliers.items.map((link) => (
+              <li key={link.id} className="space-y-1 p-4 sm:px-5">
+                <p className="font-medium [overflow-wrap:anywhere]">
+                  {access.can("purchasing.supplier.read") ? (
+                    <Link
+                      href={`/compras/proveedores/${link.supplierId}`}
+                      className="rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {link.supplierName}
+                    </Link>
+                  ) : (
+                    link.supplierName
+                  )}
+                </p>
+                <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                  {link.supplierSku
+                    ? `Su código: ${link.supplierSku}`
+                    : "Sin código del proveedor"}{" "}
+                  · Se compra por{" "}
+                  {link.presentation ? link.presentation.text : link.unitName}
+                </p>
+                {suppliers.costsVisible && link.lastCost && (
+                  <p className="text-sm tabular-nums">
+                    Último costo: {link.lastCost.text}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {access.can("inventory.movement.read") && (
         <section

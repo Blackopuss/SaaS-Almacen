@@ -45,6 +45,7 @@ export const TENANT_MODELS = [
   "ProductImport",
   "ProductImportItem",
   "ProductPresentation",
+  "ProductSupplier",
   "QuotaUsage",
   "StockBalance",
   "StockCount",

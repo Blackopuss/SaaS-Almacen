@@ -148,6 +148,7 @@ model Organization {
   exitImports          ExitImport[]
   exitImportRows       ExitImportRow[]
   contacts             Contact[]
+  productSuppliers     ProductSupplier[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -619,6 +620,7 @@ model Product {
   minimum        StockMinimum?
   countLines     StockCountLine[]
   exitImportRows ExitImportRow[]
+  suppliers      ProductSupplier[]
   status         ProductStatus         @default(ACTIVE)
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   updatedAt      DateTime              @updatedAt @db.DateTime(3)
@@ -673,6 +675,7 @@ model ProductPresentation {
   versions       PresentationVersion[]
   movementLines  StockMovementLine[]
   countCaptures  StockCountCapture[]
+  purchasedAs    ProductSupplier[]
 
   @@unique([organizationId, id])
   /// Lets a movement line prove its presentation is of its product.
@@ -697,6 +700,7 @@ model PresentationVersion {
   createdAt       DateTime            @default(now()) @db.DateTime(3)
   movementLines   StockMovementLine[]
   countCaptures   StockCountCapture[]
+  lastCostOf      ProductSupplier[]
 
   @@unique([organizationId, id])
   /// Lets a movement line prove its version is of its presentation.
@@ -1226,28 +1230,29 @@ model ExitImportRow {
 /// contact is for a module is a facet (`isSupplier`, `isCustomer`), and a
 /// contact always has at least one.
 model Contact {
-  id              String       @id @db.Char(36)
-  organizationId  String       @db.Char(36)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id               String            @id @db.Char(36)
+  organizationId   String            @db.Char(36)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// As the business knows it: «Ferretera del Norte».
-  name            String       @db.VarChar(160)
+  name             String            @db.VarChar(160)
   /// Legal name, when it differs: «Ferretera del Norte, S.A. de C.V.».
-  legalName       String?      @db.VarChar(200)
+  legalName        String?           @db.VarChar(200)
   /// Mexican tax id, in capitals and without spaces; optional.
-  rfc             String?      @db.VarChar(13)
-  isSupplier      Boolean      @default(false)
-  isCustomer      Boolean      @default(false)
+  rfc              String?           @db.VarChar(13)
+  isSupplier       Boolean           @default(false)
+  isCustomer       Boolean           @default(false)
   /// Who to ask for there.
-  contactPerson   String?      @db.VarChar(120)
-  email           String?      @db.VarChar(254)
-  phone           String?      @db.VarChar(40)
-  address         String?      @db.VarChar(300)
-  notes           String?      @db.VarChar(500)
+  contactPerson    String?           @db.VarChar(120)
+  email            String?           @db.VarChar(254)
+  phone            String?           @db.VarChar(40)
+  address          String?           @db.VarChar(300)
+  notes            String?           @db.VarChar(500)
   /// Set when it is no longer used; its documents keep pointing to it.
-  archivedAt      DateTime?    @db.DateTime(3)
-  createdByUserId String       @db.Char(36)
-  createdAt       DateTime     @default(now()) @db.DateTime(3)
-  updatedAt       DateTime     @updatedAt @db.DateTime(3)
+  archivedAt       DateTime?         @db.DateTime(3)
+  createdByUserId  String            @db.Char(36)
+  createdAt        DateTime          @default(now()) @db.DateTime(3)
+  updatedAt        DateTime          @updatedAt @db.DateTime(3)
+  suppliedProducts ProductSupplier[]
 
   @@unique([organizationId, id])
   /// Orders and searches the list of suppliers (name and RFC) in one index.
@@ -1255,4 +1260,44 @@ model Contact {
   @@index([organizationId, isCustomer, name, id])
   @@index([organizationId, rfc])
   @@map("contact")
+}
+
+/// That a supplier sells a product to the company (CMP-03): the code the
+/// supplier knows it by, the presentation it is bought in and what it
+/// cost the last time. One row per product and supplier.
+///
+/// The presentation only says how it is bought; its content is the one of
+/// the catalog and is never changed from here. The last cost is not typed
+/// in: it is written when a purchase is registered, and shown only to who
+/// may see costs.
+model ProductSupplier {
+  id                            String               @id @db.Char(36)
+  organizationId                String               @db.Char(36)
+  organization                  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId                     String               @db.Char(36)
+  product                       Product              @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  /// The contact, in its supplier facet (checked by the service).
+  contactId                     String               @db.Char(36)
+  contact                       Contact              @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  /// Code of the product in the supplier's catalog.
+  supplierSku                   String?              @db.VarChar(64)
+  /// Presentation of the product it is usually bought in; null = its unit.
+  presentationId                String?              @db.Char(36)
+  presentation                  ProductPresentation? @relation(fields: [organizationId, productId, presentationId], references: [organizationId, productId, id], onDelete: Restrict, onUpdate: Restrict)
+  /// What one unit of purchase cost the last time, in pesos, before taxes.
+  lastCost                      Decimal?             @db.Decimal(14, 4)
+  /// What that cost was for: the version of the presentation bought, or
+  /// null when it was bought by the product's unit.
+  lastCostPresentationId        String?              @db.Char(36)
+  lastCostPresentationVersionId String?              @db.Char(36)
+  lastCostVersion               PresentationVersion? @relation(fields: [organizationId, lastCostPresentationId, lastCostPresentationVersionId], references: [organizationId, presentationId, id], onDelete: Restrict, onUpdate: Restrict)
+  lastCostAt                    DateTime?            @db.DateTime(3)
+  createdByUserId               String               @db.Char(36)
+  createdAt                     DateTime             @default(now()) @db.DateTime(3)
+  updatedAt                     DateTime             @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, productId, contactId])
+  @@index([organizationId, contactId, productId])
+  @@map("product_supplier")
 }

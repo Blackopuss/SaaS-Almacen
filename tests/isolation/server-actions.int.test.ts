@@ -18,6 +18,20 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  linkProductSupplierAction: {
+    input:
+      "id de proveedor, id de producto, código del proveedor e id de presentación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); proveedor, producto y presentación se buscan solo en esa empresa",
+    coveredBy: "tests/purchasing/product-suppliers.int.test.ts",
+  },
+  updateProductSupplierAction: {
+    input:
+      "id de proveedor (solo para volver a su pantalla), id del vínculo, código del proveedor e id de presentación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el vínculo y la presentación se buscan solo en esa empresa",
+    coveredBy: "tests/purchasing/product-suppliers.int.test.ts",
+  },
   createSupplierAction: {
     input:
       "datos del proveedor (nombre, razón social, RFC, contacto, correo, teléfono, dirección, notas) y si acepta guardar un posible duplicado",

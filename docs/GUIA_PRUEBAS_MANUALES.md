@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 101 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores).
+Actualizada: 2026-10-10 · Avance: 102 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores y sus productos).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -509,6 +509,16 @@ Esta es la prueba que más me importa: dime en qué punto dudaste, qué palabra 
 6. Con varios proveedores, busca por parte del nombre y por parte del RFC.
 
 Dime qué datos de tus proveedores faltan (días de crédito, cuenta bancaria, condiciones) y si necesitas poder archivarlos.
+
+**H2. Qué te vende cada proveedor**
+
+1. En la ficha de un proveedor: «Vincular producto». Busca un producto, elígelo, escribe el código con el que lo conoce el proveedor y elige cómo se lo compras (por pieza, o por una de sus presentaciones, por ejemplo «Caja = 100 piezas»).
+2. De vuelta en la ficha aparece en «Productos que te vende» con su código y «Se compra por caja de 100 piezas». Intenta vincular el mismo producto otra vez: avisa que ya está vinculado.
+3. «Editar» en el vínculo cambia el código o la presentación. El contenido de la caja **no** se cambia aquí (eso es en la ficha del producto).
+4. En la ficha del producto (Inventario) aparece «Quién te lo vende».
+5. El último costo todavía dice «Sin costo todavía»: se anotará solo al registrar una compra (siguientes pasos). Entra con una cuenta de Consulta: ve los vínculos pero nada de costos; con Almacén no puede entrar a Proveedores.
+
+Dime si quieres poder escribir a mano un costo de referencia antes de tu primera compra.
 
 ## 4. Lo que todavía no existe
 

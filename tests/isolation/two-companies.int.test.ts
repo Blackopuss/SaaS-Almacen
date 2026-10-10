@@ -268,13 +268,24 @@ beforeAll(async () => {
         data: {},
       },
     });
+    const contactId = newId();
     await db.contact.create({
       data: {
-        id: newId(),
+        id: contactId,
         organizationId,
         name: "Ferretera del Norte",
         rfc: "FNO010203AB1",
         isSupplier: true,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.productSupplier.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        contactId,
+        supplierSku: "FN-1",
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
