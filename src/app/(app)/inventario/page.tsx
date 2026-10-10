@@ -427,8 +427,25 @@ export default async function InventarioPage({
           <EmptyState
             icon={Package}
             title="Todavía no hay productos"
-            description="Agrega tu primer producto para empezar a controlar tu inventario."
-            action={addButton}
+            description={
+              access.allows("inventory.import.create")
+                ? "Sube tu Excel para traerlos todos de una vez, o agrega el primero a mano."
+                : "Agrega tu primer producto para empezar a controlar tu inventario."
+            }
+            action={
+              access.allows("inventory.import.create") ? (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild>
+                    <Link href="/inventario/importar">
+                      Importar desde Excel
+                    </Link>
+                  </Button>
+                  {addButton}
+                </div>
+              ) : (
+                addButton
+              )
+            }
           />
         )
       ) : (

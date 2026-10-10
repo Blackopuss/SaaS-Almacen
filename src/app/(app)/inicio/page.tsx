@@ -13,7 +13,11 @@ import { PageContainer, PageHeader, ReadOnlyNotice } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib";
-import { listLowStock, listRecentMovements } from "@/modules/inventory";
+import {
+  getFirstSteps,
+  listLowStock,
+  listRecentMovements,
+} from "@/modules/inventory";
 import { moduleRegistry } from "@/modules/registry";
 import {
   getModuleAccess,
@@ -21,6 +25,8 @@ import {
   usageLevel,
   usagePercent,
 } from "@/platform/billing";
+
+import { FirstStepsGuide } from "./first-steps-guide";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -57,11 +63,16 @@ export default async function InicioPage() {
     access.can("inventory.stock.read");
   const showMovements = inventory && access.can("inventory.movement.read");
   const showPlan = access.can("platform.plan.read");
+  // The guide of first use (IMP-12) is for a company that can still be
+  // set up: with the plan in read-only nothing of it could be done.
+  const showGuide =
+    moduleState === "active" && access.can("inventory.product.read");
 
-  const [low, movements, plan] = await Promise.all([
+  const [low, movements, plan, firstSteps] = await Promise.all([
     showLow ? listLowStock(actor) : null,
     showMovements ? listRecentMovements(actor, { limit: SHOWN }) : null,
     showPlan ? getPlanOverview(moduleRegistry, actor.organizationId) : null,
+    showGuide ? getFirstSteps(actor) : null,
   ]);
 
   const canEnter = access.allows("inventory.entry.create");
@@ -105,6 +116,20 @@ export default async function InicioPage() {
           Tu cuenta todavía no tiene secciones asignadas en esta empresa. Pide
           al titular o a un administrador que te dé un rol.
         </p>
+      )}
+
+      {firstSteps && !firstSteps.complete && (
+        <FirstStepsGuide
+          steps={firstSteps}
+          can={{
+            importProducts: access.allows("inventory.import.create"),
+            createProduct: access.allows("inventory.product.create"),
+            createLocation: access.allows("inventory.location.create"),
+            openingBalance: access.allows("inventory.opening.create"),
+            entry: canEnter,
+            exit: canExit,
+          }}
+        />
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -175,3 +175,4 @@ export {
   type ExportKind,
   type ExportResult,
 } from "./exports";
+export { getFirstSteps, type FirstSteps } from "./first-steps";

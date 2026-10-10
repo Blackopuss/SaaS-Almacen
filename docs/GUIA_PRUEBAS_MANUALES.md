@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 98 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-11).
+Actualizada: 2026-10-10 · Avance: 99 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -486,6 +486,16 @@ Dime si tu sistema de ventas exporta el archivo con otros títulos o con la fech
 6. En Configuración → Bitácora aparece cada exportación (qué se exportó, formato y cuántas filas).
 
 Dime si a los archivos les falta alguna columna que uses con tu contador, o si prefieres otro orden.
+
+**G9. Guía de primer uso (empieza aquí con una empresa nueva)**
+
+1. Crea una empresa nueva (o usa la de E4) y entra a Inicio. Deberías ver «Primeros pasos — 0 de 3 listos», con el primer paso abierto: «Trae tus productos».
+2. Sin leer nada más, sigue **solo los botones de la guía**: «Importar desde Excel», llena la plantilla con dos o tres productos y su existencia, confirma. De vuelta en Inicio: «2 de 3 listos» (productos y existencias) y el paso abierto es «Registra tu primer movimiento».
+3. «Registrar entrada», elige un producto y una cantidad. De vuelta en Inicio la guía ya no está y ves el panel normal.
+4. Repite con otra empresa agregando un producto a mano: la guía te lleva a «Di cuánto tienes» → «Capturar saldo inicial».
+5. Con una cuenta de Consulta en una empresa nueva, la guía aparece pero sin botones: dice que lo pida a quien lleva el inventario.
+
+Esta es la prueba que más me importa: dime en qué punto dudaste, qué palabra no se entendió o dónde esperabas otro botón.
 
 ## 4. Lo que todavía no existe
 
