@@ -6,6 +6,7 @@ import {
   getJob,
   runNextJob,
   runWorker,
+  settleFailedJobs,
   type JobContext,
   type JobHandlers,
 } from "@/platform/jobs";
@@ -478,5 +479,181 @@ describe("workers", () => {
     await loop;
     expect(done).toHaveLength(3);
     expect(await db.job.count({ where: { status: "DONE" } })).toBe(3);
+  }, 30_000);
+});
+
+describe("jobs that failed for good (IMP-08B)", () => {
+  it("onFailed runs once the job has no attempts left, never before", async () => {
+    const { organizationId, userId } = await company();
+    const seen: JobContext[] = [];
+    const handlers = {
+      "test.held": {
+        ...at(async () => {
+          throw new Error("no se pudo");
+        }),
+        onFailed: async (context: JobContext) => {
+          seen.push(context);
+        },
+      },
+    };
+    const { jobId } = await add(organizationId, "test.held", {
+      maxAttempts: 2,
+      payload: { thing: "a" },
+      createdByUserId: userId,
+    });
+    expect(await runNextJob(handlers, { workerId: "test" })).toMatchObject({
+      kind: "retry",
+    });
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 0,
+      pending: 0,
+    });
+    expect(seen).toEqual([]);
+
+    expect(await runNextJob(handlers, { workerId: "test" })).toMatchObject({
+      kind: "failed",
+    });
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 1,
+      pending: 0,
+    });
+    // With the company of the row, like the job itself.
+    expect(seen).toEqual([
+      {
+        jobId,
+        organizationId,
+        createdByUserId: userId,
+        payload: { thing: "a" },
+        attempt: 2,
+        maxAttempts: 2,
+      },
+    ]);
+    // Settled once: it is not called again.
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 0,
+      pending: 0,
+    });
+    expect(seen).toHaveLength(1);
+  });
+
+  it("a job that ended well, or is waiting or running, is never settled", async () => {
+    const { organizationId } = await company();
+    const onFailed = vi.fn(async () => {});
+    const handlers = { "test.fine": { ...at(async () => "ok"), onFailed } };
+    await add(organizationId, "test.fine");
+    await drain(handlers);
+    await add(organizationId, "test.fine");
+    const running = await add(organizationId, "test.fine");
+    await db.job.update({
+      where: { id: running.jobId },
+      data: { status: "RUNNING", lockedAt: new Date(), lockedBy: "other" },
+    });
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 0,
+      pending: 0,
+    });
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it("if giving back fails it is tried again later, and others go on", async () => {
+    const { organizationId } = await company();
+    let broken = true;
+    const settled: string[] = [];
+    const handlers = {
+      "test.flaky": {
+        ...at(async () => {
+          throw new Error("no");
+        }),
+        onFailed: async (context: JobContext) => {
+          if (broken) throw new Error("la base no respondió");
+          settled.push(context.jobId);
+        },
+      },
+      "test.steady": {
+        ...at(async () => {
+          throw new Error("no");
+        }),
+        onFailed: async (context: JobContext) => {
+          settled.push(context.jobId);
+        },
+      },
+    };
+    const flaky = await add(organizationId, "test.flaky", { maxAttempts: 1 });
+    const steady = await add(organizationId, "test.steady", {
+      maxAttempts: 1,
+    });
+    await drain(handlers);
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 1,
+      pending: 1,
+    });
+    expect(settled).toEqual([steady.jobId]);
+    broken = false;
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 1,
+      pending: 0,
+    });
+    expect(settled).toEqual([steady.jobId, flaky.jobId]);
+  });
+
+  it("failed jobs with nothing to give back are simply marked; unknown types wait", async () => {
+    const { organizationId } = await company();
+    const unknown = await add(organizationId, "test.unknown");
+    await add(organizationId, "test.plain", { maxAttempts: 1 });
+    const handlers = {
+      "test.plain": at(async () => {
+        throw new Error("no");
+      }),
+    };
+    await drain(handlers);
+    expect(await settleFailedJobs(handlers)).toEqual({
+      settled: 1,
+      pending: 0,
+    });
+    // Nobody here knows what «test.unknown» held: it is left for a worker
+    // that does, and settled then.
+    const unsettled = await db.job.findMany({
+      where: { status: "FAILED", failureHandledAt: null },
+      select: { id: true },
+    });
+    expect(unsettled).toEqual([{ id: unknown.jobId }]);
+    const onFailed = vi.fn(async () => {});
+    expect(
+      await settleFailedJobs({
+        "test.unknown": { ...at(async () => {}), onFailed },
+      }),
+    ).toEqual({ settled: 1, pending: 0 });
+    expect(onFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("the worker loop settles what fails without being asked", async () => {
+    const { organizationId } = await company();
+    const stop = new AbortController();
+    const released: string[] = [];
+    const handlers = {
+      "test.loop_failed": {
+        ...at(async () => {
+          throw new Error("no");
+        }),
+        onFailed: async (context: JobContext) => {
+          released.push(context.jobId);
+          stop.abort();
+        },
+      },
+    };
+    const { jobId } = await add(organizationId, "test.loop_failed", {
+      maxAttempts: 1,
+    });
+    await runWorker(handlers, {
+      workerId: "loop",
+      signal: stop.signal,
+      idleMs: 20,
+      settleEveryMs: 60_000,
+    });
+    expect(released).toEqual([jobId]);
+    expect(
+      (await db.job.findUniqueOrThrow({ where: { id: jobId } }))
+        .failureHandledAt,
+    ).not.toBeNull();
   }, 30_000);
 });

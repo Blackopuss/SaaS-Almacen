@@ -1,11 +1,18 @@
 import "server-only";
 
-import { newId } from "@/lib";
+import { isAppError, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
+import { assertModulePermission } from "@/platform/billing";
 import { applyImportedProduct } from "@/platform/catalog";
 import { releaseReservation } from "@/platform/entitlements";
 import type { JobHandlers } from "@/platform/jobs";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
+
+import {
+  IMPORT_JOB_TYPE,
+  releaseFailedImport,
+  stopUnauthorizedImport,
+} from "./import-release";
 
 /**
  * Applying a confirmed import, in the worker (IMP-08). The products were
@@ -18,7 +25,7 @@ import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
  * stopped and never repeats a product.
  */
 
-export const IMPORT_JOB_TYPE = "inventory.import_products";
+export { IMPORT_JOB_TYPE };
 
 /** What an item keeps of its product, fixed at confirmation. */
 export type ImportItemData = {
@@ -47,7 +54,11 @@ const BATCH = 50;
 
 export type ApplyImportOutcome =
   | { ok: true; status: "DONE"; processed: number; failed: number }
-  | { ok: false; reason: "not_found" | "not_confirmed" };
+  | {
+      ok: false;
+      /** `stopped`: cancelled or failed meanwhile; nothing more is applied. */
+      reason: "not_found" | "not_confirmed" | "stopped";
+    };
 
 /**
  * Applies what is pending of an import. Returns when nothing is left;
@@ -62,6 +73,28 @@ export async function applyImport(
   const batchSize = Math.min(Math.max(options.batchSize ?? BATCH, 1), 200);
 
   for (;;) {
+    // The import was authorized when a person confirmed it, but each batch
+    // is applied later, in that person's name: before every one, check
+    // they may still do it (role, membership, plan of the company). If
+    // not, what is pending is not applied and its places go back.
+    const gate = await client.productImport.findFirst({
+      where: { id: String(importId).slice(0, 36) },
+      select: { status: true, confirmedByUserId: true, createdByUserId: true },
+    });
+    if (gate && (gate.status === "CONFIRMED" || gate.status === "RUNNING")) {
+      try {
+        await assertModulePermission(
+          organizationId,
+          gate.confirmedByUserId ?? gate.createdByUserId,
+          "inventory.import.confirm",
+        );
+      } catch (error) {
+        if (!isAppError(error) || error.kind !== "forbidden") throw error;
+        await stopUnauthorizedImport(organizationId, importId);
+        return { ok: false, reason: "stopped" };
+      }
+    }
+
     const step = await client.$transaction(
       async (tx) => {
         // Cancelling or another worker cannot slip in between.
@@ -89,6 +122,11 @@ export async function applyImport(
             processed: row.processedItems,
             failed: row.failedItems,
           };
+        }
+        if (row.status === "CANCELLED" || row.status === "FAILED") {
+          // Stopped while this worker was between batches (IMP-08B): its
+          // places already went back, so nothing more is applied.
+          return { end: "stopped" as const };
         }
         if (row.status !== "CONFIRMED" && row.status !== "RUNNING") {
           return { end: "not_confirmed" as const };
@@ -210,8 +248,8 @@ export async function applyImport(
     );
 
     if (step.end === "not_found") return { ok: false, reason: "not_found" };
-    if (step.end === "not_confirmed") {
-      return { ok: false, reason: "not_confirmed" };
+    if (step.end === "not_confirmed" || step.end === "stopped") {
+      return { ok: false, reason: step.end };
     }
     if (step.end === "done") {
       return {
@@ -238,6 +276,17 @@ export const inventoryJobHandlers: JobHandlers = {
         throw new Error("La importación de este trabajo ya no existe.");
       }
       return outcome;
+    },
+    // The job will not run again: what the import still held goes back.
+    onFailed: async (context) => {
+      const importId = String(
+        (context.payload as { importId?: unknown } | null)?.importId ?? "",
+      );
+      await releaseFailedImport(
+        context.organizationId,
+        importId,
+        context.jobId,
+      );
     },
   },
 };

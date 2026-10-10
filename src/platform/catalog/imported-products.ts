@@ -18,8 +18,8 @@ import { defaultStep } from "./quantity";
  * from what the import held when it was confirmed.
  *
  * No permission is checked here: the import was authorized when a person
- * confirmed it, and the batch runs later, in the background, in that
- * person's name.
+ * confirmed it, and whoever applies the batch (`applyImport`) checks
+ * again, before each one, that the person may still import.
  */
 
 export type ImportedProduct = {

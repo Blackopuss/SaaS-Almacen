@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  cancelImportAction: {
+    input: "id de importación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la importación se busca solo en esa empresa",
+    coveredBy: "tests/inventory/import-release.int.test.ts",
+  },
   confirmImportAction: {
     input: "id de importación",
     identity:

@@ -5,6 +5,7 @@ export {
   getJob,
   runNextJob,
   runWorker,
+  settleFailedJobs,
 } from "./queue";
 export type {
   EnqueueInput,
@@ -14,4 +15,5 @@ export type {
   JobInfo,
   RunOptions,
   RunOutcome,
+  SettleOutcome,
 } from "./queue";

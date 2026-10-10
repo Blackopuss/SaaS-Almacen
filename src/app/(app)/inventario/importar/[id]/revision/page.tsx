@@ -27,6 +27,7 @@ import {
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
+import { CancelImport } from "./cancel-import";
 import { ConfirmImport } from "./confirm-import";
 
 export const metadata: Metadata = { title: "Revisión de la importación" };
@@ -144,6 +145,15 @@ export default async function RevisionPage({
     Boolean(plan?.ready) &&
     moduleState === "active" &&
     access.allows("inventory.import.confirm");
+  // While it has not ended: before confirming, waiting or being applied.
+  const canCancel =
+    detail !== null &&
+    (editable ||
+      detail.status === "CONFIRMED" ||
+      detail.status === "RUNNING") &&
+    moduleState === "active" &&
+    access.allows("inventory.import.cancel");
+  const importedItems = detail ? detail.processedItems - detail.failedItems : 0;
 
   return (
     <PageContainer>
@@ -345,8 +355,18 @@ export default async function RevisionPage({
                     `; ${detail.failedItems === 1 ? "1 no se pudo importar" : `${count(detail.failedItems)} no se pudieron importar`} (abajo dice por qué)`}
                   .
                 </p>
-              ) : detail.status === "CANCELLED" ? (
-                <p>No cambió nada en tu inventario.</p>
+              ) : detail.status === "CANCELLED" ||
+                detail.status === "FAILED" ? (
+                <p>
+                  {importedItems === 0
+                    ? "No se importó ningún producto"
+                    : importedItems === 1
+                      ? "1 producto ya se había importado y se queda en tu catálogo"
+                      : `${count(importedItems)} productos ya se habían importado y se quedan en tu catálogo`}
+                  {detail.totalItems - detail.processedItems > 0 &&
+                    `; ${detail.totalItems - detail.processedItems === 1 ? "1 no se importó" : `${count(detail.totalItems - detail.processedItems)} no se importaron`}`}
+                  . No quedan lugares apartados de tu plan.
+                </p>
               ) : (
                 <p className="tabular-nums">
                   {count(detail.processedItems)} de {count(detail.totalItems)}{" "}
@@ -359,6 +379,11 @@ export default async function RevisionPage({
               )}
               {detail.lastError && (
                 <p className="text-destructive">{detail.lastError}</p>
+              )}
+              {canCancel && (
+                <div className="pt-2">
+                  <CancelImport importId={detail.id} started />
+                </div>
               )}
               {detail.status === "DONE" && (
                 <p>
@@ -540,15 +565,22 @@ export default async function RevisionPage({
               </>
             )}
           </p>
-          {canConfirm && (
-            <div className="border-t p-4 sm:px-5">
-              <ConfirmImport
-                importId={plan.importId}
-                products={
-                  plan.counts.new + plan.counts.update + plan.counts.reactivate
-                }
-                places={plan.quota.required}
-              />
+          {(canConfirm || canCancel) && (
+            <div className="flex flex-wrap gap-3 border-t p-4 sm:px-5">
+              {canConfirm && (
+                <ConfirmImport
+                  importId={plan.importId}
+                  products={
+                    plan.counts.new +
+                    plan.counts.update +
+                    plan.counts.reactivate
+                  }
+                  places={plan.quota.required}
+                />
+              )}
+              {canCancel && (
+                <CancelImport importId={plan.importId} started={false} />
+              )}
             </div>
           )}
         </section>

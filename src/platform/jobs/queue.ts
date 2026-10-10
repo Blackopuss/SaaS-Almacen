@@ -34,6 +34,13 @@ export type JobHandler = {
   handle: (context: JobContext) => Promise<unknown>;
   /** Wait before the next attempt; default grows from 5 s to 15 min. */
   retryDelayMs?: (attempt: number) => number;
+  /**
+   * Called once the job has failed for good — it used up its attempts or
+   * its worker disappeared — to give back what the job was holding (a
+   * reservation). Never called while the job can still run. Like
+   * `handle`, it may run more than once for the same job.
+   */
+  onFailed?: (context: JobContext) => Promise<void>;
 };
 
 /** Handlers by job type: "inventory.import_products" → handler. */
@@ -345,19 +352,87 @@ export async function runNextJob(
   };
 }
 
+export type SettleOutcome = {
+  /** Failed jobs whose held things were given back now. */
+  settled: number;
+  /** Failed jobs that could not be settled yet; tried again next time. */
+  pending: number;
+};
+
+/**
+ * Gives back what jobs that failed for good were holding (IMP-08B): for
+ * each `FAILED` job not yet settled, calls `onFailed` of its handler and
+ * marks it. It covers every way a job ends as failed — its last attempt,
+ * an unknown type, a worker that disappeared — because it starts from the
+ * rows, not from the worker that was running them. A job that is waiting
+ * or running is never touched.
+ *
+ * If `onFailed` fails the job stays unsettled and is tried again on the
+ * next call; two workers may settle the same job, so `onFailed` must be
+ * safe to repeat. Jobs of a type this worker has no handler for are left
+ * as they are, for a worker that knows what they were holding.
+ */
+export async function settleFailedJobs(
+  handlers: JobHandlers,
+  options: { limit?: number } = {},
+): Promise<SettleOutcome> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 500);
+  const jobs = await db.job.findMany({
+    where: {
+      status: "FAILED",
+      failureHandledAt: null,
+      type: { in: Object.keys(handlers) },
+    },
+    orderBy: [{ finishedAt: "asc" }, { id: "asc" }],
+    take: limit,
+  });
+  let settled = 0;
+  let pending = 0;
+  for (const job of jobs) {
+    try {
+      await handlers[job.type]?.onFailed?.({
+        jobId: job.id,
+        organizationId: job.organizationId,
+        createdByUserId: job.createdByUserId,
+        payload: job.payload,
+        attempt: job.attempts,
+        maxAttempts: job.maxAttempts,
+      });
+    } catch (error) {
+      pending++;
+      console.error(
+        `[jobs] no se pudo liberar lo que retenía ${job.type} ${job.id} (empresa ${job.organizationId}); se intentará de nuevo:`,
+        error,
+      );
+      continue;
+    }
+    await db.job.updateMany({
+      where: { id: job.id, status: "FAILED", failureHandledAt: null },
+      data: { failureHandledAt: new Date() },
+    });
+    settled++;
+  }
+  return { settled, pending };
+}
+
 /**
  * Worker loop: runs jobs one after another and rests while there are
- * none. Stops, after the job in hand, when `signal` is aborted.
+ * none. Stops, after the job in hand, when `signal` is aborted. Between
+ * jobs it settles the ones that failed for good, at most every
+ * `settleEveryMs`, and right after one fails.
  */
 export async function runWorker(
   handlers: JobHandlers,
   options: RunOptions & {
     signal?: AbortSignal;
     idleMs?: number;
+    settleEveryMs?: number;
     onOutcome?: (outcome: RunOutcome) => void;
   } = {},
 ): Promise<void> {
   const idleMs = options.idleMs ?? 1_000;
+  const settleEveryMs = options.settleEveryMs ?? 30_000;
+  let settledAt = 0;
   while (!options.signal?.aborted) {
     let outcome: RunOutcome;
     try {
@@ -366,6 +441,14 @@ export async function runWorker(
       // The database blinked: wait and go on, the queue is still there.
       console.error("[jobs] no se pudo tomar el siguiente trabajo:", error);
       outcome = { kind: "idle" };
+    }
+    if (outcome.kind === "failed" || Date.now() - settledAt >= settleEveryMs) {
+      settledAt = Date.now();
+      try {
+        await settleFailedJobs(handlers);
+      } catch (error) {
+        console.error("[jobs] no se pudieron revisar los fallidos:", error);
+      }
     }
     options.onOutcome?.(outcome);
     if (outcome.kind === "idle") {

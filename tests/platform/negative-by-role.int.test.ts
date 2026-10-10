@@ -409,10 +409,16 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
         "tests/platform/quota.int.test.ts",
         "tests/platform/products.int.test.ts",
         "tests/platform/product-archive.int.test.ts",
+        "tests/inventory/import-confirmation.int.test.ts",
+        "tests/inventory/import-apply.int.test.ts",
+        "tests/inventory/import-release.int.test.ts",
       ],
-      waitsFor: "IMP (importaciones que reservan cupo)",
     },
-    "NEG-20": { waitsFor: "IMP (trabajos en segundo plano)" },
+    "NEG-20": {
+      tests: ["tests/inventory/import-release.int.test.ts"],
+      waitsFor:
+        "CMP-06B (envío de órdenes desde el worker) e IMP-11 (descargas de exportaciones)",
+    },
     "NEG-21": {
       tests: [
         "tests/platform/product-update.int.test.ts",

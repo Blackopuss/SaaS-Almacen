@@ -948,30 +948,34 @@ enum JobStatus {
 /// export. The row is the queue — it survives restarts — and carries the
 /// company it belongs to, which is the only company its handler works in.
 model Job {
-  id              String       @id @db.Char(36)
-  organizationId  String       @db.Char(36)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id               String       @id @db.Char(36)
+  organizationId   String       @db.Char(36)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Which handler runs it: "inventory.import_products".
-  type            String       @db.VarChar(64)
-  payload         Json
-  status          JobStatus    @default(PENDING)
+  type             String       @db.VarChar(64)
+  payload          Json
+  status           JobStatus    @default(PENDING)
   /// Times a worker has started it.
-  attempts        Int          @default(0)
-  maxAttempts     Int          @default(5)
+  attempts         Int          @default(0)
+  maxAttempts      Int          @default(5)
   /// Not before this moment (now, or later after a failed attempt).
-  runAt           DateTime     @default(now()) @db.DateTime(3)
-  lockedAt        DateTime?    @db.DateTime(3)
-  lockedBy        String?      @db.VarChar(64)
+  runAt            DateTime     @default(now()) @db.DateTime(3)
+  lockedAt         DateTime?    @db.DateTime(3)
+  lockedBy         String?      @db.VarChar(64)
   /// Why the last attempt failed, for people; never secrets.
-  lastError       String?      @db.VarChar(500)
-  result          Json?
+  lastError        String?      @db.VarChar(500)
+  result           Json?
   /// Person who asked for it (an account; not a company row).
-  createdByUserId String?      @db.Char(36)
-  createdAt       DateTime     @default(now()) @db.DateTime(3)
-  finishedAt      DateTime?    @db.DateTime(3)
+  createdByUserId  String?      @db.Char(36)
+  createdAt        DateTime     @default(now()) @db.DateTime(3)
+  finishedAt       DateTime?    @db.DateTime(3)
+  /// When what a job that failed for good was holding was given back
+  /// (IMP-08B); null while that is still to be done.
+  failureHandledAt DateTime?    @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@index([status, runAt])
+  @@index([status, failureHandledAt])
   @@index([organizationId, type, createdAt])
   @@map("job")
 }

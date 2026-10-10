@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-05 · Avance: 94 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-08).
+Actualizada: 2026-10-10 · Avance: 95 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-08B).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -447,12 +447,22 @@ Las importaciones se aplican en segundo plano: además de la aplicación debe es
 
 Las existencias iniciales del archivo todavía no se aplican: llegan en el paso siguiente (IMP-09). Por ahora los productos importados entran en cero.
 
+**G6. Cancelar una importación y lugares que se devuelven**
+
+1. Con una importación «lista» (sin confirmar), «Cancelar importación»: queda «Importación cancelada», no se importó nada y ya no se puede confirmar.
+2. Confirma otra con el worker detenido y revisa «Mi plan»: aparecen los lugares reservados. Cancélala: el aviso dice cuántos lugares volvieron y «Mi plan» ya no muestra reservados.
+3. Con un archivo grande, arranca el worker y cancela a la mitad: los productos que ya habían entrado se quedan en tu catálogo, los demás no se importan y solo vuelven los lugares que no se usaron. En «Mi plan», productos activos = los que sí entraron.
+4. Una importación terminada ya no ofrece «Cancelar importación». Consulta (solo lectura) y Compras no ven el botón.
+5. Quita el rol a quien confirmó una importación mientras el worker está detenido y arráncalo: la importación queda «No pudo terminar» con el motivo, lo pendiente no se importa y sus lugares vuelven al plan.
+6. La bitácora muestra la cancelación, o que la importación se detuvo antes de terminar.
+
+Una importación cancelada o detenida no se reanuda: se sube el archivo de nuevo (lo que ya entró aparece como «Se actualiza»).
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
 - Existencias iniciales desde el archivo de importación (los productos entran en cero).
-- Cancelar una importación ya confirmada.
 - Importar salidas diarias y exportar catálogo, existencias o historial a Excel.
 - Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores (la sección existe, vacía).

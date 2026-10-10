@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   IMPORT_COLUMNS,
+  cancelImport,
   confirmImport,
   saveImportMapping,
   startImport,
@@ -143,6 +144,48 @@ export async function confirmImportAction(
             ? "Importación confirmada: se apartó 1 lugar de tu plan."
             : `Importación confirmada: se apartaron ${result.reserved} lugares de tu plan.`,
     };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+export type CancelImportState =
+  { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Cancels an import (IMP-08B): what was already imported stays and the
+ * places it still held go back to the plan. The import is looked for only
+ * inside the company of the session; sending it twice cancels once.
+ */
+export async function cancelImportAction(
+  importId: string,
+): Promise<CancelImportState> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await cancelImport(
+      { organizationId: organization.id, userId: user.id },
+      String(importId),
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath("/inventario/importar");
+    revalidatePath(`/inventario/importar/${String(importId)}`);
+    revalidatePath(`/inventario/importar/${String(importId)}/revision`);
+    const kept =
+      result.applied === 0
+        ? ""
+        : result.applied === 1
+          ? " El producto que ya se había importado se queda en tu catálogo."
+          : ` Los ${result.applied.toLocaleString("es-MX")} productos que ya se habían importado se quedan en tu catálogo.`;
+    const places =
+      result.released === 0
+        ? ""
+        : result.released === 1
+          ? " Volvió 1 lugar a tu plan."
+          : ` Volvieron ${result.released.toLocaleString("es-MX")} lugares a tu plan.`;
+    return { ok: true, message: `Importación cancelada.${kept}${places}` };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };

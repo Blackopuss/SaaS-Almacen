@@ -127,3 +127,8 @@ export {
   inventoryJobHandlers,
   type ApplyImportOutcome,
 } from "./import-apply";
+export {
+  cancelImport,
+  releaseFailedImport,
+  type CancelImportResult,
+} from "./import-release";
