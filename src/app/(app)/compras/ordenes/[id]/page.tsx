@@ -1,4 +1,4 @@
-import { ChevronLeft, Pencil, Plus } from "lucide-react";
+import { ChevronLeft, Download, Pencil, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -74,6 +74,8 @@ export default async function OrdenPage({
     order.canSubmit && active && access.allows("purchasing.order.submit");
   const canCancel =
     order.canCancel && active && access.allows("purchasing.order.cancel");
+  // The PDF carries prices: for who may export orders (not Consulta).
+  const canExport = access.can("purchasing.order.export");
   const zone = access.organization.timeZone;
   const addHref = `/compras/ordenes/${order.id}/linea`;
   const expected = order.expectedOn
@@ -88,13 +90,25 @@ export default async function OrdenPage({
         title={`Orden ${order.numberText}`}
         description={order.supplierName}
         actions={
-          canEdit ? (
-            <Button asChild variant="outline">
-              <Link href={`/compras/ordenes/${order.id}/editar`}>
-                <Pencil aria-hidden="true" data-icon="inline-start" />
-                Editar datos
-              </Link>
-            </Button>
+          canEdit || canExport ? (
+            <>
+              {canExport && (
+                <Button asChild variant="outline">
+                  <a href={`/api/compras/ordenes/${order.id}/pdf`} download>
+                    <Download aria-hidden="true" data-icon="inline-start" />
+                    Descargar PDF
+                  </a>
+                </Button>
+              )}
+              {canEdit && (
+                <Button asChild variant="outline">
+                  <Link href={`/compras/ordenes/${order.id}/editar`}>
+                    <Pencil aria-hidden="true" data-icon="inline-start" />
+                    Editar datos
+                  </Link>
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />

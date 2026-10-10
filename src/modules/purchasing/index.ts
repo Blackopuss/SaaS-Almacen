@@ -54,3 +54,4 @@ export {
   transitionProblem,
 } from "./order-states";
 export type { PurchaseOrderStatus } from "./order-states";
+export { buildOrderPdf, type OrderPdf } from "./order-pdf";

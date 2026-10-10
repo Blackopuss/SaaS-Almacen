@@ -24,3 +24,12 @@ export type {
   ReadSpreadsheetResult,
   SpreadsheetContent,
 } from "./spreadsheet-reader";
+export {
+  PDF_PAGE,
+  PdfPageWriter,
+  buildPdf,
+  pdfText,
+  textWidth,
+  wrapText,
+} from "./pdf";
+export type { PdfFont, PdfTextOptions } from "./pdf";
