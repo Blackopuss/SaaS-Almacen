@@ -268,6 +268,16 @@ beforeAll(async () => {
         data: {},
       },
     });
+    await db.contact.create({
+      data: {
+        id: newId(),
+        organizationId,
+        name: "Ferretera del Norte",
+        rfc: "FNO010203AB1",
+        isSupplier: true,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {

@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 99 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas).
+Actualizada: 2026-10-10 · Avance: 100 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: solo la base de contactos, sin pantallas).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 

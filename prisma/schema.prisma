@@ -147,6 +147,7 @@ model Organization {
   productImportItems   ProductImportItem[]
   exitImports          ExitImport[]
   exitImportRows       ExitImportRow[]
+  contacts             Contact[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1216,4 +1217,41 @@ model ExitImportRow {
   @@index([organizationId, importId, status, row])
   @@index([organizationId, status, day])
   @@map("exit_import_row")
+}
+
+/// A person or business the company deals with (CMP-01): a supplier it
+/// buys from, a customer it sells to, or both. Contacts belong to the
+/// core, not to a module: Compras, Ventas and CRM share the same row
+/// instead of each keeping its own copy of the same business. What a
+/// contact is for a module is a facet (`isSupplier`, `isCustomer`), and a
+/// contact always has at least one.
+model Contact {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// As the business knows it: «Ferretera del Norte».
+  name            String       @db.VarChar(160)
+  /// Legal name, when it differs: «Ferretera del Norte, S.A. de C.V.».
+  legalName       String?      @db.VarChar(200)
+  /// Mexican tax id, in capitals and without spaces; optional.
+  rfc             String?      @db.VarChar(13)
+  isSupplier      Boolean      @default(false)
+  isCustomer      Boolean      @default(false)
+  /// Who to ask for there.
+  contactPerson   String?      @db.VarChar(120)
+  email           String?      @db.VarChar(254)
+  phone           String?      @db.VarChar(40)
+  address         String?      @db.VarChar(300)
+  notes           String?      @db.VarChar(500)
+  /// Set when it is no longer used; its documents keep pointing to it.
+  archivedAt      DateTime?    @db.DateTime(3)
+  createdByUserId String       @db.Char(36)
+  createdAt       DateTime     @default(now()) @db.DateTime(3)
+  updatedAt       DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, isSupplier, name, id])
+  @@index([organizationId, isCustomer, name, id])
+  @@index([organizationId, rfc])
+  @@map("contact")
 }
