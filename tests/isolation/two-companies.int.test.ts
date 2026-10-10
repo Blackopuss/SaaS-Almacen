@@ -289,6 +289,29 @@ beforeAll(async () => {
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const purchaseOrderId = newId();
+    await db.purchaseOrder.create({
+      data: {
+        id: purchaseOrderId,
+        organizationId,
+        number: 1,
+        contactId,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.purchaseOrderLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        orderId: purchaseOrderId,
+        lineNumber: 1,
+        productId,
+        capturedQuantity: "5",
+        factor: "1",
+        baseQuantity: "5",
+        unitCode: "piece",
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {

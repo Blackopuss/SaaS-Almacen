@@ -18,6 +18,37 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  createPurchaseOrderAction: {
+    input: "id de proveedor, día esperado y notas",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el proveedor se busca solo entre los de esa empresa",
+    coveredBy: "tests/purchasing/orders.int.test.ts",
+  },
+  updatePurchaseOrderAction: {
+    input: "id de orden, día esperado y notas",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la orden se busca solo en esa empresa",
+    coveredBy: "tests/purchasing/orders.int.test.ts",
+  },
+  addOrderLineAction: {
+    input: "id de orden, id de producto, forma de pedirlo, cantidad y costo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); orden, producto y presentación se buscan solo en esa empresa; el costo exige además el permiso de registrar costos",
+    coveredBy: "tests/purchasing/orders.int.test.ts",
+  },
+  updateOrderLineAction: {
+    input:
+      "id de orden (solo para volver a su pantalla), id de línea, forma de pedirlo, cantidad y costo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la línea y su orden se buscan solo en esa empresa; el costo exige además el permiso de registrar costos",
+    coveredBy: "tests/purchasing/orders.int.test.ts",
+  },
+  removeOrderLineAction: {
+    input: "id de orden (solo para repintar su pantalla) e id de línea",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la línea y su orden se buscan solo en esa empresa",
+    coveredBy: "tests/purchasing/orders.int.test.ts",
+  },
   linkProductSupplierAction: {
     input:
       "id de proveedor, id de producto, código del proveedor e id de presentación",

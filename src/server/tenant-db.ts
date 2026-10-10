@@ -46,6 +46,8 @@ export const TENANT_MODELS = [
   "ProductImportItem",
   "ProductPresentation",
   "ProductSupplier",
+  "PurchaseOrder",
+  "PurchaseOrderLine",
   "QuotaUsage",
   "StockBalance",
   "StockCount",
@@ -255,6 +257,7 @@ const LOCKABLE = {
   product: "product",
   exitImport: "exit_import",
   productImport: "product_import",
+  purchaseOrder: "purchase_order",
   stockCount: "stock_count",
 } as const;
 

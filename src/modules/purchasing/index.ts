@@ -18,3 +18,29 @@ export type {
   PurchasingActor,
   SaveProductSupplierResult,
 } from "./product-suppliers";
+export {
+  PURCHASE_ORDER_MAX_LINES,
+  PURCHASE_ORDER_PAGE_SIZE,
+  PURCHASE_ORDER_STATUS_LABELS,
+  addOrderLine,
+  createPurchaseOrder,
+  formatOrderNumber,
+  getPurchaseOrder,
+  isPurchaseOrderStatus,
+  listPurchaseOrders,
+  removeOrderLine,
+  updateOrderLine,
+  updatePurchaseOrder,
+} from "./orders";
+export type {
+  CreateOrderResult,
+  OrderFailure,
+  OrderField,
+  OrderHeaderInput,
+  OrderLineInput,
+  PurchaseOrderDetail,
+  PurchaseOrderLine,
+  PurchaseOrderPage,
+  PurchaseOrderStatus,
+  PurchaseOrderSummary,
+} from "./orders";

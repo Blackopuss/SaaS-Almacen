@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 102 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores y sus productos).
+Actualizada: 2026-10-10 · Avance: 103 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores, sus productos y órdenes en borrador).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -520,12 +520,26 @@ Dime qué datos de tus proveedores faltan (días de crédito, cuenta bancaria, c
 
 Dime si quieres poder escribir a mano un costo de referencia antes de tu primera compra.
 
+**H3. Orden de compra (borrador)**
+
+1. Compras → «Nueva orden». Elige el proveedor (y, si quieres, cuándo la esperas y una nota). Nace la orden «OC-0001» en **Borrador**.
+2. «Agregar producto»: primero aparece lo que te vende ese proveedor, con su código; abajo puedes buscar cualquier producto. Elige uno.
+3. Elige cómo lo pides («Por pieza» o «Caja = 100 piezas»), la cantidad y el costo de cada una. Pide **3 cajas**: en la orden debe verse **«3 cajas × 100 = 300 piezas»**, el costo por caja y el importe.
+4. Intenta pedir **2.5 cajas**: lo rechaza en el campo de cantidad (las presentaciones se piden completas) y conserva lo que escribiste.
+5. Agrega otro producto sin costo: el total dice cuántos productos no tienen costo.
+6. «Editar» en una línea cambia cantidad o costo; «Quitar» la saca. «Editar datos» cambia el día esperado y las notas (el proveedor ya no).
+7. Cambia el contenido de la caja en la ficha del producto (de 100 a 120): la línea que ya pediste sigue diciendo «× 100»; una línea nueva dice «× 120».
+8. Haz una segunda orden: es la OC-0002 y aparece arriba en la lista. Los botones «Borrador», «Enviada»… filtran.
+9. Entra con una cuenta de Consulta: ve la orden y las cantidades, pero **ningún costo ni total**, y no puede cambiarla. Con Almacén no puede entrar a Compras.
+
+Todavía no se puede enviar, cancelar ni recibir la orden: llega en los siguientes pasos. Dime si el número «OC-0001» te sirve así y si necesitas descuentos o impuestos por línea.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
 - Avisos por correo de existencias bajas (la lista sí existe).
-- Órdenes de compra y recepciones (ya hay proveedores; lo demás llega en los siguientes pasos).
+- Enviar, cancelar y recibir órdenes de compra (ya se pueden escribir en borrador).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.
