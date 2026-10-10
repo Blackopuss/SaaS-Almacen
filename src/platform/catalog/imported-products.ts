@@ -43,6 +43,10 @@ export type ImportedProductResult =
       usedReservation: boolean;
       /** Presentation of the row, when it has one. */
       presentationId: string | null;
+      /** Its version with the content the import was confirmed with. */
+      presentationVersionId: string | null;
+      /** Unit the product is kept in. */
+      unitCode: string;
     }
   | { ok: false; error: string };
 
@@ -168,6 +172,7 @@ export async function applyImportedProduct(
   }
 
   let presentationId: string | null = null;
+  let presentationVersionId: string | null = null;
   if (input.presentation) {
     const current = await tx.productPresentation.findFirst({
       where: { productId, name: input.presentation.name },
@@ -176,7 +181,7 @@ export async function applyImportedProduct(
         versions: {
           orderBy: { version: "desc" },
           take: 1,
-          select: { version: true, factor: true },
+          select: { id: true, version: true, factor: true },
         },
       },
     });
@@ -196,12 +201,15 @@ export async function applyImportedProduct(
     const latest = current?.versions[0];
     // A different content is a new version: what moved before keeps its own.
     if (
-      !latest ||
-      !dec(latest.factor.toString()).equals(input.presentation.content)
+      latest &&
+      dec(latest.factor.toString()).equals(input.presentation.content)
     ) {
+      presentationVersionId = latest.id;
+    } else {
+      presentationVersionId = newId();
       await tx.presentationVersion.create({
         data: {
-          id: newId(),
+          id: presentationVersionId,
           organizationId,
           presentationId,
           version: (latest?.version ?? 0) + 1,
@@ -211,5 +219,13 @@ export async function applyImportedProduct(
       });
     }
   }
-  return { ok: true, productId, outcome, usedReservation, presentationId };
+  return {
+    ok: true,
+    productId,
+    outcome,
+    usedReservation,
+    presentationId,
+    presentationVersionId,
+    unitCode: input.unitCode,
+  };
 }

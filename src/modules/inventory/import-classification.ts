@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Permission } from "@/platform/authorization";
 import { getQuotaUsage } from "@/platform/entitlements";
 import { forOrganization } from "@/server";
 
@@ -81,6 +82,38 @@ export type ImportPlan =
       entries: PlannedProduct[];
     })
   | Extract<ImportClassification, { ok: false }>;
+
+/** The presentation a product of the file brings: the one its rows name. */
+export const plannedPresentation = (entry: Pick<PlannedProduct, "rows">) =>
+  entry.rows.find((line) => line.presentation)?.presentation ?? null;
+
+/**
+ * Permissions the operations of an import need, besides confirming it.
+ * Importing is not a way around the manual controls: whoever confirms
+ * must be allowed to do by hand everything the file does.
+ */
+export function importPermissions(
+  entries: readonly PlannedProduct[],
+): Permission[] {
+  const needed = new Set<Permission>(["inventory.import.confirm"]);
+  for (const { kind, first, rows } of entries) {
+    needed.add(
+      kind === "new"
+        ? "inventory.product.create"
+        : kind === "update"
+          ? "inventory.product.update"
+          : "inventory.product.reactivate",
+    );
+    if (plannedPresentation({ rows })) {
+      needed.add("inventory.presentation.create");
+      // On a product that exists the file may change its content.
+      if (kind !== "new") needed.add("inventory.presentation.update");
+    }
+    if (first.minimum) needed.add("inventory.minimum.update");
+    if (rows.some((line) => line.stock)) needed.add("inventory.opening.create");
+  }
+  return [...needed].sort();
+}
 
 /**
  * Classifies the products of an import against the catalog of the

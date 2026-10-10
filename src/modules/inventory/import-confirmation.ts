@@ -3,13 +3,18 @@ import "server-only";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import { reserveQuota } from "@/platform/entitlements";
+import type { Permission } from "@/platform/authorization";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
-import { newId } from "@/lib";
+import { isAppError, newId } from "@/lib";
 import { enqueueJob } from "@/platform/jobs";
 
 import { IMPORT_JOB_TYPE, type ImportItemData } from "./import-apply";
-import { planImport } from "./import-classification";
+import {
+  importPermissions,
+  planImport,
+  plannedPresentation,
+} from "./import-classification";
 import type { InventoryActor } from "./movements";
 
 /**
@@ -35,7 +40,7 @@ export type ConfirmImportResult =
     }
   | {
       ok: false;
-      reason: "not_found" | "not_ready" | "no_room" | "file";
+      reason: "not_found" | "not_ready" | "no_room" | "file" | "forbidden";
       error: string;
     };
 
@@ -49,6 +54,17 @@ class Rejected extends Error {
 }
 
 const places = (n: number) => (n === 1 ? "1 lugar" : `${n} lugares`);
+
+/** What each operation of a file is called, to say which one is not allowed. */
+const OPERATION: Partial<Record<Permission, string>> = {
+  "inventory.product.create": "crear productos",
+  "inventory.product.update": "cambiar productos que ya existen",
+  "inventory.product.reactivate": "reactivar productos archivados",
+  "inventory.presentation.create": "agregar presentaciones",
+  "inventory.presentation.update": "cambiar el contenido de presentaciones",
+  "inventory.minimum.update": "poner mínimos",
+  "inventory.opening.create": "registrar existencias iniciales",
+};
 
 export async function confirmImport(
   actor: InventoryActor,
@@ -74,6 +90,21 @@ export async function confirmImport(
     };
   }
   const required = plan.quota.required;
+  // Importing is not a way around the manual controls: whoever confirms
+  // must be allowed to do by hand each thing this file does.
+  const permissions = importPermissions(plan.entries);
+  for (const permission of permissions) {
+    try {
+      await assertModulePermission(organizationId, userId, permission);
+    } catch (error) {
+      if (!isAppError(error) || error.kind !== "forbidden") throw error;
+      return {
+        ok: false,
+        reason: "forbidden",
+        error: `Este archivo necesita ${OPERATION[permission] ?? "algo"} y tu acceso no lo permite. Pide a un administrador que lo confirme, o quita eso del archivo.`,
+      };
+    }
+  }
 
   try {
     return await forOrganization(organizationId).$transaction(
@@ -151,7 +182,7 @@ export async function confirmImport(
             brand: entry.first.brand,
             barcode: entry.first.barcode,
             unitCode: entry.first.unitCode,
-            presentation: entry.first.presentation,
+            presentation: plannedPresentation(entry),
             minimum: entry.first.minimum,
             stock: entry.rows.flatMap((line) =>
               line.stock
@@ -178,6 +209,7 @@ export async function confirmImport(
           data: {
             status: "CONFIRMED",
             reservedPlaces: required,
+            requiredPermissions: permissions,
             totalItems: items.length,
             confirmedAt: new Date(),
             confirmedByUserId: userId,

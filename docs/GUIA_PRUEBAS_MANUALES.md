@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 95 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-08B).
+Actualizada: 2026-10-10 · Avance: 96 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-09).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -445,7 +445,10 @@ Las importaciones se aplican en segundo plano: además de la aplicación debe es
 6. Si después de confirmar (con el worker detenido) alguien crea a mano un producto con un código de barras del archivo, al aplicar ese producto queda como «no se pudo importar» con su motivo y los demás sí entran.
 7. En «Mi plan», los productos activos suben solo por los nuevos y reactivados que sí entraron. La bitácora muestra la confirmación y el resultado.
 
-Las existencias iniciales del archivo todavía no se aplican: llegan en el paso siguiente (IMP-09). Por ahora los productos importados entran en cero.
+8. Existencias iniciales: llena «Existencia inicial» (y «Ubicación», y «Existencia contada en» si la cuentas por caja) en algunas filas, y repite una clave en dos filas para darle existencia en dos ubicaciones. Al terminar, cada producto tiene en Inventario exactamente lo que decía el archivo, por ubicación, y en Movimientos aparece un «Saldo inicial» por cada fila con existencia, con la referencia «Importación, fila N» y, si venía por caja, «3 cajas × 100 = 300 piezas».
+9. Detener y volver a arrancar el worker a la mitad no duplica existencias: los saldos siguen siendo los del archivo.
+10. Si después de confirmar (con el worker detenido) registras una entrada a mano de uno de esos productos, o archivas una de sus ubicaciones, ese producto queda como «no se pudo importar» con su motivo y **no cambia nada de él**; los demás entran.
+11. Un producto que ya tiene movimientos no acepta existencia inicial desde un archivo: la revisión lo marca como choque antes de confirmar.
 
 **G6. Cancelar una importación y lugares que se devuelven**
 
@@ -462,7 +465,6 @@ Una importación cancelada o detenida no se reanuda: se sube el archivo de nuevo
 
 Para que no lo reportes como falla:
 
-- Existencias iniciales desde el archivo de importación (los productos entran en cero).
 - Importar salidas diarias y exportar catálogo, existencias o historial a Excel.
 - Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores (la sección existe, vacía).

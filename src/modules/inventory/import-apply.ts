@@ -2,12 +2,14 @@ import "server-only";
 
 import { isAppError, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
+import { isPermission } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
 import { applyImportedProduct } from "@/platform/catalog";
 import { releaseReservation } from "@/platform/entitlements";
 import type { JobHandlers } from "@/platform/jobs";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
+import { checkImportedStock, postImportedStock } from "./import-stock";
 import {
   IMPORT_JOB_TYPE,
   releaseFailedImport,
@@ -39,7 +41,7 @@ export type ImportItemData = {
   unitCode: string;
   presentation: { name: string; content: string } | null;
   minimum: string | null;
-  /** Initial stock by location, already in the product's unit (IMP-09). */
+  /** Initial stock by location, already in the product's unit. */
   stock: {
     row: number;
     base: string;
@@ -79,15 +81,34 @@ export async function applyImport(
     // not, what is pending is not applied and its places go back.
     const gate = await client.productImport.findFirst({
       where: { id: String(importId).slice(0, 36) },
-      select: { status: true, confirmedByUserId: true, createdByUserId: true },
+      select: {
+        status: true,
+        confirmedByUserId: true,
+        createdByUserId: true,
+        requiredPermissions: true,
+      },
     });
     if (gate && (gate.status === "CONFIRMED" || gate.status === "RUNNING")) {
+      // Everything its operations need, as fixed when it was confirmed.
+      const needed = new Set(["inventory.import.confirm"]);
+      if (Array.isArray(gate.requiredPermissions)) {
+        for (const permission of gate.requiredPermissions) {
+          needed.add(String(permission));
+        }
+      }
       try {
-        await assertModulePermission(
-          organizationId,
-          gate.confirmedByUserId ?? gate.createdByUserId,
-          "inventory.import.confirm",
-        );
+        for (const permission of needed) {
+          // A name that is no longer a permission is denied, not skipped.
+          if (!isPermission(permission)) {
+            await stopUnauthorizedImport(organizationId, importId);
+            return { ok: false, reason: "stopped" };
+          }
+          await assertModulePermission(
+            organizationId,
+            gate.confirmedByUserId ?? gate.createdByUserId,
+            permission,
+          );
+        }
       } catch (error) {
         if (!isAppError(error) || error.kind !== "forbidden") throw error;
         await stopUnauthorizedImport(organizationId, importId);
@@ -175,10 +196,78 @@ export async function applyImport(
           };
         }
 
+        // The batch works under the same locks as a manual change, taken
+        // before anything is read: the products of the batch that exist,
+        // all at once and in id order — never one by one in the order of
+        // the file, which could cross with a movement of several products
+        // — and then the locations its stock goes to (INV-19B).
+        const known = await tx.product.findMany({
+          where: { sku: { in: items.map((item) => item.sku) } },
+          select: { id: true },
+        });
+        const locked = new Set(
+          await lockRows(
+            tx,
+            "product",
+            known.map((product) => product.id),
+          ),
+        );
+        const places = new Set(
+          items.flatMap((item) =>
+            ((item.data as ImportItemData).stock ?? []).map(
+              (line) => line.locationId,
+            ),
+          ),
+        );
+        if (places.size > 0) await lockRows(tx, "location", [...places]);
+
         let reserved = row.reservedPlaces;
         let failed = 0;
+        const fail = async (itemId: string, error: string) => {
+          failed++;
+          await tx.productImportItem.updateMany({
+            where: { id: itemId },
+            data: {
+              status: "FAILED",
+              error: error.slice(0, 300),
+              appliedAt: new Date(),
+            },
+          });
+        };
         for (const item of items) {
           const data = item.data as ImportItemData;
+          const stock = data.stock ?? [];
+          if (stock.length > 0) {
+            const current = await tx.product.findFirst({
+              where: { sku: item.sku },
+              select: { id: true, unitCode: true, quantityStep: true },
+            });
+            if (current && !locked.has(current.id)) {
+              // Created by someone else after the locks were taken: start
+              // the batch again, with it locked like the others.
+              throw new Error(
+                "El catálogo cambió mientras se aplicaba la importación; se intentará de nuevo.",
+              );
+            }
+            // Before touching the product: if its stock can no longer
+            // enter, the product is left whole, as it was.
+            const problem = await checkImportedStock(
+              tx,
+              current
+                ? {
+                    id: current.id,
+                    unitCode: current.unitCode,
+                    quantityStep: current.quantityStep.toString(),
+                  }
+                : null,
+              stock,
+              data.presentation !== null,
+            );
+            if (problem) {
+              await fail(item.id, problem);
+              continue;
+            }
+          }
           const applied = await applyImportedProduct(
             tx,
             actor,
@@ -195,15 +284,7 @@ export async function applyImport(
             { hasReservation: reserved > 0 },
           );
           if (!applied.ok) {
-            failed++;
-            await tx.productImportItem.updateMany({
-              where: { id: item.id },
-              data: {
-                status: "FAILED",
-                error: applied.error.slice(0, 300),
-                appliedAt: new Date(),
-              },
-            });
+            await fail(item.id, applied.error);
             continue;
           }
           if (applied.usedReservation) reserved--;
@@ -223,6 +304,24 @@ export async function applyImport(
                 },
               });
             }
+          }
+          if (stock.length > 0) {
+            // Its initial stock, with the quantities fixed at confirmation.
+            await postImportedStock(tx, actor, {
+              itemId: item.id,
+              product: { id: applied.productId, unitCode: applied.unitCode },
+              presentation:
+                data.presentation &&
+                applied.presentationId &&
+                applied.presentationVersionId
+                  ? {
+                      id: applied.presentationId,
+                      versionId: applied.presentationVersionId,
+                      content: data.presentation.content,
+                    }
+                  : null,
+              lines: stock,
+            });
           }
           await tx.productImportItem.updateMany({
             where: { id: item.id },

@@ -132,3 +132,4 @@ export {
   releaseFailedImport,
   type CancelImportResult,
 } from "./import-release";
+export { importPermissions } from "./import-classification";

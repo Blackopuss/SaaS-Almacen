@@ -131,7 +131,14 @@ export function validateImportRows(
   /** First row of each SKU and what it said, to compare repetitions. */
   const firstBySku = new Map<
     string,
-    { row: number; name: string; unitCode: string; locations: Set<string> }
+    {
+      row: number;
+      name: string;
+      unitCode: string;
+      locations: Set<string>;
+      /** The presentation the product brings, from the first row that has one. */
+      presentation: { name: string; content: string } | null;
+    }
   >();
   const skuByBarcode = new Map<string, { sku: string; row: number }>();
 
@@ -296,7 +303,11 @@ export function validateImportRows(
           } else {
             inPresentation = true;
             base = count.times(presentation.content);
-            if (base.greaterThan("999999999.999")) {
+            // Both what was counted and what it amounts to must fit.
+            if (
+              count.greaterThan("999999999.999") ||
+              base.greaterThan("999999999.999")
+            ) {
               issue("initialStock", "La cantidad es demasiado grande.");
               base = null;
             }
@@ -348,6 +359,7 @@ export function validateImportRows(
           name,
           unitCode,
           locations: new Set([place]),
+          presentation,
         });
       } else if (
         foldName(first.name) !== foldName(name) ||
@@ -366,6 +378,21 @@ export function validateImportRows(
         );
       } else {
         first.locations.add(place);
+      }
+      // A product brings one presentation: its rows repeat it or leave it
+      // empty, so the stock counted in it has a single content.
+      if (first && presentation) {
+        if (!first.presentation) {
+          first.presentation = presentation;
+        } else if (
+          foldName(first.presentation.name) !== foldName(presentation.name) ||
+          !dec(first.presentation.content).equals(presentation.content)
+        ) {
+          issue(
+            "presentation",
+            `Esta clave ya trae la presentación «${first.presentation.name}» de ${first.presentation.content} en otra fila. En las filas repetidas deja la misma presentación y contenido, o déjalos vacíos; las demás presentaciones se agregan después en el producto.`,
+          );
+        }
       }
     }
     if (barcode !== null && sku !== "") {

@@ -1028,43 +1028,46 @@ enum ProductImportStatus {
 /// was uploaded and how to read it. Nothing of the catalog changes until
 /// the import is confirmed (IMP-08).
 model ProductImport {
-  id                String              @id @db.Char(36)
-  organizationId    String              @db.Char(36)
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  fileId            String              @db.Char(36)
-  file              StoredFile          @relation(fields: [organizationId, fileId], references: [organizationId, id], onDelete: Restrict)
-  status            ProductImportStatus @default(MAPPING)
+  id                  String              @id @db.Char(36)
+  organizationId      String              @db.Char(36)
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fileId              String              @db.Char(36)
+  file                StoredFile          @relation(fields: [organizationId, fileId], references: [organizationId, id], onDelete: Restrict)
+  status              ProductImportStatus @default(MAPPING)
   /// Sheet that was read; null for CSV.
-  sheetName         String?             @db.VarChar(64)
+  sheetName           String?             @db.VarChar(64)
   /// Row of the file (from 1) that holds the titles.
-  headerRow         Int
+  headerRow           Int
   /// Titles of the file, by column: ["Clave", "Nombre", …].
-  headers           Json
+  headers             Json
   /// Rows with data under the titles.
-  dataRows          Int
+  dataRows            Int
   /// Cells that held a formula: their stored value is what is read.
-  formulaCells      Int                 @default(0)
+  formulaCells        Int                 @default(0)
   /// Which column of the file feeds each of ours: { "sku": 0, "name": 1 }.
-  mapping           Json
+  mapping             Json
   /// "." or ","; null until the person says how decimals are written.
-  decimalSeparator  String?             @db.Char(1)
+  decimalSeparator    String?             @db.Char(1)
   /// Places of the plan held for its new and reactivated products while
   /// it is applied; each one becomes a product or is given back.
-  reservedPlaces    Int                 @default(0)
-  confirmedAt       DateTime?           @db.DateTime(3)
-  confirmedByUserId String?             @db.Char(36)
+  reservedPlaces      Int                 @default(0)
+  confirmedAt         DateTime?           @db.DateTime(3)
+  confirmedByUserId   String?             @db.Char(36)
+  /// Permissions its operations need (create products, opening stock…),
+  /// fixed when it was confirmed and checked again before each batch.
+  requiredPermissions Json?
   /// Products of the file, fixed when it was confirmed (IMP-08).
-  totalItems        Int                 @default(0)
+  totalItems          Int                 @default(0)
   /// Of those, how many the worker has finished: applied or failed.
-  processedItems    Int                 @default(0)
-  failedItems       Int                 @default(0)
-  finishedAt        DateTime?           @db.DateTime(3)
+  processedItems      Int                 @default(0)
+  failedItems         Int                 @default(0)
+  finishedAt          DateTime?           @db.DateTime(3)
   /// Why it stopped, for people, when it could not be finished.
-  lastError         String?             @db.VarChar(500)
-  items             ProductImportItem[]
-  createdByUserId   String              @db.Char(36)
-  createdAt         DateTime            @default(now()) @db.DateTime(3)
-  updatedAt         DateTime            @updatedAt @db.DateTime(3)
+  lastError           String?             @db.VarChar(500)
+  items               ProductImportItem[]
+  createdByUserId     String              @db.Char(36)
+  createdAt           DateTime            @default(now()) @db.DateTime(3)
+  updatedAt           DateTime            @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt])

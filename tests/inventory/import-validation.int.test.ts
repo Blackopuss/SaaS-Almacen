@@ -306,6 +306,60 @@ describe("validateImportRows", () => {
     expect(problems([here, { ...here, sku: "tor-1" }])).toHaveLength(1);
   });
 
+  it("the rows of a product bring one presentation, with one content", () => {
+    const boxed: Row = {
+      ...base,
+      presentation: "Caja",
+      presentationContent: "100",
+      initialStock: "2",
+      initialStockIn: "Caja",
+    };
+    const there = { location: "Zona A › Estante 3" };
+    // The same box again, or none: both are fine.
+    expect(check([boxed, { ...boxed, ...there }]).issues).toEqual([]);
+    expect(
+      check([boxed, { ...base, initialStock: "40", ...there }]).issues,
+    ).toEqual([]);
+    // Named only in a later row: it is still the product's presentation.
+    const late = check([
+      { ...base, initialStock: "40" },
+      { ...boxed, ...there },
+    ]);
+    expect(late.issues).toEqual([]);
+    expect(late.valid[1]!.stock).toMatchObject({
+      base: "200",
+      inPresentation: true,
+    });
+    // Another content, or another presentation, for the same key.
+    expect(
+      problems([boxed, { ...boxed, presentationContent: "200", ...there }]),
+    ).toEqual([
+      "3 presentation: Esta clave ya trae la presentación «Caja» de 100 en otra fila. En las filas repetidas deja la misma presentación y contenido, o déjalos vacíos; las demás presentaciones se agregan después en el producto.",
+    ]);
+    expect(
+      problems([
+        boxed,
+        { ...boxed, presentation: "Bolsa", initialStockIn: "Bolsa", ...there },
+      ])[0],
+    ).toContain("ya trae la presentación «Caja»");
+  });
+
+  it("what is counted in a presentation must fit, not only what it amounts to", () => {
+    expect(
+      problems([
+        {
+          sku: "ARE-1",
+          name: "Arena",
+          unit: "kilogramo",
+          presentation: "Pizca",
+          presentationContent: "0.01",
+          initialStock: "1000000000",
+          initialStockIn: "Pizca",
+        },
+      ]),
+    ).toEqual(["2 initialStock: La cantidad es demasiado grande."]);
+  });
+
   it("a barcode belongs to one product of the file", () => {
     const a: Row = { ...base, barcode: "750100" };
     expect(
