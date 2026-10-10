@@ -440,7 +440,10 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       ],
     },
     "NEG-24": { waitsFor: "CMP (recepciones y devoluciones)" },
-    "NEG-25": { waitsFor: "CMP-16 e IMP (exportaciones y PDF)" },
+    "NEG-25": {
+      tests: ["tests/inventory/exports.int.test.ts"],
+      waitsFor: "CMP-16 (campos de costo en exportaciones y PDF)",
+    },
     "NEG-26": { tests: ["tests/platform/ownership.int.test.ts"] },
   };
 

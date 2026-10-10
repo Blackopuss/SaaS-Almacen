@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 97 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-10).
+Actualizada: 2026-10-10 · Avance: 98 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-11).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -476,11 +476,21 @@ Para cuando las ventas se registran en otro sistema o en notas. Necesita el work
 
 Dime si tu sistema de ventas exporta el archivo con otros títulos o con la fecha en otro formato, y si prefieres ver una salida por ticket en lugar de una por producto.
 
+**G8. Exportar a Excel**
+
+1. `/inventario` → «Exportar a Excel» (lo ven todos los roles, también Consulta).
+2. Descarga el catálogo, las existencias y el historial, en Excel y en CSV, y ábrelos. Deberías ver los mismos datos que en pantalla: productos activos y archivados con su mínimo; existencias por ubicación con la ruta completa («Zona A › Estante 3»); y en el historial una fila por movimiento con fecha y hora, tipo, cantidad, motivo, referencia y quién.
+3. En el historial, elige un rango de fechas: el archivo trae solo esos días.
+4. Crea un producto cuyo nombre empiece con `=` (por ejemplo `=1+1`) y expórtalo: en Excel debe verse el texto con un apóstrofo delante, **no** el resultado 2.
+5. Con una cuenta sin rol, o sin sesión, la descarga no se entrega.
+6. En Configuración → Bitácora aparece cada exportación (qué se exportó, formato y cuántas filas).
+
+Dime si a los archivos les falta alguna columna que uses con tu contador, o si prefieres otro orden.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Exportar catálogo, existencias o historial a Excel.
 - Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores (la sección existe, vacía).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).

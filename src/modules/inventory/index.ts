@@ -166,3 +166,12 @@ export {
   exitImportJobHandlers,
   type ApplyExitImportOutcome,
 } from "./exit-import-apply";
+export {
+  EXPORT_KINDS,
+  EXPORT_MAX_ROWS,
+  buildExport,
+  isExportKind,
+  type ExportFormat,
+  type ExportKind,
+  type ExportResult,
+} from "./exports";

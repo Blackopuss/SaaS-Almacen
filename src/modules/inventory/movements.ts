@@ -1897,7 +1897,10 @@ function offsetOf(timeZone: string, at: Date): string {
 }
 
 /** Start of a calendar day of the company, as a moment in UTC; null if unreadable. */
-function startOfDay(day: string | undefined, timeZone: string): Date | null {
+export function startOfDay(
+  day: string | undefined,
+  timeZone: string,
+): Date | null {
   if (!day || !DAY.test(day)) return null;
   const guess = new Date(`${day}T12:00:00Z`);
   if (Number.isNaN(guess.getTime())) return null;

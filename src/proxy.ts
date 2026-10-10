@@ -20,6 +20,7 @@ const PROTECTED = [
   "/interno",
   "/api/archivos",
   "/api/importaciones",
+  "/api/exportaciones",
 ];
 
 export default function proxy(request: NextRequest) {

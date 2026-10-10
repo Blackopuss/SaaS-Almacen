@@ -270,6 +270,14 @@ export default async function InventarioPage({
             Importar desde Excel
           </Link>
         )}
+        {!showArchived && access.can("inventory.export.create") && (
+          <Link
+            href="/inventario/exportar"
+            className="ml-4 inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Exportar a Excel
+          </Link>
+        )}
         {lowCount !== null && (
           <Link
             href="/inventario/bajas"
