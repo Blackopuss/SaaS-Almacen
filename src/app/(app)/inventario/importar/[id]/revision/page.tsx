@@ -22,6 +22,7 @@ import {
   classifyImport,
   getImport,
   isImportEditable,
+  listImportFailures,
   validateImport,
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
@@ -136,6 +137,8 @@ export default async function RevisionPage({
   // Once confirmed its places are held: the question is no longer whether
   // it fits.
   const editable = detail ? isImportEditable(detail.status) : false;
+  const failures =
+    detail && detail.failedItems > 0 ? await listImportFailures(actor, id) : [];
   const canConfirm =
     editable &&
     Boolean(plan?.ready) &&
@@ -297,25 +300,97 @@ export default async function RevisionPage({
       )}
 
       {detail && !editable && (
-        <div
-          role="status"
-          className="flex max-w-3xl items-start gap-2 rounded-xl border bg-card p-4 text-sm"
+        <section
+          aria-labelledby="estado-importacion"
+          className="max-w-3xl rounded-xl border bg-card"
         >
-          <CircleCheck
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-success"
-          />
-          <p>
-            <span className="font-medium">Importación confirmada.</span>{" "}
-            {detail.reservedPlaces === 0
-              ? "No necesitó lugares de tu plan."
-              : detail.reservedPlaces === 1
-                ? "Tiene 1 lugar de tu plan apartado."
-                : `Tiene ${count(detail.reservedPlaces)} lugares de tu plan apartados.`}{" "}
-            Ya no admite cambios. Sus productos se crearán en segundo plano en
-            el paso siguiente; por ahora tu inventario sigue igual.
-          </p>
-        </div>
+          <div
+            role="status"
+            className="flex items-start gap-2 p-4 text-sm sm:p-5"
+          >
+            {detail.status === "DONE" && detail.failedItems === 0 ? (
+              <CircleCheck
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-success"
+              />
+            ) : detail.status === "DONE" || detail.status === "FAILED" ? (
+              <CircleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-warning"
+              />
+            ) : (
+              <CircleCheck
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              />
+            )}
+            <div className="space-y-1">
+              <h2 id="estado-importacion" className="font-medium">
+                {detail.status === "DONE"
+                  ? "Importación terminada"
+                  : detail.status === "RUNNING"
+                    ? "Importando…"
+                    : detail.status === "CONFIRMED"
+                      ? "Importación confirmada, en espera"
+                      : detail.status === "FAILED"
+                        ? "La importación no pudo terminar"
+                        : "Importación cancelada"}
+              </h2>
+              {detail.status === "DONE" ? (
+                <p>
+                  {detail.processedItems - detail.failedItems === 1
+                    ? "1 producto quedó en tu catálogo"
+                    : `${count(detail.processedItems - detail.failedItems)} productos quedaron en tu catálogo`}
+                  {detail.failedItems > 0 &&
+                    `; ${detail.failedItems === 1 ? "1 no se pudo importar" : `${count(detail.failedItems)} no se pudieron importar`} (abajo dice por qué)`}
+                  .
+                </p>
+              ) : detail.status === "CANCELLED" ? (
+                <p>No cambió nada en tu inventario.</p>
+              ) : (
+                <p className="tabular-nums">
+                  {count(detail.processedItems)} de {count(detail.totalItems)}{" "}
+                  productos procesados
+                  {detail.reservedPlaces > 0 &&
+                    ` · ${detail.reservedPlaces === 1 ? "1 lugar apartado" : `${count(detail.reservedPlaces)} lugares apartados`} de tu plan`}
+                  . Se aplica en segundo plano: puedes salir de esta pantalla y
+                  volver a abrirla para ver el avance.
+                </p>
+              )}
+              {detail.lastError && (
+                <p className="text-destructive">{detail.lastError}</p>
+              )}
+              {detail.status === "DONE" && (
+                <p>
+                  <Link
+                    href="/inventario"
+                    className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    Ver tu inventario
+                  </Link>
+                </p>
+              )}
+            </div>
+          </div>
+          {failures.length > 0 && (
+            <ul className="divide-y border-t">
+              {failures.map((failure) => (
+                <li key={failure.sku} className="space-y-1 p-4 text-sm sm:px-5">
+                  <p className="font-medium [overflow-wrap:anywhere]">
+                    {failure.sku}
+                    {failure.row !== null && (
+                      <span className="font-normal text-muted-foreground tabular-nums">
+                        {" "}
+                        · fila {failure.row}
+                      </span>
+                    )}
+                  </p>
+                  <p>{failure.error}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       {plan && plan.validRows > 0 && editable && (

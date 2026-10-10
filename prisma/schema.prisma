@@ -144,6 +144,7 @@ model Organization {
   jobs                 Job[]
   storedFiles          StoredFile[]
   productImports       ProductImport[]
+  productImportItems   ProductImportItem[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1048,6 +1049,15 @@ model ProductImport {
   reservedPlaces    Int                 @default(0)
   confirmedAt       DateTime?           @db.DateTime(3)
   confirmedByUserId String?             @db.Char(36)
+  /// Products of the file, fixed when it was confirmed (IMP-08).
+  totalItems        Int                 @default(0)
+  /// Of those, how many the worker has finished: applied or failed.
+  processedItems    Int                 @default(0)
+  failedItems       Int                 @default(0)
+  finishedAt        DateTime?           @db.DateTime(3)
+  /// Why it stopped, for people, when it could not be finished.
+  lastError         String?             @db.VarChar(500)
+  items             ProductImportItem[]
   createdByUserId   String              @db.Char(36)
   createdAt         DateTime            @default(now()) @db.DateTime(3)
   updatedAt         DateTime            @updatedAt @db.DateTime(3)
@@ -1055,4 +1065,40 @@ model ProductImport {
   @@unique([organizationId, id])
   @@index([organizationId, createdAt])
   @@map("product_import")
+}
+
+enum ProductImportItemStatus {
+  PENDING
+  /// The product was created, updated or reactivated.
+  DONE
+  /// This product could not be applied; the others go on.
+  FAILED
+}
+
+/// One product of a confirmed import (IMP-08): what the file said about
+/// it, fixed at the moment of confirming — its fields, the content of its
+/// presentation, its stock by location. The worker applies items one by
+/// one and marks them, so applying again never repeats one.
+model ProductImportItem {
+  id             String                  @id @db.Char(36)
+  organizationId String                  @db.Char(36)
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  importId       String                  @db.Char(36)
+  import         ProductImport           @relation(fields: [organizationId, importId], references: [organizationId, id], onDelete: Restrict)
+  /// Order of the product in the file.
+  position       Int
+  sku            String                  @db.VarChar(64)
+  /// What it was when confirmed: "new", "update" or "reactivate".
+  kind           String                  @db.VarChar(12)
+  data           Json
+  status         ProductImportItemStatus @default(PENDING)
+  /// The product it became, once applied.
+  productId      String?                 @db.Char(36)
+  error          String?                 @db.VarChar(300)
+  appliedAt      DateTime?               @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, importId, position])
+  @@index([organizationId, importId, status, position])
+  @@map("product_import_item")
 }

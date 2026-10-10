@@ -1,3 +1,4 @@
+import { inventoryJobHandlers } from "@/modules/inventory";
 import type { JobHandlers } from "@/platform/jobs";
 
 /**
@@ -5,4 +6,4 @@ import type { JobHandlers } from "@/platform/jobs";
  * runs the queue but never imports modules: the worker process receives
  * this list. A module adds its handlers here («inventory.import_products»).
  */
-export const jobHandlers: JobHandlers = {};
+export const jobHandlers: JobHandlers = { ...inventoryJobHandlers };

@@ -65,6 +65,23 @@ export type ImportClassification =
 const MAX_SHOWN = 200;
 const CHUNK = 500;
 
+/** A product of the file with everything its rows say, and what it is. */
+export type PlannedProduct = {
+  sku: string;
+  kind: ImportProductKind;
+  /** Its first row: the fields of the product. */
+  first: ValidImportRow;
+  /** Every row of it: one per location with stock. */
+  rows: ValidImportRow[];
+};
+
+export type ImportPlan =
+  | (Extract<ImportClassification, { ok: true }> & {
+      /** Every product of the file, in its order; not only the ones shown. */
+      entries: PlannedProduct[];
+    })
+  | Extract<ImportClassification, { ok: false }>;
+
 /**
  * Classifies the products of an import against the catalog of the
  * company and tells how much quota it needs.
@@ -73,6 +90,21 @@ export async function classifyImport(
   actor: InventoryActor,
   importId: string,
 ): Promise<ImportClassification> {
+  const plan = await planImport(actor, importId);
+  if (!plan.ok) return plan;
+  // The screen gets the summary; the full list is for the confirmation.
+  const classification: ImportClassification & { entries?: unknown } = {
+    ...plan,
+  };
+  delete classification.entries;
+  return classification;
+}
+
+/** The classification with every product of the file, for confirming it. */
+export async function planImport(
+  actor: InventoryActor,
+  importId: string,
+): Promise<ImportPlan> {
   // Checks the permission and reads the file again.
   const checked = await checkImport(actor, importId);
   if (!checked.ok) return checked;
@@ -169,6 +201,7 @@ export async function classifyImport(
     reactivate: 0,
   };
   const products: ClassifiedProduct[] = [];
+  const entries: PlannedProduct[] = [];
   for (const [key, { first, rows }] of bySku) {
     const current = existing.get(key);
     const kind: ImportProductKind = !current
@@ -177,6 +210,7 @@ export async function classifyImport(
         ? "update"
         : "reactivate";
     counts[kind]++;
+    entries.push({ sku: current?.sku ?? first.sku, kind, first, rows });
 
     const changes: string[] = [];
     if (current) {
@@ -259,6 +293,7 @@ export async function classifyImport(
     conflicts: conflicts.slice(0, MAX_SHOWN),
     conflictCount: conflicts.length,
     products,
+    entries,
     ready:
       valid.length > 0 &&
       checked.result.invalidRows === 0 &&

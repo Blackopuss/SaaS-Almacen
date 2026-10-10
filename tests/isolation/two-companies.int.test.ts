@@ -244,9 +244,10 @@ beforeAll(async () => {
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const productImportId = newId();
     await db.productImport.create({
       data: {
-        id: newId(),
+        id: productImportId,
         organizationId,
         fileId: storedFileId,
         headerRow: 1,
@@ -254,6 +255,17 @@ beforeAll(async () => {
         dataRows: 1,
         mapping: {},
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.productImportItem.create({
+      data: {
+        id: newId(),
+        organizationId,
+        importId: productImportId,
+        position: 1,
+        sku: "TOR-001",
+        kind: "update",
+        data: {},
       },
     });
     await db.job.create({

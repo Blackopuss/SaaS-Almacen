@@ -15,8 +15,10 @@ import { getUnit, isUnitCode } from "./units";
  * Products of the catalog (INV-02). Every new product goes through
  * `createProduct`: it checks the role and the contracted module, takes one
  * place of the plan's quota and writes the product in the same transaction.
- * If anything fails, the place is not consumed. No other code creates
- * products (a test fails if `product.create` appears elsewhere).
+ * If anything fails, the place is not consumed. The only other way in is a
+ * confirmed import (`imported-products.ts`, IMP-08), which takes its place
+ * from what the import holds (a test fails if `product.create` appears
+ * anywhere else).
  */
 
 const text = (max: number) =>

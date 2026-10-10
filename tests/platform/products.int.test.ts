@@ -370,8 +370,11 @@ describe("one way in", () => {
         readFileSync(file, "utf8"),
       ),
     );
-    expect(creators.map((file) => path.basename(file))).toEqual([
-      "products.ts",
-    ]);
+    // Manual products, and those of a confirmed import (IMP-08): both take
+    // their place of the plan in the same transaction.
+    const catalog = path.join(process.cwd(), "src", "platform", "catalog");
+    expect(creators.map((file) => path.relative(catalog, file)).sort()).toEqual(
+      ["imported-products.ts", "products.ts"],
+    );
   });
 });

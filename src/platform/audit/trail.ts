@@ -19,6 +19,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "inventory.adjusted": "Ajustó existencias",
   "inventory.count_applied": "Aplicó un conteo físico",
   "inventory.import_confirmed": "Confirmó una importación de productos",
+  "inventory.import_applied": "Se aplicó una importación de productos",
   "inventory.reversed": "Reversó un movimiento",
   "product.created": "Creó un producto",
   "product.updated": "Cambió la ficha de un producto",

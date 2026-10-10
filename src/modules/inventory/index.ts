@@ -92,6 +92,7 @@ export {
   NUMERIC_IMPORT_COLUMNS,
   getImport,
   isImportEditable,
+  listImportFailures,
   listImports,
   normalizeDecimal,
   saveImportMapping,
@@ -120,3 +121,9 @@ export {
   type ImportProductKind,
 } from "./import-classification";
 export { confirmImport, type ConfirmImportResult } from "./import-confirmation";
+export {
+  IMPORT_JOB_TYPE,
+  applyImport,
+  inventoryJobHandlers,
+  type ApplyImportOutcome,
+} from "./import-apply";

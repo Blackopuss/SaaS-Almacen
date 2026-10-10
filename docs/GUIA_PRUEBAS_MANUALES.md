@@ -1,14 +1,49 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-04 · Avance: 59 de 148 pasos (USR y MOD completas; Inventario hasta INV-09).
+Actualizada: 2026-10-05 · Avance: 94 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-08).
 
-Sirve para recorrer a mano todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
+Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
-## 1. Preparar y entrar
+## 1. Empezar desde cero
 
-1. Ten MySQL corriendo y, en la carpeta del proyecto, ejecuta `npm run dev`.
-2. Abre `http://localhost:3000`.
-3. Si es la primera vez o quieres dejar la cuenta demo en su estado inicial: `npm run db:seed`.
+### 1.1 Lo que necesitas
+
+- MySQL 9.4 corriendo en tu computadora.
+- Node 24 o más reciente.
+- Una app de autenticación en el teléfono (Google Authenticator, Authy…) para el recorrido A1.
+
+### 1.2 Primera vez en esta computadora
+
+Solo si nunca has levantado el proyecto aquí:
+
+```powershell
+npm install
+# Copia .env.example como .env.local y escribe MYSQL_ROOT_PASSWORD
+npm run setup      # secretos, bases, usuarios y tablas
+```
+
+### 1.3 Dejar la base de desarrollo vacía (opcional, lo corres tú)
+
+Si ya habías probado antes y quieres partir de una base limpia:
+
+```powershell
+npm run db:reset   # BORRA todo lo de almacen_dev y vuelve a crear las tablas
+```
+
+Te pide confirmación. Es la única forma de quitar empresas, movimientos y bitácora de pruebas anteriores (no se pueden borrar desde la app). Yo nunca lo ejecuto por mi cuenta. Si quieres, borra también las carpetas `.local/mail` (correos viejos de `/correos`) y `storage` (archivos subidos); se vuelven a crear solas.
+
+Si prefieres conservar lo que tienes, sáltate este paso: todos los recorridos funcionan igual sobre una base con datos.
+
+### 1.4 Preparar la cuenta demo y arrancar
+
+```powershell
+npm run db:seed                          # crea o restaura la cuenta demo y su plan
+npm run staff -- add demo@almacen.test   # acceso a la consola interna (recorrido E)
+npm run dev                              # terminal 1: la aplicación, http://localhost:3000
+npm run worker                           # terminal 2: aplica las importaciones (recorrido G5)
+```
+
+Deja las dos terminales abiertas mientras pruebas.
 
 ### Cuenta demo (titular de «Ferretería Demo»)
 
@@ -18,7 +53,7 @@ Sirve para recorrer a mano todo lo que ya existe y anotar lo que no te guste. Ca
 | Contraseña | `DEMO_PASSWORD` en `.env.local` |
 | Código de dos pasos | `npm run demo:codigo` (cambia cada 30 segundos y cada código sirve una sola vez) |
 
-La Ferretería Demo ya tiene plan: Inventario y Compras, 1,000 productos y 5 usuarios.
+La Ferretería Demo ya tiene plan: Inventario y Compras, 1,000 productos y 5 usuarios. Empieza sin productos; solo tiene la ubicación «General».
 
 ### Los correos no salen de tu computadora
 
@@ -26,7 +61,25 @@ Todavía no hay proveedor de correo. Cada mensaje que la app «envía» aparece 
 
 ### Probar como otra persona
 
-Abre una ventana de incógnito (o otro navegador) para la segunda persona; así no cierras tu sesión de titular.
+Abre una ventana de incógnito (u otro navegador) para la segunda persona; así no cierras tu sesión de titular.
+
+### Orden sugerido
+
+A (cuenta) → E1 (darle plan a la empresa nueva) → D (productos) → F (existencias y movimientos) → G (importación) → B (equipo y roles) → C (bitácora) → resto de E. Así cada recorrido encuentra los datos que dejó el anterior.
+
+### Alternativa: base de pruebas (no ensucia desarrollo)
+
+Para repetir recorridos de movimientos, conteos o importación sin dejar rastro en desarrollo:
+
+```powershell
+npm run dev:test                                              # terminal 1: http://localhost:3100
+npm run test:company -- "<contraseña de 12+ caracteres>" warehouse   # imprime el correo para entrar
+$env:DATABASE_NAME="almacen_test"; npm run worker             # terminal 2 (PowerShell)
+```
+
+El rol puede ser `warehouse`, `buyer`, `viewer` o `administrator` (este último tendrá que activar los dos pasos). La empresa trae Inventario y Compras, 100 productos y 5 usuarios. Esa base se vacía sola cada vez que corren las pruebas automáticas (`npm test`). Límites: ahí no hay buzón `/correos` ni cuenta de titular con contraseña, así que los recorridos A, B y E se hacen en `http://localhost:3000`.
+
+En PowerShell, `$env:DATABASE_NAME=…` se queda puesto en esa terminal: ciérrala al terminar para no correr otros comandos contra la base de pruebas.
 
 ## 2. Mapa de pantallas
 
@@ -37,17 +90,19 @@ Abre una ventana de incógnito (o otro navegador) para la segunda persona; así 
 | `/correos` | Buzón local de correos (solo desarrollo) | Cualquiera |
 | `/inicio` | Resumen del día: existencias bajas, últimos movimientos y uso del plan | Todos (cada bloque según permiso) |
 | `/inventario` | Lista de productos con búsqueda, filtros, páginas y existencias | Quien pueda ver productos |
-| `/inventario/importar` | Plantilla, subir archivo y elegir columnas para importar el catálogo | Titular, Administrador, Almacén |
-| `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
-| `/inventario/<id>` | Ficha del producto: total, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/nuevo` | Alta de producto | Titular, Administrador, Almacén |
+| `/inventario/<id>` | Ficha del producto: total, mínimo, dónde está, equivalencias y últimos movimientos | Quien pueda ver productos |
 | `/inventario/<id>/editar` | Ficha, presentaciones y archivar | Titular, Administrador, Almacén |
+| `/inventario/bajas` | Productos en su mínimo o por debajo | Quien pueda ver mínimos y existencias |
+| `/inventario/importar` | Plantilla y subir archivo para importar el catálogo | Titular, Administrador, Almacén |
+| `/inventario/importar/<id>` | Elegir qué columna de tu archivo es cada dato | Titular, Administrador, Almacén |
+| `/inventario/importar/<id>/revision` | Revisar filas, confirmar y ver el avance de la importación | Titular, Administrador, Almacén |
 | `/movimientos` | Historial con filtros (fechas, producto, persona, tipo) y botones para registrar | Quien pueda ver movimientos |
-| `/movimientos/entrada`, `/salida`, `/reubicar`, `/ajuste`, `/saldo-inicial` | Registrar un movimiento de un producto | Titular, Administrador, Almacén (según permiso) |
+| `/movimientos/entrada`, `/salida`, `/reubicar`, `/ajuste`, `/saldo-inicial` | Registrar un movimiento de un producto | Titular, Administrador, Almacén |
 | `/movimientos/salida-rapida` | Salida de varios productos en una sola confirmación | Quien pueda registrar salidas |
-| `/ubicaciones` | Zonas, pasillos y estantes; «General» existe siempre | Según rol |
-| `/conteos`, `/conteos/<id>` | Iniciar un conteo físico y capturar lo contado | Titular, Administrador, Almacén (Consulta solo lee) |
-| `/compras` | Todavía vacía (solo el aviso de «sin datos») | Según rol |
+| `/ubicaciones` | Zonas, pasillos y estantes; «General» existe siempre | Todos leen; Titular, Administrador y Almacén modifican |
+| `/conteos`, `/conteos/<id>` | Iniciar un conteo físico, capturar lo contado y aplicarlo | Titular, Administrador, Almacén (Consulta solo lee; Comprador no entra) |
+| `/compras` | Todavía vacía (solo el aviso de «sin datos») | Titular, Administrador, Comprador, Consulta |
 | `/configuracion` | Seguridad (dos pasos, sesiones) y enlaces de empresa | Todos |
 | `/configuracion/equipo` | Personas, roles e invitaciones | Titular y Administrador |
 | `/configuracion/plan` | Mi plan: cupos, módulos y vigencia | Titular y Administrador |
@@ -65,12 +120,12 @@ Marca cada uno como ✅ bien, ⚠️ funciona pero mejorable, o ❌ falla.
 1. En incógnito, entra a `/registro` y crea una cuenta con un correo inventado (por ejemplo `prueba1@example.test`) y contraseña de 12 caracteres o más.
 2. Abre `/correos`, busca «Confirma tu correo» y abre su enlace.
 3. Escribe el nombre del negocio y crea la empresa.
-4. La app te obliga a activar la verificación en dos pasos: escanea el QR con una app de autenticación (Google Authenticator, Authy…) y escribe el código.
+4. La app te obliga a activar la verificación en dos pasos: escanea el QR con una app de autenticación y escribe el código.
 5. Guarda los códigos de recuperación que te muestra.
 
-Deberías ver: no puedes entrar sin confirmar el correo; no puedes usar la app sin activar los dos pasos; al final llegas a Inventario con el aviso de que el módulo no está activo (una empresa nueva no tiene plan hasta que se le asigna; ver E1).
+Deberías ver: no puedes entrar sin confirmar el correo; no puedes usar la app sin activar los dos pasos; al final llegas a Inicio y, al abrir Inventario, al aviso de que el módulo no está activo (una empresa nueva no tiene plan hasta que se le asigna; ver E1).
 
-Nota: una empresa creada aquí ya no se puede borrar (su bitácora es permanente). No pasa nada; es tu base de desarrollo.
+Nota: una empresa creada aquí ya no se puede borrar desde la app (su bitácora es permanente); solo desaparece con el paso 1.3.
 
 **A2. Iniciar sesión con dos pasos**
 
@@ -81,14 +136,16 @@ Deberías ver: con contraseña equivocada dice «Correo o contraseña incorrecto
 
 **A3. Entrar con un código de recuperación**
 
-En la pantalla del código elige «¿No tienes tu teléfono? Usa un código de recuperación». Deberías ver: entra, ese código deja de servir y llega un correo de aviso a `/correos`.
+Con la cuenta de A1 (de la que guardaste los códigos), en la pantalla del código elige «¿No tienes tu teléfono? Usa un código de recuperación». Deberías ver: entra, ese código deja de servir y llega un correo de aviso a `/correos`.
 
 **A4. Recuperar contraseña**
 
-1. En `/ingresar` → «¿Olvidaste tu contraseña?», escribe el correo.
+1. En `/ingresar` → «¿Olvidaste tu contraseña?», escribe el correo de la cuenta de A1.
 2. Abre el enlace desde `/correos` y elige una contraseña nueva.
 
 Deberías ver: la misma respuesta exista o no el correo; el enlace sirve una sola vez; se cierran todas las sesiones y llega un correo de aviso.
+
+(Si lo haces con la cuenta demo, `npm run db:seed` le devuelve la contraseña de `.env.local`.)
 
 **A5. Sesiones y dos pasos en Configuración**
 
@@ -108,16 +165,16 @@ Deberías ver: la persona entra directo, sin confirmar correo ni dos pasos; en s
 
 **B2. Lo que ve cada rol**
 
-Repite B1 con Comprador y Consulta (o cambia el rol desde «Roles»).
+Repite B1 con Comprador y Consulta (o cambia el rol desde «Roles»). Todos ven además Inicio y Configuración.
 
-| Rol | Menú | Puede agregar productos |
+| Rol | Menú | Puede agregar productos y registrar movimientos |
 | --- | --- | --- |
 | Almacén | Inventario, Movimientos, Ubicaciones, Conteos | Sí |
-| Comprador | Inventario, Movimientos, Ubicaciones, Compras | No (no ve el botón) |
+| Comprador | Inventario, Movimientos, Ubicaciones, Compras | No (no ve los botones) |
 | Consulta | Todas las secciones, solo lectura | No |
 | Administrador | Todo, más Equipo, Mi plan y Bitácora | Sí |
 
-Un Administrador debe activar los dos pasos antes de usar la app.
+Un Administrador debe activar los dos pasos antes de usar la app. «Importar desde Excel» solo lo ven titular, administrador y almacén.
 
 **B3. Cambiar roles y desactivar**
 
@@ -140,7 +197,9 @@ Entra como un Administrador invitado. Deberías ver: no puede invitar ni nombrar
 
 ### C. Bitácora
 
-En `/configuracion/bitacora` deberías ver, del más reciente al más antiguo, todo lo que hiciste en B y D: invitaciones, cambios de rol (con rol anterior y nuevo), desactivaciones con su motivo, productos creados y editados, presentaciones. No hay forma de editar ni borrar un registro.
+En `/configuracion/bitacora` deberías ver, del más reciente al más antiguo, lo que hiciste en los demás recorridos: invitaciones, cambios de rol (con rol anterior y nuevo), desactivaciones con su motivo, productos creados y editados, presentaciones, ajustes y reversas con su motivo, conteos aplicados, importaciones confirmadas y aplicadas, y cambios de plan. No hay forma de editar ni borrar un registro.
+
+Las entradas, salidas y reubicaciones normales no aparecen aquí: su rastro es el historial de Movimientos.
 
 ### D. Productos
 
@@ -163,7 +222,7 @@ Crea un producto «Cable» con unidad Metro. Deberías ver: aparece «Precisión
 
 **D4. Editar la ficha**
 
-En la lista, «Editar». Cambia el nombre y la marca. Deberías ver: «Cambios de … guardados»; guardar sin cambiar nada dice «No hay cambios que guardar»; no hay ningún campo de cantidad (las existencias se moverán con entradas y salidas, que aún no existen); el cambio aparece en la bitácora.
+En la lista, «Editar». Cambia el nombre y la marca. Deberías ver: «Cambios de … guardados»; guardar sin cambiar nada dice «No hay cambios que guardar»; no hay ningún campo de cantidad (las existencias solo se mueven con movimientos; ver F); el cambio aparece en la bitácora.
 
 **D5. Presentaciones**
 
@@ -171,21 +230,27 @@ En la ficha del tornillo, sección «Presentaciones»:
 
 1. Agrega «Caja» con 100. Deberías ver «Caja = 100 piezas».
 2. Intenta agregar «Bolsa» con 12.5: se rechaza («piezas completas»). Con 0 o con texto, también.
-3. En «Cambiar contenido» de la Caja escribe 120. Deberías ver «Caja = 120 piezas».
+3. En «Cambiar contenido» de la Caja escribe 120. Deberías ver «Caja = 120 piezas». Vuelve a dejarla en 100 para los recorridos F.
 4. En el cable (metros) agrega «Rollo» con 100 y otro con 30.5: ambos se aceptan.
 
 **D6. Archivar y reactivar**
+
+Hazlo con un producto sin existencias. Con existencias se rechaza («Todavía hay … de este producto. Regístralas como salida o ajústalas a cero antes de archivarlo»); pruébalo después de F2.
 
 1. En la ficha, «Archivar producto» → confirmar.
 2. Deberías ver: desaparece de la lista, «Mi plan» baja un lugar, y aparece en «Ver productos archivados».
 3. «Reactivar»: vuelve a la lista y ocupa su lugar otra vez.
 
+**D7. Ubicaciones**
+
+En `/ubicaciones` crea una zona («Zona A»), dentro un pasillo y dentro un estante. Deberías ver: «General» existe siempre; cada ubicación muestra su ruta («Zona A › Pasillo 2»); un estante no puede contener nada y una zona no puede ir dentro de un pasillo; las ubicaciones se archivan, no se borran. Las necesitarás en F6 y F14.
+
 ### E. Plan, módulos y consola interna
 
 **E1. Asignar plan a una empresa (consola interna)**
 
-1. Hazte personal de plataforma una sola vez: `npm run staff -- add demo@almacen.test`.
-2. Entra a `http://localhost:3000/interno`. Busca la empresa que creaste en A1.
+1. Si no lo hiciste en 1.4: `npm run staff -- add demo@almacen.test`.
+2. Con la cuenta demo entra a `http://localhost:3000/interno`. Busca la empresa que creaste en A1.
 3. Elige un nivel (por ejemplo «100 productos · 2 usuarios»), marca Inventario, escribe un motivo y «Asignar plan».
 
 Deberías ver: «Plan asignado»; en la otra ventana, esa empresa ya puede usar Inventario; sin motivo no deja guardar; si quitas Inventario y dejas Compras lo rechaza («Compras necesita Inventario»); el cambio queda en la bitácora de esa empresa.
@@ -202,7 +267,7 @@ Desde la consola, reasigna el plan de una empresa sin Compras. Deberías ver: Co
 
 **E4. Límite de productos**
 
-Asigna a la empresa de prueba un cupo pequeño (por ejemplo 2) y crea 3 productos. Deberías ver: el tercero se rechaza con «Llegaste al límite de tu plan: 2 de 2 productos activos…»; al archivar uno, ya cabe otro.
+Asigna a la empresa de A1 un cupo pequeño (por ejemplo 2) y crea 3 productos. Deberías ver: el tercero se rechaza con «Llegaste al límite de tu plan: 2 de 2 productos activos…»; al archivar uno, ya cabe otro.
 
 **E5. Plan vencido**
 
@@ -210,11 +275,11 @@ En la consola pon «Vigente hasta» mañana para comprobar que se muestra la fec
 
 ### F. Existencias y movimientos
 
-Para estos recorridos conviene la base de pruebas (no ensucia desarrollo, porque los movimientos no se pueden borrar): `npm run dev:test` abre la app en `http://localhost:3100` y `npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator]` crea ahí una empresa y te imprime el correo para entrar.
+Los movimientos no se pueden borrar (se corrigen con reversa). Si no quieres dejarlos en desarrollo, usa la base de pruebas de la sección 1.
 
 **F1. Lista de productos**
 
-Crea más de 25 productos. Deberías ver: páginas con «Anterior/Siguiente», búsqueda por nombre, clave o código de barras (la coincidencia exacta aparece arriba), filtros por categoría y marca que se combinan y quedan en la dirección, y las existencias de cada producto.
+Crea más de 25 productos (o impórtalos con G). Deberías ver: páginas con «Anterior/Siguiente», búsqueda por nombre, clave o código de barras (la coincidencia exacta aparece arriba), filtros por categoría y marca que se combinan y quedan en la dirección, y las existencias de cada producto.
 
 **F2. Entrada, con cajas y otras unidades**
 
@@ -239,7 +304,7 @@ Registra una salida mayor a lo que hay en la ubicación. Deberías ver: «Solo h
 
 **F6. Reubicar**
 
-Con dos ubicaciones, `/movimientos/reubicar`: mueve parte de un producto. Deberías ver: sale de una, entra a la otra, el total no cambia; origen y destino iguales se rechaza.
+Con dos ubicaciones (D7), `/movimientos/reubicar`: mueve parte de un producto. Deberías ver: sale de una, entra a la otra, el total no cambia; origen y destino iguales se rechaza.
 
 **F7. Ajuste**
 
@@ -296,9 +361,9 @@ En un producto por piezas, un mínimo de `0.5` debe rechazarse. Los productos ar
 4. Cada producto muestra lo que el sistema tenía en esa ubicación al contarlo y la diferencia («Faltan 20 piezas», «Sobran…», «Coincide»).
 5. Si no hay nada de un producto, captura `0`. Quita una captura equivocada con el bote de basura.
 6. Intenta iniciar otro conteo de la misma ubicación: se rechaza y te ofrece continuar el abierto.
-7. «Cancelar conteo»: queda cerrado, visible y sin cambios posibles.
+7. En otro conteo de prueba, «Cancelar conteo»: queda cerrado, visible y sin cambios posibles.
 
-En todo momento tus existencias siguen iguales: capturar no mueve nada. Aplicar las diferencias como ajustes llega en un paso posterior.
+En todo momento tus existencias siguen iguales: capturar no mueve nada. Las diferencias se aplican en F16.
 
 **F15. Conteo: movimientos después de contar**
 
@@ -321,11 +386,11 @@ Un movimiento en otra ubicación, o anterior a que contaras ese producto, no apa
 
 **F17. Reconciliación (comprobación técnica)**
 
-En la terminal, `npm run stock:reconcile` revisa que las existencias de cada producto en cada ubicación coincidan con la suma de sus movimientos, en todas las empresas. Deberías ver «0 diferencia(s)». Solo lee; si algún día reporta una diferencia, avísame con el texto que imprime: es una falla a investigar, no algo que se corrija solo.
+En la terminal, `npm run stock:reconcile` revisa que las existencias de cada producto en cada ubicación coincidan con la suma de sus movimientos, en todas las empresas. Deberías ver «0 diferencia(s)». Solo lee; si algún día reporta una diferencia, avísame con el texto que imprime: es una falla a investigar, no algo que se corrija solo. Córrelo al terminar todos los recorridos F.
 
 **F18. Inicio**
 
-Al entrar ahora llegas a `/inicio` (también es el primer elemento del menú; en el celular la barra inferior es Inicio, Inventario, Movimientos, Conteos y «Más», donde quedó Ubicaciones).
+Al entrar llegas a `/inicio` (también es el primer elemento del menú; en el celular la barra inferior es Inicio, Inventario, Movimientos, Conteos y «Más», donde quedó Ubicaciones).
 
 Deberías ver, según tu rol: «Existencias bajas» con los cinco productos más vacíos y el enlace «Ver todas»; «Uso de tu plan» con productos activos y personas (solo titular y administrador); «Últimos movimientos» con los cinco más recientes; y los botones «Registrar entrada» y «Salida rápida» si puedes registrar. Una persona sin rol ve solo el aviso de que pida uno.
 
@@ -337,7 +402,7 @@ Deberías ver, según tu rol: «Existencias bajas» con los cinco productos más
 2. Descarga «Plantilla de Excel (.xlsx)» y «Plantilla CSV» y ábrelas.
 3. Deberías ver: los títulos de las 13 columnas, cuatro productos de ejemplo (por pieza con caja de 100, por metro con rollo, por kilogramo con saco y uno sin presentación) y, en Excel, la hoja «Instrucciones» con qué poner en cada columna y la lista de unidades válidas.
 
-Dime si falta alguna columna de las que tiene tu Excel actual, o si algún título o ejemplo no se entiende. Subir el archivo y revisarlo llega en los pasos siguientes.
+Dime si falta alguna columna de las que tiene tu Excel actual, o si algún título o ejemplo no se entiende.
 
 **G2. Subir tu archivo y elegir columnas**
 
@@ -363,30 +428,39 @@ Revisar no importa nada: puedes corregir y volver a subir las veces que quieras.
 En la misma pantalla de revisión, «Qué pasará con tus productos»:
 
 1. Sube un archivo que mezcle una clave que ya tienes (con otro nombre o marca), una de un producto archivado y una nueva. Deberías ver los tres contadores (Nuevos, Se actualizan, Se reactivan), qué cambia en los existentes («Nombre: A → B») y cuántos lugares de tu plan necesita contra los disponibles.
-2. Sube más productos nuevos de los que caben en tu plan: te dice cuántos faltan y que no se importará una parte.
+2. Sube más productos nuevos de los que caben en tu plan: te dice cuántos faltan y que no se importará una parte. (Con los 1,000 lugares de la demo es más fácil probarlo en la empresa de E4, con cupo pequeño.)
 3. Choques: una existencia inicial para un producto que ya tiene movimientos, una unidad distinta a la que ya tiene el producto, o un código de barras que ya usa otro producto. Aparecen por fila, con la explicación.
 
-Sigue sin importarse nada: confirmar llega en los pasos siguientes.
+Hasta aquí no se importa nada: eso ocurre al confirmar (G5).
 
-**G5. Confirmar la importación (por ahora, solo en la base de pruebas)**
+**G5. Confirmar e importar**
 
-Hazlo con `npm run dev:test`, no en tu base de desarrollo: confirmar aparta lugares de tu plan y todavía no existe el paso que crea los productos ni el que libera lo apartado.
+Las importaciones se aplican en segundo plano: además de la aplicación debe estar corriendo el worker en otra terminal (`npm run worker`; con la base de pruebas, ver la sección 1).
 
 1. Con una importación «lista», «Confirmar importación». El aviso te dice cuántos productos y cuántos lugares de tu plan aparta.
-2. Deberías ver «Importación confirmada. Tiene N lugares de tu plan apartados», sin botón para confirmar otra vez y sin poder cambiar sus columnas.
-3. En «Mi plan» o al revisar otra importación, los lugares disponibles ya descuentan los apartados; dar de alta productos a mano respeta ese apartado.
-4. Tu inventario sigue igual: los productos se crearán en el paso siguiente.
+2. Deberías ver «Importación confirmada, en espera» con «0 de N productos procesados». Ya no se pueden cambiar sus columnas ni confirmar otra vez. (Para verla en este estado, confirma con el worker detenido.)
+3. Con el worker corriendo, recarga la pantalla: pasa a «Importando…» y luego a «Importación terminada: N productos quedaron en tu catálogo», con el enlace «Ver tu inventario». Tus productos aparecen en Inventario con su unidad, presentación (con el contenido que decía el archivo) y mínimo.
+4. Con un archivo grande (varios cientos de filas), detén el worker a la mitad (Ctrl+C) y vuelve a arrancarlo: continúa donde se quedó sin duplicar productos.
+5. Un producto que ya existía se actualiza (una celda vacía no borra lo que tenía); uno archivado vuelve a estar activo.
+6. Si después de confirmar (con el worker detenido) alguien crea a mano un producto con un código de barras del archivo, al aplicar ese producto queda como «no se pudo importar» con su motivo y los demás sí entran.
+7. En «Mi plan», los productos activos suben solo por los nuevos y reactivados que sí entraron. La bitácora muestra la confirmación y el resultado.
+
+Las existencias iniciales del archivo todavía no se aplican: llegan en el paso siguiente (IMP-09). Por ahora los productos importados entran en cero.
 
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
+- Existencias iniciales desde el archivo de importación (los productos entran en cero).
+- Cancelar una importación ya confirmada.
+- Importar salidas diarias y exportar catálogo, existencias o historial a Excel.
 - Avisos por correo de existencias bajas (la lista sí existe).
-- Compras y proveedores.
+- Compras y proveedores (la sección existe, vacía).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.
 - Prueba gratuita automática al registrarse: hoy el plan se asigna desde la consola.
+- Servidor en internet: todo corre en tu computadora.
 
 ## 5. Cómo darme la retroalimentación
 
@@ -405,33 +479,7 @@ También me sirve mucho:
 
 - Textos que no entendería un ferretero (dime cómo lo dirías tú).
 - Pasos que sobran o que faltan.
-- Lo que se ve mal en el celular (abre `http://localhost:3000` desde las herramientas de tu navegador en vista móvil).
+- Lo que se ve mal en el celular (abre `http://localhost:3000` desde las herramientas de tu navegador en vista móvil) y en modo oscuro (interruptor en la barra lateral).
 - Las tres decisiones pendientes: quién será personal de plataforma, si el registro debe dar un periodo de prueba automático, y si reactivar a un miembro necesita un permiso distinto al de desactivarlo.
 
-Contiene:
-
-- Cómo entrar: arrancar la app, cuenta demo, de dónde sale la contraseña y el código de dos pasos, y el buzón local /correos.
-- Mapa de pantallas: cada dirección, qué es y qué rol puede entrar.
-- Recorridos paso a paso con lo que deberías ver en cada uno: cuenta y acceso, equipo y roles, bitácora, productos, y plan con consola interna.
-- Lo que todavía no existe, para que no lo reportes como falla.
-- Plantilla para darme cada observación.
-
-Dos avisos antes de probar:
-
-- El recorrido E1 te pide correr npm ruest para poder entrar a /interno; hoy no
-
-Contiene:
-
-- Cómo entrar: arrancar la app, cuenta demo, de dónde sale la contraseña y el código de dos pasos, y el buzón local /correos.
-- Mapa de pantallas: cada dirección, qu
-- Recorridos paso a paso con lo que deberías ver en cada uno: cuenta y acceso, equipo y roles, bitácora,
-  productos, y plan con consola interna
-- Lo que todavía no existe, para que no lo reportes como falla.
-- Plantilla para darme cada observación
-
-Dos avisos antes de probar:
-
-- El recorrido E1 te pide correr npm run staff -- add <demo@almacen.test> para poder entrar a /interno; hoy no hay nadie con ese acceso.
-- Las empresas que crees al probar el rde desarrollo, porque su bitácora no sepuede borrar.
-
-No recorrí la guía de punta a punta como la leerías tú. Cada flujo lo probé por separado durante la sesión, así que algún texto exacto de pantalla ue escribí; si ves una diferencia,anótala como observación.
+No recorrí esta guía de punta a punta como la leerías tú: cada flujo se probó por separado al construirlo, así que algún texto exacto de pantalla puede diferir de lo escrito aquí. Si ves una diferencia, anótala como observación.

@@ -257,6 +257,12 @@ export type ImportDetail = {
   /** Places of the plan held since it was confirmed (IMP-07). */
   reservedPlaces: number;
   confirmedAt: Date | null;
+  /** Products fixed at confirmation, and how many the worker finished. */
+  totalItems: number;
+  processedItems: number;
+  failedItems: number;
+  finishedAt: Date | null;
+  lastError: string | null;
   /** First rows of data, as text, to recognize the columns. */
   preview: { row: number; cells: string[] }[];
   /**
@@ -311,6 +317,11 @@ export async function getImport(
       decimalSeparator: true,
       reservedPlaces: true,
       confirmedAt: true,
+      totalItems: true,
+      processedItems: true,
+      failedItems: true,
+      finishedAt: true,
+      lastError: true,
       createdAt: true,
       file: { select: { name: true } },
     },
@@ -365,6 +376,11 @@ export async function getImport(
     decimalSeparator,
     reservedPlaces: row.reservedPlaces,
     confirmedAt: row.confirmedAt,
+    totalItems: row.totalItems,
+    processedItems: row.processedItems,
+    failedItems: row.failedItems,
+    finishedAt: row.finishedAt,
+    lastError: row.lastError,
     preview,
     numbers,
     createdAt: row.createdAt,
@@ -533,4 +549,32 @@ export async function listImports(
     dataRows: row.dataRows,
     createdAt: row.createdAt,
   }));
+}
+
+/** Products of an import the worker could not apply, with the reason. */
+export async function listImportFailures(
+  actor: InventoryActor,
+  importId: string,
+): Promise<{ sku: string; row: number | null; error: string }[]> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "inventory.import.read",
+  );
+  const items = await forOrganization(
+    actor.organizationId,
+  ).productImportItem.findMany({
+    where: { importId: String(importId).slice(0, 36), status: "FAILED" },
+    orderBy: { position: "asc" },
+    take: 200,
+    select: { sku: true, error: true, data: true },
+  });
+  return items.map((item) => {
+    const row = (item.data as { row?: unknown } | null)?.row;
+    return {
+      sku: item.sku,
+      row: typeof row === "number" ? row : null,
+      error: item.error ?? "No se pudo aplicar.",
+    };
+  });
 }

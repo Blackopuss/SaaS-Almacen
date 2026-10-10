@@ -76,3 +76,8 @@ export type {
   ConversionPreview,
   ResolvedConversion,
 } from "./conversion-service";
+export { applyImportedProduct } from "./imported-products";
+export type {
+  ImportedProduct,
+  ImportedProductResult,
+} from "./imported-products";
