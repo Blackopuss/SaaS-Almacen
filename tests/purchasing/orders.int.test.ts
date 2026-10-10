@@ -9,6 +9,7 @@ import {
   linkProductSupplier,
   listPurchaseOrders,
   removeOrderLine,
+  submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
   type PurchasingActor,
@@ -514,10 +515,9 @@ describe("lines of a draft", () => {
       capture: "base",
       quantity: "5",
     });
-    // The states arrive with CMP-05; this is what one of them means here.
-    await db.purchaseOrder.update({
-      where: { id: orderId },
-      data: { status: "SENT" },
+    expect(await submitPurchaseOrder(actor, orderId)).toMatchObject({
+      ok: true,
+      status: "SENT",
     });
     const refused = { ok: false, reason: "not_draft" };
     expect(
@@ -673,10 +673,13 @@ describe("listPurchaseOrders", () => {
       capture: "base",
       quantity: "1",
     });
-    await db.purchaseOrder.update({
-      where: { id: first },
-      data: { status: "SENT" },
+    const cable = await product(actor, "CAB-2");
+    await line(actor, first, {
+      productId: cable,
+      capture: "base",
+      quantity: "1",
     });
+    await submitPurchaseOrder(actor, first);
 
     const all = await listPurchaseOrders(actor);
     expect(
@@ -689,7 +692,7 @@ describe("listPurchaseOrders", () => {
     ).toEqual([
       ["OC-0003", "Ferretera del Norte", "Borrador", 0],
       ["OC-0002", "Ferretera del Sur", "Borrador", 1],
-      ["OC-0001", "Ferretera del Norte", "Enviada", 0],
+      ["OC-0001", "Ferretera del Norte", "Enviada", 1],
     ]);
     expect(all).toMatchObject({
       total: 3,

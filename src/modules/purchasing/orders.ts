@@ -19,6 +19,13 @@ import {
   type TenantDb,
 } from "@/server";
 
+import {
+  PURCHASE_ORDER_STATUS_LABELS,
+  canTransition,
+  isPurchaseOrderStatus,
+  transitionProblem,
+  type PurchaseOrderStatus,
+} from "./order-states";
 import type { PurchasingActor } from "./product-suppliers";
 
 /**
@@ -37,16 +44,6 @@ import type { PurchasingActor } from "./product-suppliers";
  * record costs and read only by who may see them. For anyone else the
  * columns are not even fetched.
  */
-
-export const PURCHASE_ORDER_STATUS_LABELS = {
-  DRAFT: "Borrador",
-  SENT: "Enviada",
-  PARTIAL: "Recibida en parte",
-  RECEIVED: "Recibida",
-  CANCELLED: "Cancelada",
-} as const;
-
-export type PurchaseOrderStatus = keyof typeof PURCHASE_ORDER_STATUS_LABELS;
 
 /** «OC-0007»: how an order is named to people. */
 export const formatOrderNumber = (number: number) =>
@@ -103,11 +100,12 @@ export type OrderField =
   | "productId"
   | "capture"
   | "quantity"
-  | "unitCost";
+  | "unitCost"
+  | "reason";
 
 export type OrderFailure = {
   ok: false;
-  reason: "invalid" | "not_found" | "not_draft";
+  reason: "invalid" | "not_found" | "not_draft" | "invalid_transition";
   fieldErrors: Partial<Record<OrderField, string>>;
   formError?: string;
 };
@@ -245,7 +243,7 @@ async function lockDraft(tx: Tx, orderId: string) {
   return order;
 }
 
-async function inDraft<T>(
+async function inOrder<T>(
   organizationId: string,
   work: (tx: Tx) => Promise<T>,
 ): Promise<T | OrderFailure> {
@@ -274,7 +272,7 @@ export async function updatePurchaseOrder(
   );
   const parsed = headerSchema.safeParse(input);
   if (!parsed.success) return headerErrors(parsed.error);
-  return inDraft(organizationId, async (tx) => {
+  return inOrder(organizationId, async (tx) => {
     const order = await lockDraft(tx, orderId);
     await tx.purchaseOrder.updateMany({
       where: { id: order.id },
@@ -401,7 +399,7 @@ export async function addOrderLine(
   if (productId === "") {
     return refuse("invalid", "productId", "Elige el producto.");
   }
-  return inDraft(organizationId, async (tx) => {
+  return inOrder(organizationId, async (tx) => {
     const order = await lockDraft(tx, orderId);
     const product = await tx.product.findFirst({
       where: { id: productId },
@@ -501,7 +499,7 @@ export async function updateOrderLine(
   );
   const cost = await costOf(actor, input);
   if (!cost.ok) return cost;
-  return inDraft(organizationId, async (tx) => {
+  return inOrder(organizationId, async (tx) => {
     const line = await lockLine(tx, lineId);
     const resolved = await resolveLine(tx, line.productId, input);
     await tx.purchaseOrderLine.updateMany({
@@ -526,10 +524,220 @@ export async function removeOrderLine(
     userId,
     "purchasing.order.update",
   );
-  return inDraft(organizationId, async (tx) => {
+  return inOrder(organizationId, async (tx) => {
     const line = await lockLine(tx, lineId);
     await tx.purchaseOrderLine.deleteMany({ where: { id: line.id } });
     return { ok: true as const };
+  });
+}
+
+/** The order, locked for the rest of the transaction, in whatever state. */
+async function lockOrder(tx: Tx, orderId: string) {
+  const [id] = await lockRows(tx, "purchaseOrder", [
+    String(orderId).slice(0, 36),
+  ]);
+  const order = id
+    ? await tx.purchaseOrder.findFirst({
+        where: { id },
+        select: {
+          id: true,
+          number: true,
+          status: true,
+          contact: { select: { name: true } },
+        },
+      })
+    : null;
+  if (!order) throw new Rejected(refuse("not_found", null, NOT_FOUND));
+  return order;
+}
+
+/** Refuses a move the table of states does not allow, with its reason. */
+function assertTransition(from: PurchaseOrderStatus, to: PurchaseOrderStatus) {
+  const problem = transitionProblem(from, to);
+  if (problem) throw new Rejected(refuse("invalid_transition", null, problem));
+}
+
+export type OrderTransitionResult =
+  | {
+      ok: true;
+      status: PurchaseOrderStatus;
+      /** It was already there (a double click, a retry): nothing changed. */
+      repeated?: true;
+    }
+  | OrderFailure;
+
+/**
+ * Confirms a draft as sent to its supplier (CMP-05). From here on its
+ * lines no longer change. It needs something to ask for, and every
+ * product of it still in use. Confirming twice confirms once.
+ *
+ * This is the person saying «it is ordered»; sending the document by
+ * mail is another step (CMP-06B) and does not move the state by itself.
+ */
+export async function submitPurchaseOrder(
+  actor: PurchasingActor,
+  orderId: string,
+): Promise<OrderTransitionResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "purchasing.order.submit",
+  );
+  return inOrder(organizationId, async (tx) => {
+    const order = await lockOrder(tx, orderId);
+    if (order.status === "SENT") {
+      return {
+        ok: true as const,
+        status: order.status,
+        repeated: true as const,
+      };
+    }
+    assertTransition(order.status, "SENT");
+    const lines = await tx.purchaseOrderLine.findMany({
+      where: { orderId: order.id },
+      take: PURCHASE_ORDER_MAX_LINES,
+      select: { product: { select: { sku: true, status: true } } },
+    });
+    if (lines.length === 0) {
+      throw new Rejected(
+        refuse(
+          "invalid",
+          null,
+          "Esta orden todavía no pide nada. Agrega al menos un producto antes de confirmarla.",
+        ),
+      );
+    }
+    const archived = [
+      ...new Set(
+        lines
+          .filter((line) => line.product.status !== "ACTIVE")
+          .map((line) => line.product.sku),
+      ),
+    ];
+    if (archived.length > 0) {
+      throw new Rejected(
+        refuse(
+          "invalid",
+          null,
+          `${archived.join(", ")} ${archived.length === 1 ? "está archivado" : "están archivados"}. Quítalo de la orden o reactívalo antes de confirmarla.`,
+        ),
+      );
+    }
+    await tx.purchaseOrder.updateMany({
+      where: { id: order.id },
+      data: { status: "SENT", sentAt: new Date(), sentByUserId: userId },
+    });
+    await recordAuditEvent(tx, {
+      organizationId,
+      actorUserId: userId,
+      action: "purchase_order.sent",
+      target: { type: "purchase_order", id: order.id },
+      metadata: {
+        orden: formatOrderNumber(order.number),
+        proveedor: order.contact.name,
+        productos: lines.length,
+      },
+    });
+    return { ok: true as const, status: "SENT" as const };
+  });
+}
+
+const cancelSchema = z.object({
+  reason: z
+    .string({ error: "Escribe por qué se cancela." })
+    .trim()
+    .min(3, "Escribe por qué se cancela (al menos 3 letras).")
+    .max(300, "El motivo admite hasta 300 caracteres."),
+});
+
+/**
+ * Cancels an order, with its reason (CMP-05): a draft, or a sent one of
+ * which nothing was received. The order and its lines stay as they were,
+ * as history. Cancelling twice cancels once.
+ */
+export async function cancelPurchaseOrder(
+  actor: PurchasingActor,
+  orderId: string,
+  input: { reason?: unknown },
+): Promise<OrderTransitionResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "purchasing.order.cancel",
+  );
+  const parsed = cancelSchema.safeParse(input);
+  if (!parsed.success) {
+    return refuse("invalid", "reason", parsed.error.issues[0]!.message);
+  }
+  return inOrder(organizationId, async (tx) => {
+    const order = await lockOrder(tx, orderId);
+    if (order.status === "CANCELLED") {
+      return {
+        ok: true as const,
+        status: order.status,
+        repeated: true as const,
+      };
+    }
+    assertTransition(order.status, "CANCELLED");
+    await tx.purchaseOrder.updateMany({
+      where: { id: order.id },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancelledByUserId: userId,
+        cancelReason: parsed.data.reason,
+      },
+    });
+    await recordAuditEvent(tx, {
+      organizationId,
+      actorUserId: userId,
+      action: "purchase_order.cancelled",
+      target: { type: "purchase_order", id: order.id },
+      reason: parsed.data.reason,
+      metadata: {
+        orden: formatOrderNumber(order.number),
+        proveedor: order.contact.name,
+        estabaEn: PURCHASE_ORDER_STATUS_LABELS[order.status],
+      },
+    });
+    return { ok: true as const, status: "CANCELLED" as const };
+  });
+}
+
+/**
+ * Moves an order forward when something of it is received: to «received
+ * in part» or to «received». For the services of receipts (CMP-07,
+ * CMP-08): it runs inside their transaction, which decides — from what
+ * has arrived — where the order goes. No screen calls it.
+ *
+ * Throws when the move is not one of the table: a receipt for an order
+ * that was not sent, or that was cancelled, must not go through.
+ */
+export async function advanceOrderOnReceipt(
+  tx: Tx,
+  orderId: string,
+  to: "PARTIAL" | "RECEIVED",
+): Promise<void> {
+  const [id] = await lockRows(tx, "purchaseOrder", [
+    String(orderId).slice(0, 36),
+  ]);
+  const order = id
+    ? await tx.purchaseOrder.findFirst({
+        where: { id },
+        select: { id: true, status: true },
+      })
+    : null;
+  if (!order) throw new Error("Purchase order not found");
+  // Another receipt already left it there: nothing to move.
+  if (order.status === to) return;
+  if (!canTransition(order.status, to)) {
+    throw new Error(`Purchase order cannot go from ${order.status} to ${to}`);
+  }
+  await tx.purchaseOrder.updateMany({
+    where: { id: order.id },
+    data: { status: to },
   });
 }
 
@@ -583,6 +791,13 @@ export type PurchaseOrderDetail = {
   statusLabel: string;
   /** Its lines and data can still be changed. */
   editable: boolean;
+  /** It can be confirmed as sent: a draft with something to ask for. */
+  canSubmit: boolean;
+  /** It can be cancelled: nothing of it was received. */
+  canCancel: boolean;
+  sentAt: Date | null;
+  cancelledAt: Date | null;
+  cancelReason: string | null;
   supplierId: string;
   supplierName: string;
   /** 2026-10-15, or null. */
@@ -680,6 +895,9 @@ export async function getPurchaseOrder(
       expectedOn: true,
       notes: true,
       createdAt: true,
+      sentAt: true,
+      cancelledAt: true,
+      cancelReason: true,
       contact: { select: { id: true, name: true } },
       lines: {
         orderBy: { lineNumber: "asc" },
@@ -698,6 +916,11 @@ export async function getPurchaseOrder(
     status: row.status,
     statusLabel: PURCHASE_ORDER_STATUS_LABELS[row.status],
     editable: row.status === "DRAFT",
+    canSubmit: canTransition(row.status, "SENT") && rows.length > 0,
+    canCancel: canTransition(row.status, "CANCELLED"),
+    sentAt: row.sentAt,
+    cancelledAt: row.cancelledAt,
+    cancelReason: row.cancelReason,
     supplierId: row.contact.id,
     supplierName: row.contact.name,
     expectedOn: row.expectedOn
@@ -749,12 +972,6 @@ export type PurchaseOrderPage = {
   /** The state the list was narrowed to, when it was. */
   status: PurchaseOrderStatus | null;
 };
-
-export const isPurchaseOrderStatus = (
-  value: unknown,
-): value is PurchaseOrderStatus =>
-  typeof value === "string" &&
-  Object.hasOwn(PURCHASE_ORDER_STATUS_LABELS, value);
 
 /**
  * Orders of the company, newest first, a page at a time; optionally only

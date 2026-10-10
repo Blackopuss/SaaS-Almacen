@@ -6,8 +6,10 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   addOrderLine,
+  cancelPurchaseOrder,
   createPurchaseOrder,
   removeOrderLine,
+  submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
   type OrderField,
@@ -226,6 +228,74 @@ export async function removeOrderLineAction(
     }
     revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
     return { ok: true };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+export type OrderStateActionResult =
+  { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Confirms a draft as sent (CMP-05). The order is looked for only inside
+ * the company of the session; sending it twice confirms once.
+ */
+export async function submitPurchaseOrderAction(
+  orderId: string,
+): Promise<OrderStateActionResult> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await submitPurchaseOrder(
+      { organizationId: organization.id, userId: user.id },
+      String(orderId),
+    );
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.formError ?? "No se pudo confirmar la orden.",
+      };
+    }
+    revalidatePath("/compras");
+    revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+    return { ok: true, message: "Orden confirmada como enviada." };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Cancels an order with its reason (CMP-05). Looked for only inside the
+ * company of the session; cancelling twice cancels once.
+ */
+export async function cancelPurchaseOrderAction(
+  orderId: string,
+  reason: string,
+): Promise<OrderStateActionResult> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await cancelPurchaseOrder(
+      { organizationId: organization.id, userId: user.id },
+      String(orderId),
+      { reason: String(reason ?? "").slice(0, 1000) },
+    );
+    if (!result.ok) {
+      return {
+        ok: false,
+        error:
+          result.fieldErrors.reason ??
+          result.formError ??
+          "No se pudo cancelar la orden.",
+      };
+    }
+    revalidatePath("/compras");
+    revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+    return { ok: true, message: "Orden cancelada." };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };

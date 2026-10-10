@@ -1323,22 +1323,29 @@ enum PurchaseOrderStatus {
 /// the company and starts as a draft, the only state in which its lines
 /// can be added, changed or removed.
 model PurchaseOrder {
-  id              String              @id @db.Char(36)
-  organizationId  String              @db.Char(36)
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                String              @id @db.Char(36)
+  organizationId    String              @db.Char(36)
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive within the company: shown as «OC-0001».
-  number          Int
+  number            Int
   /// The contact, in its supplier facet (checked by the service).
-  contactId       String              @db.Char(36)
-  contact         Contact             @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
-  status          PurchaseOrderStatus @default(DRAFT)
+  contactId         String              @db.Char(36)
+  contact           Contact             @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  status            PurchaseOrderStatus @default(DRAFT)
   /// Day it is expected to arrive, in the calendar of the company.
-  expectedOn      DateTime?           @db.Date
-  notes           String?             @db.VarChar(500)
-  lines           PurchaseOrderLine[]
-  createdByUserId String              @db.Char(36)
-  createdAt       DateTime            @default(now()) @db.DateTime(3)
-  updatedAt       DateTime            @updatedAt @db.DateTime(3)
+  expectedOn        DateTime?           @db.Date
+  notes             String?             @db.VarChar(500)
+  /// When a person confirmed it as sent, and who (CMP-05).
+  sentAt            DateTime?           @db.DateTime(3)
+  sentByUserId      String?             @db.Char(36)
+  /// When and why it was cancelled, and by whom.
+  cancelledAt       DateTime?           @db.DateTime(3)
+  cancelledByUserId String?             @db.Char(36)
+  cancelReason      String?             @db.VarChar(300)
+  lines             PurchaseOrderLine[]
+  createdByUserId   String              @db.Char(36)
+  createdAt         DateTime            @default(now()) @db.DateTime(3)
+  updatedAt         DateTime            @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])

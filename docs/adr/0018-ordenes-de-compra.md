@@ -1,6 +1,6 @@
-# ADR 0018 — Órdenes de compra: borrador y líneas
+# ADR 0018 — Órdenes de compra: borrador, líneas y estados
 
-Fecha: 2026-10-10 · Estado: aceptada (puntos a confirmar por el fundador) · Paso: CMP-04
+Fecha: 2026-10-10 · Estado: aceptada (puntos a confirmar por el fundador) · Pasos: CMP-04, CMP-05
 
 ## Contexto
 
@@ -17,6 +17,15 @@ Una orden de compra es lo que el negocio le pide a un proveedor. Es el documento
 - **El importe y el total se calculan**, no se guardan: cantidad capturada × costo, sumado sin redondear. Las líneas sin costo se cuentan aparte y el total lo avisa.
 - **Sin impuestos por ahora.** El total dice «antes de impuestos». El cálculo de IVA pertenece a Ventas (VEN-04) y, en Compras, a cuando se registre la factura del proveedor.
 
+### Estados (CMP-05)
+
+- **Cinco estados y seis movimientos:** borrador → enviada o cancelada; enviada → recibida en parte, recibida o cancelada; recibida en parte → recibida. Recibida y cancelada son finales; nada vuelve atrás. La tabla vive una sola vez en código (`order-states.ts`, pura) y se repite en un disparador de la base, de modo que ni un servicio nuevo ni una escritura directa pueden saltársela.
+- **Quién mueve qué.** Una persona confirma (`purchasing.order.submit`) o cancela (`purchasing.order.cancel`, con motivo). «Recibida en parte» y «recibida» no las elige nadie: las pone una recepción según lo que llegó (`advanceOrderOnReceipt`, dentro de la transacción de la recepción).
+- **Confirmar no es aprobar ni enviar el correo.** La matriz dice que confirmar «no implica aprobación por otra persona»; y el envío del PDF (CMP-06B) puede fallar o repetirse sin que la orden cambie de estado.
+- **Una orden recibida en parte no se cancela:** lo que llegó ya es inventario e historia. Lo que falte se cierra como faltante (CMP-11).
+- **Cada estado lleva sus datos** (`CHECK`): fecha y persona de la confirmación; fecha, persona y motivo de la cancelación. Una orden cancelada después de enviada conserva su fecha de envío.
+- **Las líneas de una orden que ya no es borrador no se escriben** (disparadores de `INSERT`, `UPDATE` y `DELETE`). Las cantidades recibidas vivirán en las tablas de recepción.
+
 ## Consecuencias
 
 - La orden todavía no hace nada en el inventario ni escribe el último costo: eso ocurre al recibir (CMP-07, CMP-13).
@@ -28,3 +37,4 @@ Una orden de compra es lo que el negocio le pide a un proveedor. Es el documento
 1. El formato del número («OC-0001») y si debe reiniciar cada año.
 2. Si quiere capturar aquí descuentos o impuestos por línea, o basta el costo neto antes de impuestos.
 3. Si una misma orden debe poder pedir el mismo producto en dos líneas (hoy sí: por caja y por pieza suelta).
+4. Si una orden enviada debe poder reabrirse para corregirla. Hoy no: se cancela y se hace otra, para que lo que recibió el proveedor y lo que dice el sistema nunca difieran en silencio.

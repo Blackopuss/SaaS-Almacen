@@ -12,10 +12,11 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib";
+import { formatDate, formatDateTime } from "@/lib";
 import { getPurchaseOrder } from "@/modules/purchasing";
 import { getModuleAccess } from "@/platform/billing";
 
+import { CancelOrder, SubmitOrder } from "./order-buttons";
 import { RemoveLine } from "./remove-line";
 
 export const metadata: Metadata = { title: "Orden de compra" };
@@ -68,6 +69,12 @@ export default async function OrdenPage({
     order.editable &&
     moduleState === "active" &&
     access.allows("purchasing.order.update");
+  const active = moduleState === "active";
+  const canSubmit =
+    order.canSubmit && active && access.allows("purchasing.order.submit");
+  const canCancel =
+    order.canCancel && active && access.allows("purchasing.order.cancel");
+  const zone = access.organization.timeZone;
   const addHref = `/compras/ordenes/${order.id}/linea`;
   const expected = order.expectedOn
     ? formatDate(new Date(`${order.expectedOn}T12:00:00.000Z`), "UTC")
@@ -103,11 +110,30 @@ export default async function OrdenPage({
                 "Estado",
                 <Badge
                   key="status"
-                  variant={order.status === "DRAFT" ? "secondary" : "default"}
+                  variant={
+                    order.status === "DRAFT"
+                      ? "secondary"
+                      : order.status === "CANCELLED"
+                        ? "outline"
+                        : "default"
+                  }
                 >
                   {order.statusLabel}
                 </Badge>,
               ],
+              ...(order.sentAt
+                ? ([
+                    ["Confirmada", formatDateTime(order.sentAt, zone)],
+                  ] as const)
+                : []),
+              ...(order.cancelledAt
+                ? ([
+                    [
+                      "Cancelada",
+                      `${formatDateTime(order.cancelledAt, zone)}\n${order.cancelReason ?? ""}`,
+                    ],
+                  ] as const)
+                : []),
               [
                 "Proveedor",
                 access.can("purchasing.supplier.read") ? (
@@ -243,12 +269,38 @@ export default async function OrdenPage({
           </p>
         )}
       </section>
-      {order.editable && (
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Es un borrador: puedes cambiarlo las veces que haga falta. Enviarlo al
-          proveedor y recibirlo llegan en los siguientes pasos.
-        </p>
+      {(canSubmit || canCancel) && (
+        <div className="flex max-w-3xl flex-wrap gap-3">
+          {canSubmit && (
+            <SubmitOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              supplierName={order.supplierName}
+              lines={order.lines.length}
+            />
+          )}
+          {canCancel && (
+            <CancelOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              sent={order.status !== "DRAFT"}
+            />
+          )}
+        </div>
       )}
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        {order.status === "DRAFT"
+          ? order.lines.length === 0
+            ? "Es un borrador: agrega al menos un producto para poder confirmarla."
+            : "Es un borrador: puedes cambiarlo las veces que haga falta. Al confirmarla queda como enviada y sus productos ya no cambian."
+          : order.status === "SENT"
+            ? "Está confirmada como enviada: sus productos ya no cambian. Recibirla llega en los siguientes pasos."
+            : order.status === "CANCELLED"
+              ? "Está cancelada: se conserva como historia y ya no cambia."
+              : order.status === "PARTIAL"
+                ? "Ya se recibió una parte."
+                : "Ya se recibió completa."}
+      </p>
     </PageContainer>
   );
 }

@@ -21,14 +21,15 @@ export type {
 export {
   PURCHASE_ORDER_MAX_LINES,
   PURCHASE_ORDER_PAGE_SIZE,
-  PURCHASE_ORDER_STATUS_LABELS,
   addOrderLine,
+  advanceOrderOnReceipt,
+  cancelPurchaseOrder,
   createPurchaseOrder,
   formatOrderNumber,
   getPurchaseOrder,
-  isPurchaseOrderStatus,
   listPurchaseOrders,
   removeOrderLine,
+  submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
 } from "./orders";
@@ -38,9 +39,18 @@ export type {
   OrderField,
   OrderHeaderInput,
   OrderLineInput,
+  OrderTransitionResult,
   PurchaseOrderDetail,
   PurchaseOrderLine,
   PurchaseOrderPage,
-  PurchaseOrderStatus,
   PurchaseOrderSummary,
 } from "./orders";
+export {
+  PURCHASE_ORDER_STATUSES,
+  PURCHASE_ORDER_STATUS_LABELS,
+  PURCHASE_ORDER_TRANSITIONS,
+  canTransition,
+  isPurchaseOrderStatus,
+  transitionProblem,
+} from "./order-states";
+export type { PurchaseOrderStatus } from "./order-states";

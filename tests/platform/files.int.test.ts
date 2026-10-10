@@ -312,6 +312,37 @@ describe("temporary links", () => {
         signature: link.signature.replace(/.$/, (c) => (c === "A" ? "B" : "A")),
       }),
     ).toEqual(invalid);
+    // A link is valid in exactly one spelling. The last character of the
+    // signature carries two bits that decoding ignores: every other
+    // character there, padding or stray symbols must be refused too.
+    const last = link.signature.at(-1)!;
+    const body = link.signature.slice(0, -1);
+    const alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    for (const character of alphabet) {
+      if (character === last) continue;
+      expect(
+        await openFileLink(actor, { ...link, signature: body + character }),
+        `…${character}`,
+      ).toEqual(invalid);
+    }
+    for (const signature of [
+      `${link.signature}=`,
+      `${link.signature} `,
+      `${link.signature}!`,
+      `${body}.${last}`,
+      link.signature.replace(/-/g, "+").replace(/_/g, "/") + "=",
+      link.signature.toUpperCase() === link.signature
+        ? link.signature.toLowerCase()
+        : link.signature.toUpperCase(),
+    ]) {
+      expect(
+        await openFileLink(actor, { ...link, signature }),
+        signature,
+      ).toEqual(invalid);
+    }
+    // And the untouched link still opens.
+    expect((await openFileLink(actor, link)).ok).toBe(true);
     expect(await openFileLink(actor, { ...link, expires: "mañana" })).toEqual(
       invalid,
     );

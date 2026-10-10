@@ -298,13 +298,17 @@ export async function openFileLink(
   const expires = /^\d{9,11}$/.test(String(link.expires))
     ? Number(link.expires)
     : NaN;
-  const given = Buffer.from(String(link.signature), "base64url");
   if (!/^[0-9a-f-]{36}$/.test(fileId) || Number.isNaN(expires)) {
     return { ok: false, reason: "invalid" };
   }
+  // The signature is compared as the text it was issued as, not after
+  // decoding it: decoding would accept other spellings of the same bytes
+  // (a different last character, padding, stray symbols), and a link is
+  // valid in exactly one form.
+  const given = Buffer.from(String(link.signature), "utf8");
   const expected = Buffer.from(
     sign(fileId, actor.organizationId, actor.userId, expires),
-    "base64url",
+    "utf8",
   );
   // Made for another person, another company or another moment: no match.
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {

@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 103 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores, sus productos y órdenes en borrador).
+Actualizada: 2026-10-10 · Avance: 104 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores, sus productos y órdenes con sus estados).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -532,14 +532,26 @@ Dime si quieres poder escribir a mano un costo de referencia antes de tu primera
 8. Haz una segunda orden: es la OC-0002 y aparece arriba en la lista. Los botones «Borrador», «Enviada»… filtran.
 9. Entra con una cuenta de Consulta: ve la orden y las cantidades, pero **ningún costo ni total**, y no puede cambiarla. Con Almacén no puede entrar a Compras.
 
-Todavía no se puede enviar, cancelar ni recibir la orden: llega en los siguientes pasos. Dime si el número «OC-0001» te sirve así y si necesitas descuentos o impuestos por línea.
+Dime si el número «OC-0001» te sirve así y si necesitas descuentos o impuestos por línea.
+
+**H4. Confirmar y cancelar una orden**
+
+1. Un borrador sin productos no ofrece «Confirmar orden» y dice qué falta.
+2. Con al menos un producto: «Confirmar orden». El aviso explica que ya no podrás cambiar lo que pide. Queda **Enviada**, con la fecha, y desaparecen «Agregar producto», «Editar» y «Quitar».
+3. «Cancelar orden» pide el motivo (sin motivo no cancela). Queda **Cancelada**, con fecha y motivo, conserva lo que pedía y ya no ofrece nada más.
+4. Cancela también un borrador: mismo resultado.
+5. En Compras, los botones de estado filtran la lista («Borrador», «Enviada», «Cancelada»).
+6. Con Consulta: ve las órdenes y su estado, sin botones para confirmar ni cancelar.
+7. La bitácora muestra la confirmación y la cancelación con su motivo.
+
+«Enviada» quiere decir que ya la diste por pedida; mandarle el PDF por correo al proveedor y recibir la mercancía llegan en los siguientes pasos. Dime si necesitas poder **reabrir** una orden enviada para corregirla en lugar de cancelarla y hacer otra.
 
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
 - Avisos por correo de existencias bajas (la lista sí existe).
-- Enviar, cancelar y recibir órdenes de compra (ya se pueden escribir en borrador).
+- PDF y envío por correo de la orden, y recibir la mercancía (la orden ya se confirma y se cancela).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.
