@@ -7,6 +7,7 @@ import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { requireSession } from "@/platform/auth";
 import {
+  ensureQuotaRows,
   getEntitlements,
   getQuotaUsage,
   invalidateEntitlements,
@@ -201,6 +202,10 @@ export async function provisionCompany(
     >`SELECT id FROM organization WHERE id = ${organizationId} FOR UPDATE`;
     if (rows.length === 0) return false;
     const now = new Date();
+    // The counters exist from the moment there is a limit to count
+    // against, created here under the lock of the company: the first
+    // products or people never race to create them.
+    await ensureQuotaRows(tx, organizationId);
     await setEntitlement(
       tx,
       organizationId,

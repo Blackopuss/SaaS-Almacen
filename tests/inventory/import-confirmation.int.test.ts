@@ -234,6 +234,28 @@ describe("confirmImport", () => {
     }
   }, 60_000);
 
+  it("the very first products of a company, all at once, never collide", async () => {
+    // Nothing has ever counted against these plans: the import and the
+    // manual products arrive together at a counter nobody has used yet.
+    for (let round = 0; round < 6; round++) {
+      const actor = await company(5);
+      const importId = await imported(actor, fresh(2));
+      const results = await Promise.allSettled([
+        confirmImport(actor, importId),
+        ...Array.from({ length: 9 }, (_, i) =>
+          createProduct(actor, { sku: `PRI-${i}`, name: `Primero ${i}` }),
+        ),
+      ]);
+      // Every one got an answer: none failed on a lock.
+      expect(
+        results.filter((result) => result.status === "rejected"),
+        `round ${round}`,
+      ).toEqual([]);
+      const state = await usage(actor);
+      expect(state.used + state.reserved).toBe(5);
+    }
+  }, 120_000);
+
   it("held places count against manual products afterwards", async () => {
     const actor = await company(5);
     const importId = await imported(actor, fresh(4));

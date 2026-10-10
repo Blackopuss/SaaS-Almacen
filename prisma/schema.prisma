@@ -1250,7 +1250,8 @@ model Contact {
   updatedAt       DateTime     @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
-  @@index([organizationId, isSupplier, name, id])
+  /// Orders and searches the list of suppliers (name and RFC) in one index.
+  @@index([organizationId, isSupplier, name, rfc, id])
   @@index([organizationId, isCustomer, name, id])
   @@index([organizationId, rfc])
   @@map("contact")

@@ -45,11 +45,47 @@ function checkAmount(amount: number) {
   }
 }
 
+/**
+ * Creates the counters of a company that do not exist yet. Call it where
+ * a limit is granted (provisioning), with the company row locked, so the
+ * counter is already there when the first product or person arrives.
+ */
+export async function ensureQuotaRows(
+  client: {
+    quotaUsage: {
+      createMany(args: {
+        data: { id: string; organizationId: string; key: string }[];
+        skipDuplicates: true;
+      }): PromiseLike<unknown>;
+    };
+  },
+  organizationId: string,
+  keys: readonly QuotaKey[] = QUOTA_KEYS,
+): Promise<void> {
+  await client.quotaUsage.createMany({
+    data: keys.map((key) => ({ id: newId(), organizationId, key })),
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * Makes sure the counter exists before it is updated. It looks first and
+ * inserts only when the row is missing: an `INSERT IGNORE` that finds the
+ * row leaves a shared lock on it until the transaction ends, and two
+ * transactions holding that lock deadlock when each goes on to update
+ * the counter. Reading takes no lock, so in the normal case — the row
+ * exists since the plan was set — nothing here can collide.
+ */
 async function ensureRow(
   client: QuotaClient,
   organizationId: string,
   key: QuotaKey,
 ) {
+  const existing = await client.quotaUsage.findFirst({
+    where: { key },
+    select: { id: true },
+  });
+  if (existing) return;
   await client.quotaUsage.createMany({
     data: [{ id: newId(), organizationId, key }],
     skipDuplicates: true,

@@ -18,6 +18,20 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  createSupplierAction: {
+    input:
+      "datos del proveedor (nombre, razón social, RFC, contacto, correo, teléfono, dirección, notas) y si acepta guardar un posible duplicado",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el proveedor se crea en esa empresa",
+    coveredBy: "tests/platform/suppliers.int.test.ts",
+  },
+  updateSupplierAction: {
+    input:
+      "id del proveedor, sus datos y si acepta guardar un posible duplicado",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el proveedor se busca solo entre los de esa empresa",
+    coveredBy: "tests/platform/suppliers.int.test.ts",
+  },
   startExitImportAction: {
     input: "archivo .csv o .xlsx de salidas y separador decimal",
     identity:

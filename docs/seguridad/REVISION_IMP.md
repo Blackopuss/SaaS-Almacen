@@ -52,6 +52,7 @@ Fecha: 2026-10-10. Complementa `REVISION_PLT.md`, `REVISION_USR.md`, `REVISION_M
 | IMP-S10 | Baja | Las exportaciones no distinguen columnas sensibles porque todavía no existen (costos, CMP-16). | Pendiente para CMP-16: omitir columnas según permiso (NEG-25 queda parcialmente abierto). |
 | IMP-S11 | Informativa | Una salida importada y después reversada a mano no puede volver a importarse con el mismo folio. | Correcto por diseño (ADR 0015); explicarlo en la ayuda. |
 | IMP-S12 | Informativa | La guía de primer uso no guarda nada: se deriva de lo que existe. No agrega superficie. | — |
+| IMP-S13 | Media | Encontrado al cerrar CMP-02 por una falla ocasional de `import-confirmation.int.test.ts`: el contador de cupo se creaba dentro de cada transacción con `INSERT IGNORE`, que al encontrar la fila deja un candado compartido hasta el final; dos o más altas simultáneas con ese candado se interbloqueaban al actualizar el contador y una terminaba en error (no en cupo rebasado: la integridad nunca estuvo en riesgo). Venía desde MOD-07. | **Corregido:** el contador se crea al asignar el plan, con la empresa bloqueada (`ensureQuotaRows` en `provisionCompany`), y `ensureRow` primero lee y solo inserta si falta. Queda una ventana teórica para empresas cuyo límite no se asignó con `provisionCompany` (sembrados y datos de prueba) cuando tres o más altas llegan a la vez la primera vez. La falla no se pudo reproducir a voluntad; la corrección se apoya en el análisis de candados y en una prueba de concurrencia que la vigila. |
 
 ## Siguiente revisión
 

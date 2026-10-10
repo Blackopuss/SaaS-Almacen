@@ -102,6 +102,19 @@ describe("provisionCompany", () => {
       ok: true,
     });
 
+    // The counters of the plan exist from now, before anything counts
+    // against them: the first products never race to create them.
+    expect(
+      await db.quotaUsage.findMany({
+        where: { organizationId: org },
+        orderBy: { key: "asc" },
+        select: { key: true, taken: true, reserved: true },
+      }),
+    ).toEqual([
+      { key: "active_products", taken: 0, reserved: 0 },
+      { key: "users", taken: 0, reserved: 0 },
+    ]);
+
     const entitlements = await getEntitlements(org);
     expect([...entitlements.modules].sort()).toEqual([
       "inventory",

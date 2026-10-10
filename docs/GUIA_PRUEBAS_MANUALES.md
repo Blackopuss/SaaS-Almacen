@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 100 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: solo la base de contactos, sin pantallas).
+Actualizada: 2026-10-10 · Avance: 101 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -497,12 +497,25 @@ Dime si a los archivos les falta alguna columna que uses con tu contador, o si p
 
 Esta es la prueba que más me importa: dime en qué punto dudaste, qué palabra no se entendió o dónde esperabas otro botón.
 
+### H. Compras
+
+**H1. Proveedores**
+
+1. Compras → «Proveedores» → «Agregar proveedor» (titular, administrador o Compras; Consulta solo ve la lista; Almacén no entra).
+2. Guarda uno solo con el nombre. Luego otro con todos los datos, pegando el RFC con guiones o en minúsculas (`fno-010203-ab1`): en la ficha debe verse limpio (`FNO010203AB1`).
+3. Escribe un RFC imposible (11 caracteres, o con mes 13): el error aparece en ese campo y lo demás que escribiste se conserva.
+4. Intenta agregar otro con el **mismo RFC** o el **mismo nombre**: no se guarda y te muestra el que ya existe. Con «Guardar de todos modos» sí se guarda (piensa en dos sucursales del mismo proveedor).
+5. Edita un proveedor: los cambios se ven en la ficha y en la bitácora dice qué campos cambiaron.
+6. Con varios proveedores, busca por parte del nombre y por parte del RFC.
+
+Dime qué datos de tus proveedores faltan (días de crédito, cuenta bancaria, condiciones) y si necesitas poder archivarlos.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
 - Avisos por correo de existencias bajas (la lista sí existe).
-- Compras y proveedores (la sección existe, vacía).
+- Órdenes de compra y recepciones (ya hay proveedores; lo demás llega en los siguientes pasos).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.

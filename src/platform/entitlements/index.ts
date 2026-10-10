@@ -18,6 +18,7 @@ export type {
 export {
   QUOTA_KEYS,
   confirmReservation,
+  ensureQuotaRows,
   consumeQuota,
   getQuotaUsage,
   releaseQuota,
