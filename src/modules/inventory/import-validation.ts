@@ -87,7 +87,7 @@ export const foldName = (text: string) =>
     .trim();
 
 /** «Zona A › Estante 3», «zona a > estante 3» and «Zona A / Estante 3» alike. */
-const foldPath = (path: string) =>
+export const foldPath = (path: string) =>
   path
     .split(/[›>/\\]/)
     .map(foldName)

@@ -142,6 +142,25 @@ export default async function ImportarPage() {
         </div>
         <UploadForm />
       </section>
+      <section
+        aria-labelledby="salidas"
+        className="max-w-3xl space-y-3 rounded-xl border bg-card p-4 sm:p-5"
+      >
+        <div className="space-y-1">
+          <h2 id="salidas" className="font-medium">
+            ¿Tus ventas se registran en otro sistema?
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Sube cada día el archivo de lo que salió y se descuenta de tus
+            existencias, sin capturarlo a mano y sin descontar dos veces.
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <Link href="/inventario/importar/salidas">
+            Importar salidas diarias
+          </Link>
+        </Button>
+      </section>
       {imports.length > 0 && (
         <section
           aria-labelledby="importaciones"

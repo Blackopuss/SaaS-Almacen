@@ -28,6 +28,8 @@ import { db } from "./db";
 export const TENANT_MODELS = [
   "AuditEvent",
   "Entitlement",
+  "ExitImport",
+  "ExitImportRow",
   "Facility",
   "Invitation",
   "Job",
@@ -249,6 +251,7 @@ const LOCKABLE = {
   facility: "facility",
   location: "location",
   product: "product",
+  exitImport: "exit_import",
   productImport: "product_import",
   stockCount: "stock_count",
 } as const;

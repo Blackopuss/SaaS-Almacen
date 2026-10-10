@@ -21,6 +21,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "inventory.import_confirmed": "Confirmó una importación de productos",
   "inventory.import_applied": "Se aplicó una importación de productos",
   "inventory.import_cancelled": "Canceló una importación de productos",
+  "inventory.exit_import_confirmed": "Confirmó una importación de salidas",
+  "inventory.exit_import_applied": "Se registraron las salidas de un archivo",
+  "inventory.exit_import_cancelled": "Canceló una importación de salidas",
+  "inventory.exit_import_failed":
+    "Una importación de salidas se detuvo antes de terminar",
   "inventory.import_failed":
     "Una importación de productos se detuvo antes de terminar",
   "inventory.reversed": "Reversó un movimiento",

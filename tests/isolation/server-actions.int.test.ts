@@ -18,6 +18,24 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  startExitImportAction: {
+    input: "archivo .csv o .xlsx de salidas y separador decimal",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el archivo se guarda como privado de esa empresa",
+    coveredBy: "tests/inventory/exit-import.int.test.ts",
+  },
+  confirmExitImportAction: {
+    input: "id de importación de salidas",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la importación se busca solo en esa empresa",
+    coveredBy: "tests/inventory/exit-import.int.test.ts",
+  },
+  cancelExitImportAction: {
+    input: "id de importación de salidas",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la importación se busca solo en esa empresa",
+    coveredBy: "tests/inventory/exit-import.int.test.ts",
+  },
   cancelImportAction: {
     input: "id de importación",
     identity:

@@ -145,6 +145,8 @@ model Organization {
   storedFiles          StoredFile[]
   productImports       ProductImport[]
   productImportItems   ProductImportItem[]
+  exitImports          ExitImport[]
+  exitImportRows       ExitImportRow[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -194,6 +196,7 @@ model Location {
   movementLines  StockMovementLine[]
   balances       StockBalance[]
   counts         StockCount[]
+  exitImportRows ExitImportRow[]
   /// True for General, NULL for other locations (never false; SQL CHECK).
   /// MySQL allows multiple NULLs in the unique key, but only one true.
   isDefault      Boolean?
@@ -614,6 +617,7 @@ model Product {
   balances       StockBalance[]
   minimum        StockMinimum?
   countLines     StockCountLine[]
+  exitImportRows ExitImportRow[]
   status         ProductStatus         @default(ACTIVE)
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   updatedAt      DateTime              @updatedAt @db.DateTime(3)
@@ -1002,6 +1006,7 @@ model StoredFile {
   /// Set when it was removed; the bytes are gone, the row stays as a trace.
   deletedAt       DateTime?       @db.DateTime(3)
   productImports  ProductImport[]
+  exitImports     ExitImport[]
 
   @@unique([organizationId, id])
   @@index([organizationId, purpose, createdAt])
@@ -1108,4 +1113,107 @@ model ProductImportItem {
   @@unique([organizationId, importId, position])
   @@index([organizationId, importId, status, position])
   @@map("product_import_item")
+}
+
+enum ExitImportStatus {
+  /// The file was read and can be reviewed; nothing has left stock.
+  READY
+  /// The person confirmed it: its rows are fixed and wait for the worker.
+  CONFIRMED
+  /// The worker is registering its exits, in batches.
+  RUNNING
+  DONE
+  /// It could not be finished; the exits registered stay, the rest did not.
+  FAILED
+  CANCELLED
+}
+
+/// A file of daily exits — what was sold or used, kept outside the system
+/// — imported to take it out of stock (IMP-10). Each row names the sale it
+/// comes from (`externalId`), so the same sale is never discounted twice,
+/// whatever file brings it again.
+model ExitImport {
+  id                String           @id @db.Char(36)
+  organizationId    String           @db.Char(36)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fileId            String           @db.Char(36)
+  file              StoredFile       @relation(fields: [organizationId, fileId], references: [organizationId, id], onDelete: Restrict)
+  status            ExitImportStatus @default(READY)
+  /// "." or ",": how the person said decimals are written in the file.
+  decimalSeparator  String           @db.Char(1)
+  /// Rows with data under the titles.
+  dataRows          Int
+  /// Rows fixed when it was confirmed, and what became of them.
+  totalRows         Int              @default(0)
+  appliedRows       Int              @default(0)
+  /// Sales that had already been imported: not discounted again.
+  duplicateRows     Int              @default(0)
+  failedRows        Int              @default(0)
+  /// First and last day of the exits of the file (calendar of the company).
+  firstDay          DateTime?        @db.Date
+  lastDay           DateTime?        @db.Date
+  confirmedAt       DateTime?        @db.DateTime(3)
+  confirmedByUserId String?          @db.Char(36)
+  finishedAt        DateTime?        @db.DateTime(3)
+  /// Why it stopped, for people, when it could not be finished.
+  lastError         String?          @db.VarChar(500)
+  rows              ExitImportRow[]
+  createdByUserId   String           @db.Char(36)
+  createdAt         DateTime         @default(now()) @db.DateTime(3)
+  updatedAt         DateTime         @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt])
+  @@map("exit_import")
+}
+
+enum ExitImportRowStatus {
+  PENDING
+  /// Its exit was registered.
+  DONE
+  /// The same sale had already been imported: nothing left stock again.
+  DUPLICATE
+  /// It could not be registered (no stock, archived…); `error` says why.
+  FAILED
+}
+
+/// One row of a confirmed file of exits: a product that left on a day, in
+/// a sale the business identifies. Product, presentation and location are
+/// fixed when confirming; the quantity is converted when the exit is
+/// registered, like any movement.
+model ExitImportRow {
+  id             String              @id @db.Char(36)
+  organizationId String              @db.Char(36)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  importId       String              @db.Char(36)
+  import         ExitImport          @relation(fields: [organizationId, importId], references: [organizationId, id], onDelete: Restrict)
+  /// Row of the file.
+  row            Int
+  /// Identifier of the sale in the business: ticket, folio, note.
+  externalId     String              @db.VarChar(64)
+  /// Day it left, in the calendar of the company.
+  day            DateTime            @db.Date
+  productId      String              @db.Char(36)
+  product        Product             @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  /// Presentation it was counted in; null when in the product's unit.
+  presentationId String?             @db.Char(36)
+  /// As written in the file, with decimal point: "3", "2.75".
+  quantity       String              @db.VarChar(24)
+  locationId     String              @db.Char(36)
+  location       Location            @relation(fields: [organizationId, locationId], references: [organizationId, id], onDelete: Restrict)
+  status         ExitImportRowStatus @default(PENDING)
+  error          String?             @db.VarChar(300)
+  /// The exit it became, once registered.
+  movementId     String?             @db.Char(36)
+  appliedAt      DateTime?           @db.DateTime(3)
+  /// Set only when its exit is registered: "<productId>:<externalId>".
+  /// Unique in the company, so a sale of a product leaves stock once.
+  appliedKey     String?             @db.VarChar(120)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, importId, row])
+  @@unique([organizationId, appliedKey])
+  @@index([organizationId, importId, status, row])
+  @@index([organizationId, status, day])
+  @@map("exit_import_row")
 }

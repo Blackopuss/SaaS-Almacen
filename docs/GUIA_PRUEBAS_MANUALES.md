@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 96 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-09).
+Actualizada: 2026-10-10 · Avance: 97 de 148 pasos (BAS, PLT, USR, MOD e Inventario completas; Importación hasta IMP-10).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -461,11 +461,26 @@ Las importaciones se aplican en segundo plano: además de la aplicación debe es
 
 Una importación cancelada o detenida no se reanuda: se sube el archivo de nuevo (lo que ya entró aparece como «Se actualiza»).
 
+**G7. Importar salidas diarias**
+
+Para cuando las ventas se registran en otro sistema o en notas. Necesita el worker corriendo, como G5.
+
+1. `/inventario` → «Importar desde Excel» → «Importar salidas diarias». Descarga la plantilla (CSV o Excel) y ábrela: una fila por producto vendido, con fecha, folio, clave (o código de barras), cantidad y, si aplica, presentación y ubicación.
+2. Llena unas filas con productos que tengan existencias, elige cómo vienen los decimales y sube el archivo. Deberías ver la revisión: cuántas salidas se descontarían, de qué días, en cuántos folios, y cómo se entiende cada fila. Todavía no sale nada.
+3. «Confirmar y descontar». Al terminar: «Salidas registradas: N salidas descontadas de tu inventario». En Inventario bajaron las existencias y en Movimientos hay una «Salida» por fila, con el folio como referencia y el día en el motivo.
+4. De vuelta en «Importar salidas» la pantalla dice **«Salidas importadas hasta el <último día>»**.
+5. Sube **el mismo archivo otra vez**: la revisión avisa que todas las filas ya se habían importado y no ofrece descontarlas. Sube uno que repita algunas ventas y traiga nuevas: solo las nuevas se descuentan.
+6. Pon una salida mayor a la existencia: esa fila queda «no se pudo descontar» con el motivo, las demás sí salen, y la pantalla principal avisa cuántas faltan. Corrige el inventario (una entrada o un ajuste) y sube el mismo archivo: ahora solo sale la que faltaba.
+7. Un archivo con problemas (clave que no existe, fecha imposible, sin folio, mismo folio y producto dos veces) los lista por fila y columna y no se puede confirmar.
+8. Consulta y Compras no pueden subir ni confirmar.
+
+Dime si tu sistema de ventas exporta el archivo con otros títulos o con la fecha en otro formato, y si prefieres ver una salida por ticket en lugar de una por producto.
+
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
-- Importar salidas diarias y exportar catálogo, existencias o historial a Excel.
+- Exportar catálogo, existencias o historial a Excel.
 - Avisos por correo de existencias bajas (la lista sí existe).
 - Compras y proveedores (la sección existe, vacía).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).

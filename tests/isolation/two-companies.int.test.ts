@@ -268,6 +268,30 @@ beforeAll(async () => {
         data: {},
       },
     });
+    const exitImportId = newId();
+    await db.exitImport.create({
+      data: {
+        id: exitImportId,
+        organizationId,
+        fileId: storedFileId,
+        decimalSeparator: ".",
+        dataRows: 1,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.exitImportRow.create({
+      data: {
+        id: newId(),
+        organizationId,
+        importId: exitImportId,
+        row: 2,
+        externalId: "T-1",
+        day: new Date("2026-10-08T00:00:00.000Z"),
+        productId,
+        quantity: "1",
+        locationId: location.id,
+      },
+    });
     await db.job.create({
       data: {
         id: newId(),

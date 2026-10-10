@@ -565,7 +565,7 @@ describe("what a file needs to be confirmed", () => {
       category: null,
       brand: null,
       barcode: null,
-      unitCode: "pza",
+      unitCode: "piece",
       presentation: null,
       stock: null,
       minimum: null,

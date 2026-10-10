@@ -133,3 +133,36 @@ export {
   type CancelImportResult,
 } from "./import-release";
 export { importPermissions } from "./import-classification";
+export {
+  EXIT_COLUMNS,
+  EXIT_IMPORT_JOB_TYPE,
+  EXIT_IMPORT_STATUS_LABELS,
+  buildExitTemplate,
+  cancelExitImport,
+  checkExitImport,
+  confirmExitImport,
+  formatExitDay,
+  getExitCoverage,
+  listExitImportFailures,
+  listExitImports,
+  matchExitColumns,
+  parseExitDay,
+  reviewExitImport,
+  startExitImport,
+  validateExitRows,
+  type CancelExitImportResult,
+  type ConfirmExitImportResult,
+  type ExitColumnKey,
+  type ExitCoverage,
+  type ExitImportReview,
+  type ExitImportStatus,
+  type ExitImportSummary,
+  type ExitIssue,
+  type ExitProduct,
+  type StartExitImportResult,
+} from "./exit-import";
+export {
+  applyExitImport,
+  exitImportJobHandlers,
+  type ApplyExitImportOutcome,
+} from "./exit-import-apply";
