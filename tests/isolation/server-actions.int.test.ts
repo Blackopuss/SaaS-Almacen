@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  sendPurchaseOrderAction: {
+    input: "id de orden",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la orden se busca solo en esa empresa y el destinatario sale de la ficha del proveedor, nunca del navegador",
+    coveredBy: "tests/purchasing/order-delivery.int.test.ts",
+  },
   submitPurchaseOrderAction: {
     input: "id de orden",
     identity:

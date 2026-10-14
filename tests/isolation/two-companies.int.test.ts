@@ -312,6 +312,26 @@ beforeAll(async () => {
         unitCode: "piece",
       },
     });
+    // A delivery needs an order that is no longer a draft: its line goes
+    // in first, then the order is confirmed.
+    await db.purchaseOrder.update({
+      where: { id: purchaseOrderId },
+      data: {
+        status: "SENT",
+        sentAt: new Date(),
+        sentByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.purchaseOrderDelivery.create({
+      data: {
+        id: newId(),
+        organizationId,
+        orderId: purchaseOrderId,
+        recipient: "ventas@ferretera.example",
+        jobId: newId(),
+        requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {

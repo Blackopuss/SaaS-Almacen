@@ -42,6 +42,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V12 Comunicación segura | TLS | Pendiente | BAS-09 (HTTPS + HSTS ya configurado para producción). |
 | V13 Configuración | Secretos fuera del repositorio; usuarios de base con mínimo privilegio | Cumple | `.env.local` ignorado; `almacen_app` sin DDL. |
 | V13 | Páginas de desarrollo cerradas en producción | Cumple | `/correos`, `/sistema-visual` (PLT16-06). |
+| V5 | Correo saliente sin inyección de cabeceras | Cumple | `sendEmail` rechaza destinatario, «responder a» y asunto con saltos de línea o más de un destinatario, y adjuntos con nombre o tipo fuera de lo permitido; el destinatario de una orden sale de la ficha del proveedor, con límites diarios (CMP-06B, ADR 0020). Pendiente al elegir proveedor de correo: SPF, DKIM y DMARC. |
 | V14 Protección de datos | Sin secretos en registros, correos ni bitácora | Cumple | `sanitizeMetadata`; tokens nunca enviados al navegador. |
 | V14 | Respaldos cifrados | Pendiente | BAS-11. |
 | V15 Codificación segura y arquitectura | Dependencias con versión exacta y auditoría | Cumple | `.npmrc save-exact`; `npm audit --omit=dev` en CI. |

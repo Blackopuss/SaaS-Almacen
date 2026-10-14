@@ -55,3 +55,16 @@ export {
 } from "./order-states";
 export type { PurchaseOrderStatus } from "./order-states";
 export { buildOrderPdf, type OrderPdf } from "./order-pdf";
+export {
+  ORDER_DELIVERY_JOB_TYPE,
+  ORDER_DELIVERY_MAX_ATTEMPTS,
+  ORDER_DELIVERY_STATUS_LABELS,
+  getOrderDeliveries,
+  purchasingJobHandlers,
+  requestOrderDelivery,
+} from "./order-delivery";
+export type {
+  OrderDelivery,
+  OrderDeliveryPanel,
+  RequestDeliveryResult,
+} from "./order-delivery";

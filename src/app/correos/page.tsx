@@ -37,10 +37,28 @@ export default async function CorreosPage() {
                   {formatDateTime(new Date(m.sentAt))}
                 </p>
               </div>
-              <p className="text-sm text-muted-foreground">Para: {m.to}</p>
+              <p className="text-sm text-muted-foreground">
+                Para: {m.to}
+                {m.replyTo && ` · Responder a: ${m.replyTo}`}
+              </p>
               <pre className="mt-3 overflow-x-auto font-sans text-sm whitespace-pre-wrap text-muted-foreground">
                 {m.text}
               </pre>
+              {m.attachments?.map((file) => (
+                <p key={file.name} className="mt-3 text-sm">
+                  Adjunto:{" "}
+                  <a
+                    href={`data:${file.contentType};base64,${file.content}`}
+                    download={file.name}
+                    className="rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    {file.name}
+                  </a>{" "}
+                  <span className="text-muted-foreground">
+                    ({Math.max(1, Math.round(file.size / 1024))} KB)
+                  </span>
+                </p>
+              ))}
               {m.actionUrl && (
                 <Button asChild size="sm" className="mt-3">
                   <a href={m.actionUrl}>Abrir enlace</a>

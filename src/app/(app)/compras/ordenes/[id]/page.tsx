@@ -13,9 +13,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime } from "@/lib";
-import { getPurchaseOrder } from "@/modules/purchasing";
+import { getOrderDeliveries, getPurchaseOrder } from "@/modules/purchasing";
 import { getModuleAccess } from "@/platform/billing";
 
+import { DeliveryPanel } from "./delivery-panel";
 import { CancelOrder, SubmitOrder } from "./order-buttons";
 import { RemoveLine } from "./remove-line";
 
@@ -60,11 +61,15 @@ export default async function OrdenPage({
     );
   }
   const { id } = await params;
-  const order = await getPurchaseOrder(
-    { organizationId: access.organization.id, userId: access.user.id },
-    id,
-  );
-  if (!order) notFound();
+  const actor = {
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  };
+  const [order, delivery] = await Promise.all([
+    getPurchaseOrder(actor, id),
+    getOrderDeliveries(actor, id),
+  ]);
+  if (!order || !delivery) notFound();
   const canEdit =
     order.editable &&
     moduleState === "active" &&
@@ -77,6 +82,12 @@ export default async function OrdenPage({
   // The PDF carries prices: for who may export orders (not Consulta).
   const canExport = access.can("purchasing.order.export");
   const zone = access.organization.timeZone;
+  // By mail it goes once it is an order (not a draft); what was sent
+  // stays in sight afterwards, whatever became of the order.
+  const showDelivery =
+    order.status === "SENT" ||
+    order.status === "PARTIAL" ||
+    delivery.deliveries.length > 0;
   const addHref = `/compras/ordenes/${order.id}/linea`;
   const expected = order.expectedOn
     ? formatDate(new Date(`${order.expectedOn}T12:00:00.000Z`), "UTC")
@@ -283,6 +294,27 @@ export default async function OrdenPage({
           </p>
         )}
       </section>
+      {showDelivery && (
+        <DeliveryPanel
+          orderId={order.id}
+          numberText={order.numberText}
+          supplierName={order.supplierName}
+          inProgress={delivery.inProgress}
+          send={active ? delivery.send : undefined}
+          deliveries={delivery.deliveries.map((row) => ({
+            id: row.id,
+            recipient: row.recipient,
+            status: row.status,
+            statusLabel: row.statusLabel,
+            requestedText: formatDateTime(row.requestedAt, zone),
+            endedText: row.sentAt ? formatDateTime(row.sentAt, zone) : null,
+            failureReason: row.failureReason,
+            attempts: row.attempts,
+            maxAttempts: row.maxAttempts,
+            retrying: row.retrying,
+          }))}
+        />
+      )}
       {(canSubmit || canCancel) && (
         <div className="flex max-w-3xl flex-wrap gap-3">
           {canSubmit && (
@@ -308,7 +340,7 @@ export default async function OrdenPage({
             ? "Es un borrador: agrega al menos un producto para poder confirmarla."
             : "Es un borrador: puedes cambiarlo las veces que haga falta. Al confirmarla queda como enviada y sus productos ya no cambian."
           : order.status === "SENT"
-            ? "Está confirmada como enviada: sus productos ya no cambian. Recibirla llega en los siguientes pasos."
+            ? "Está confirmada como enviada: sus productos ya no cambian. Mandarla por correo no cambia su estado. Recibirla llega en los siguientes pasos."
             : order.status === "CANCELLED"
               ? "Está cancelada: se conserva como historia y ya no cambia."
               : order.status === "PARTIAL"

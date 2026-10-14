@@ -9,6 +9,7 @@ import {
   cancelPurchaseOrder,
   createPurchaseOrder,
   removeOrderLine,
+  requestOrderDelivery,
   submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
@@ -296,6 +297,37 @@ export async function cancelPurchaseOrderAction(
     revalidatePath("/compras");
     revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
     return { ok: true, message: "Orden cancelada." };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Asks to send an order to its supplier by mail, or to try again after a
+ * failure (CMP-06B). The order is looked for only inside the company of
+ * the session and the address is the supplier's, never one sent by the
+ * browser. The worker sends it.
+ */
+export async function sendPurchaseOrderAction(
+  orderId: string,
+): Promise<OrderStateActionResult> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await requestOrderDelivery(
+      { organizationId: organization.id, userId: user.id },
+      String(orderId),
+    );
+    if (!result.ok) return { ok: false, error: result.message };
+    revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+    return {
+      ok: true,
+      message: result.repeated
+        ? `Ya hay un envío en camino a ${result.recipient}.`
+        : `La orden va en camino a ${result.recipient}.`,
+    };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };

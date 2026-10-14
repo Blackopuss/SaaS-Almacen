@@ -108,49 +108,50 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id                   String                @id @db.Char(36)
-  name                 String                @db.VarChar(120)
-  timeZone             String                @default("America/Mexico_City") @db.VarChar(64)
-  currency             String                @default("MXN") @db.Char(3)
+  id                      String                  @id @db.Char(36)
+  name                    String                  @db.VarChar(120)
+  timeZone                String                  @default("America/Mexico_City") @db.VarChar(64)
+  currency                String                  @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId          String                @db.Char(36)
-  owner                User                  @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt            DateTime              @default(now()) @db.DateTime(3)
-  updatedAt            DateTime              @updatedAt @db.DateTime(3)
-  memberships          Membership[]
-  memberRoles          MembershipRole[]
-  sessions             Session[]
-  auditEvents          AuditEvent[]
-  ownershipTransfers   OwnershipTransfer[]
-  invitations          Invitation[]
-  subscriptions        Subscription[]
-  subscriptionItems    SubscriptionItem[]
-  entitlements         Entitlement[]
-  quotaUsages          QuotaUsage[]
-  products             Product[]
-  productCategories    ProductCategory[]
-  productBrands        ProductBrand[]
-  productPresentations ProductPresentation[]
-  presentationVersions PresentationVersion[]
-  facilities           Facility[]
-  locations            Location[]
-  stockMovements       StockMovement[]
-  stockMovementLines   StockMovementLine[]
-  stockBalances        StockBalance[]
-  stockMinimums        StockMinimum[]
-  stockCounts          StockCount[]
-  stockCountLines      StockCountLine[]
-  stockCountCaptures   StockCountCapture[]
-  jobs                 Job[]
-  storedFiles          StoredFile[]
-  productImports       ProductImport[]
-  productImportItems   ProductImportItem[]
-  exitImports          ExitImport[]
-  exitImportRows       ExitImportRow[]
-  contacts             Contact[]
-  productSuppliers     ProductSupplier[]
-  purchaseOrders       PurchaseOrder[]
-  purchaseOrderLines   PurchaseOrderLine[]
+  ownerUserId             String                  @db.Char(36)
+  owner                   User                    @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt               DateTime                @default(now()) @db.DateTime(3)
+  updatedAt               DateTime                @updatedAt @db.DateTime(3)
+  memberships             Membership[]
+  memberRoles             MembershipRole[]
+  sessions                Session[]
+  auditEvents             AuditEvent[]
+  ownershipTransfers      OwnershipTransfer[]
+  invitations             Invitation[]
+  subscriptions           Subscription[]
+  subscriptionItems       SubscriptionItem[]
+  entitlements            Entitlement[]
+  quotaUsages             QuotaUsage[]
+  products                Product[]
+  productCategories       ProductCategory[]
+  productBrands           ProductBrand[]
+  productPresentations    ProductPresentation[]
+  presentationVersions    PresentationVersion[]
+  facilities              Facility[]
+  locations               Location[]
+  stockMovements          StockMovement[]
+  stockMovementLines      StockMovementLine[]
+  stockBalances           StockBalance[]
+  stockMinimums           StockMinimum[]
+  stockCounts             StockCount[]
+  stockCountLines         StockCountLine[]
+  stockCountCaptures      StockCountCapture[]
+  jobs                    Job[]
+  storedFiles             StoredFile[]
+  productImports          ProductImport[]
+  productImportItems      ProductImportItem[]
+  exitImports             ExitImport[]
+  exitImportRows          ExitImportRow[]
+  contacts                Contact[]
+  productSuppliers        ProductSupplier[]
+  purchaseOrders          PurchaseOrder[]
+  purchaseOrderLines      PurchaseOrderLine[]
+  purchaseOrderDeliveries PurchaseOrderDelivery[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1323,35 +1324,73 @@ enum PurchaseOrderStatus {
 /// the company and starts as a draft, the only state in which its lines
 /// can be added, changed or removed.
 model PurchaseOrder {
-  id                String              @id @db.Char(36)
-  organizationId    String              @db.Char(36)
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                String                  @id @db.Char(36)
+  organizationId    String                  @db.Char(36)
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive within the company: shown as «OC-0001».
   number            Int
   /// The contact, in its supplier facet (checked by the service).
-  contactId         String              @db.Char(36)
-  contact           Contact             @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
-  status            PurchaseOrderStatus @default(DRAFT)
+  contactId         String                  @db.Char(36)
+  contact           Contact                 @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  status            PurchaseOrderStatus     @default(DRAFT)
   /// Day it is expected to arrive, in the calendar of the company.
-  expectedOn        DateTime?           @db.Date
-  notes             String?             @db.VarChar(500)
+  expectedOn        DateTime?               @db.Date
+  notes             String?                 @db.VarChar(500)
   /// When a person confirmed it as sent, and who (CMP-05).
-  sentAt            DateTime?           @db.DateTime(3)
-  sentByUserId      String?             @db.Char(36)
+  sentAt            DateTime?               @db.DateTime(3)
+  sentByUserId      String?                 @db.Char(36)
   /// When and why it was cancelled, and by whom.
-  cancelledAt       DateTime?           @db.DateTime(3)
-  cancelledByUserId String?             @db.Char(36)
-  cancelReason      String?             @db.VarChar(300)
+  cancelledAt       DateTime?               @db.DateTime(3)
+  cancelledByUserId String?                 @db.Char(36)
+  cancelReason      String?                 @db.VarChar(300)
   lines             PurchaseOrderLine[]
-  createdByUserId   String              @db.Char(36)
-  createdAt         DateTime            @default(now()) @db.DateTime(3)
-  updatedAt         DateTime            @updatedAt @db.DateTime(3)
+  deliveries        PurchaseOrderDelivery[]
+  createdByUserId   String                  @db.Char(36)
+  createdAt         DateTime                @default(now()) @db.DateTime(3)
+  updatedAt         DateTime                @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
   @@index([organizationId, status, number])
   @@index([organizationId, contactId, number])
   @@map("purchase_order")
+}
+
+enum PurchaseOrderDeliveryStatus {
+  /// Waiting for the worker, or between attempts.
+  QUEUED
+  SENT
+  /// It will not be tried again; a person may ask for another one.
+  FAILED
+}
+
+/// One time a person asked to send an order to its supplier by mail
+/// (CMP-06B). The worker sends it; the row says how it ended. The address
+/// is the one the supplier had when it was asked, and the row no longer
+/// changes once it is sent or failed (trigger). Sending does not move the
+/// state of the order.
+model PurchaseOrderDelivery {
+  id                String                      @id @db.Char(36)
+  organizationId    String                      @db.Char(36)
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  orderId           String                      @db.Char(36)
+  order             PurchaseOrder               @relation(fields: [organizationId, orderId], references: [organizationId, id], onDelete: Restrict)
+  recipient         String                      @db.VarChar(254)
+  status            PurchaseOrderDeliveryStatus @default(QUEUED)
+  /// The job that sends it (a row of `job` of the same company).
+  jobId             String                      @db.Char(36)
+  requestedByUserId String                      @db.Char(36)
+  requestedAt       DateTime                    @default(now()) @db.DateTime(3)
+  sentAt            DateTime?                   @db.DateTime(3)
+  failedAt          DateTime?                   @db.DateTime(3)
+  /// Why it was not sent, for people; never the answer of a mail server.
+  failureReason     String?                     @db.VarChar(300)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, jobId])
+  @@index([organizationId, orderId, requestedAt])
+  @@index([organizationId, requestedAt])
+  @@map("purchase_order_delivery")
 }
 
 /// One product of a purchase order. Like a movement line, it keeps what

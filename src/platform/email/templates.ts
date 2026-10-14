@@ -1,4 +1,4 @@
-import type { EmailMessage } from "./send";
+import type { EmailAttachment, EmailMessage } from "./send";
 
 /** Spanish email copy. Plain text first: readable in every client. */
 
@@ -181,6 +181,51 @@ export function invitationEmail(input: {
       "",
       `El enlace vence en ${input.days} días y solo funciona una vez.`,
       "Si no esperabas esta invitación, ignora este mensaje.",
+    ].join("\n"),
+  };
+}
+
+/** A name as it may go into a subject: one line, without control characters. */
+const oneLine = (text: string, max: number) =>
+  text
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+
+/**
+ * A purchase order for a supplier, with its PDF (CMP-06B). The supplier
+ * is not a user of the system: the message says who sends it and answers
+ * go to that person, never to the system.
+ */
+export function purchaseOrderEmail(input: {
+  to: string;
+  /** Who is greeted: the contact person, or the supplier. */
+  greeting: string;
+  organizationName: string;
+  orderNumber: string;
+  /** «20 de octubre de 2026», when the order says it. */
+  expectedOn?: string | null;
+  sender: { name: string; email: string };
+  pdf: EmailAttachment;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.sender.email,
+    subject: `Orden de compra ${oneLine(input.orderNumber, 20)} de ${company}`,
+    attachments: [input.pdf],
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `${company} te envía su orden de compra ${input.orderNumber}. Va adjunta en PDF.`,
+      ...(input.expectedOn
+        ? [`La esperamos para el ${input.expectedOn}.`]
+        : []),
+      "",
+      `Para confirmarla o si tienes dudas, responde a este correo: le llega a ${oneLine(input.sender.name, 120)} (${input.sender.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}. Si no esperabas esta orden, ignora el mensaje.`,
     ].join("\n"),
   };
 }

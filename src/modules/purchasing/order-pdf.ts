@@ -287,25 +287,27 @@ function money(amount: string): string {
   return `${grouped}.${fraction.padEnd(2, "0")}`;
 }
 
+export type ComposedOrderPdf = {
+  order: PurchaseOrderDetail;
+  supplier: Supplier;
+  company: { name: string; timeZone: string };
+  pdf: OrderPdf;
+};
+
 /**
- * Builds the PDF of an order of the company; null when it is not one of
- * its orders. Each download is written down in the audit trail.
+ * The document of an order, read as the screen reads it for that person:
+ * same permission, and costs only for who may see them. Null when it is
+ * not an order of the company. It neither asks for the permission to
+ * export nor writes the audit trail: who calls it does (the download
+ * here, the delivery by mail in `order-delivery.ts`).
  */
-export async function buildOrderPdf(
+export async function composeOrderPdf(
   actor: PurchasingActor,
   orderId: string,
-): Promise<OrderPdf | null> {
-  const { organizationId, userId } = actor;
-  await assertModulePermission(
-    organizationId,
-    userId,
-    "purchasing.order.export",
-  );
-  // Reads the order as the screen does: same permission, and costs only
-  // for who may see them.
+): Promise<ComposedOrderPdf | null> {
   const order = await getPurchaseOrder(actor, orderId);
   if (!order) return null;
-  const client = forOrganization(organizationId);
+  const client = forOrganization(actor.organizationId);
   const [supplier, membership] = await Promise.all([
     client.contact.findFirst({
       where: { id: order.supplierId },
@@ -324,19 +326,47 @@ export async function buildOrderPdf(
     }),
   ]);
   if (!supplier || !membership) return null;
-  const bytes = buildPdf(draw(order, supplier, membership.organization), {
+  const company = membership.organization;
+  const bytes = buildPdf(draw(order, supplier, company), {
     title: `Orden de compra ${order.numberText}`,
   });
-  await recordAuditEvent(client, {
+  return {
+    order,
+    supplier,
+    company,
+    pdf: {
+      name: `${order.numberText}.pdf`,
+      contentType: "application/pdf",
+      bytes,
+    },
+  };
+}
+
+/**
+ * Builds the PDF of an order of the company; null when it is not one of
+ * its orders. Each download is written down in the audit trail.
+ */
+export async function buildOrderPdf(
+  actor: PurchasingActor,
+  orderId: string,
+): Promise<OrderPdf | null> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(
+    organizationId,
+    userId,
+    "purchasing.order.export",
+  );
+  const composed = await composeOrderPdf(actor, orderId);
+  if (!composed) return null;
+  await recordAuditEvent(forOrganization(organizationId), {
     organizationId,
     actorUserId: userId,
     action: "purchase_order.exported",
-    target: { type: "purchase_order", id: order.id },
-    metadata: { orden: order.numberText, proveedor: supplier.name },
+    target: { type: "purchase_order", id: composed.order.id },
+    metadata: {
+      orden: composed.order.numberText,
+      proveedor: composed.supplier.name,
+    },
   });
-  return {
-    name: `${order.numberText}.pdf`,
-    contentType: "application/pdf",
-    bytes,
-  };
+  return composed.pdf;
 }

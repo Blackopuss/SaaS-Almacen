@@ -37,6 +37,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "purchase_order.sent": "Confirmó una orden de compra como enviada",
   "purchase_order.cancelled": "Canceló una orden de compra",
   "purchase_order.exported": "Descargó el PDF de una orden de compra",
+  "purchase_order.delivery_requested":
+    "Pidió enviar una orden de compra por correo",
+  "purchase_order.delivered": "Se envió una orden de compra por correo",
+  "purchase_order.delivery_failed":
+    "No se pudo enviar una orden de compra por correo",
   "supplier.created": "Agregó un proveedor",
   "supplier.updated": "Cambió los datos de un proveedor",
   "product.created": "Creó un producto",

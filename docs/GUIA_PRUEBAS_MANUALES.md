@@ -1,6 +1,6 @@
 # Guía de pruebas manuales
 
-Actualizada: 2026-10-10 · Avance: 105 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores, sus productos y órdenes con sus estados).
+Actualizada: 2026-10-10 · Avance: 106 de 148 pasos (BAS, PLT, USR, MOD, Inventario e Importación completas; Compras: proveedores, sus productos y órdenes con sus estados).
 
 Sirve para recorrer a mano, desde cero, todo lo que ya existe y anotar lo que no te guste. Cada recorrido dice qué hacer y qué deberías ver. Al final hay una plantilla para darme la retroalimentación.
 
@@ -102,7 +102,8 @@ En PowerShell, `$env:DATABASE_NAME=…` se queda puesto en esa terminal: ciérra
 | `/movimientos/salida-rapida` | Salida de varios productos en una sola confirmación | Quien pueda registrar salidas |
 | `/ubicaciones` | Zonas, pasillos y estantes; «General» existe siempre | Todos leen; Titular, Administrador y Almacén modifican |
 | `/conteos`, `/conteos/<id>` | Iniciar un conteo físico, capturar lo contado y aplicarlo | Titular, Administrador, Almacén (Consulta solo lee; Comprador no entra) |
-| `/compras` | Todavía vacía (solo el aviso de «sin datos») | Titular, Administrador, Comprador, Consulta |
+| `/compras`, `/compras/ordenes/<id>` | Órdenes de compra: lista por estado; cada orden con sus productos, PDF y envío por correo | Titular, Administrador, Comprador; Consulta solo lee |
+| `/compras/proveedores` | Proveedores y los productos que surte cada uno | Titular, Administrador, Comprador; Consulta solo lee |
 | `/configuracion` | Seguridad (dos pasos, sesiones) y enlaces de empresa | Todos |
 | `/configuracion/equipo` | Personas, roles e invitaciones | Titular y Administrador |
 | `/configuracion/plan` | Mi plan: cupos, módulos y vigencia | Titular y Administrador |
@@ -554,14 +555,28 @@ Dime si el número «OC-0001» te sirve así y si necesitas descuentos o impuest
 
 Dime qué le falta al documento para mandárselo a un proveedor: tu RFC, dirección, teléfono, logotipo, condiciones de pago, firma.
 
-«Enviada» quiere decir que ya la diste por pedida; mandarle el PDF por correo al proveedor y recibir la mercancía llegan en los siguientes pasos. Dime si necesitas poder **reabrir** una orden enviada para corregirla en lugar de cancelarla y hacer otra.
+**H6. Enviar la orden por correo**
+
+Necesitas el worker corriendo en otra terminal (`npm run worker`); es quien manda los correos.
+
+1. Ponle correo a un proveedor, haz una orden y confírmala. Aparece el bloque «Envío por correo».
+2. «Enviar por correo»: te dice a qué correo va. Confirma. En unos segundos el envío pasa de «Enviando» a «Enviado» sin recargar la página.
+3. Abre `/correos`: está el mensaje para tu proveedor, con «Responder a» tu correo y el PDF adjunto para descargar. El estado de la orden sigue siendo «Enviada».
+4. Fallo: cambia el correo del proveedor a uno terminado en `.invalid` (por ejemplo `ventas@proveedor.invalid`) y envía otra vez. Verás «No salió en el intento 1 de 4. Se vuelve a intentar solo»; tras unos 6 minutos queda «No se envió» con su motivo y el botón «Reintentar envío». Corrige el correo y reintenta: sale, y el fallido se queda como historia.
+5. Un borrador y una orden cancelada no muestran el botón. Un proveedor sin correo muestra el motivo en lugar del botón.
+6. Con Consulta se ven los envíos, pero no el botón.
+7. La bitácora dice quién pidió el envío, cuándo salió y cuándo falló.
+
+Los correos todavía no salen a internet: se quedan en `/correos`. Dime si necesitas mandar la orden también a otro correo (copia para ti, un segundo contacto) y si quieres que se ofrezca enviarla al confirmarla.
+
+«Enviada» quiere decir que ya la diste por pedida; mandarla por correo no cambia ese estado, y recibir la mercancía llega en los siguientes pasos. Dime si necesitas poder **reabrir** una orden enviada para corregirla en lugar de cancelarla y hacer otra.
 
 ## 4. Lo que todavía no existe
 
 Para que no lo reportes como falla:
 
 - Avisos por correo de existencias bajas (la lista sí existe).
-- Envío por correo de la orden y recibir la mercancía (la orden ya se confirma, se cancela y se descarga en PDF).
+- Recibir la mercancía de una orden (la orden ya se confirma, se cancela, se descarga en PDF y se envía por correo).
 - Ventas con precios, cobro o ticket (la salida rápida solo descuenta existencias).
 - Pantalla para transferir la titularidad (la lógica está, falta la interfaz).
 - Envío real de correos, cobro y precios de los planes.

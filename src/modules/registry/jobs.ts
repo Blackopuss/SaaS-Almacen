@@ -2,6 +2,7 @@ import {
   exitImportJobHandlers,
   inventoryJobHandlers,
 } from "@/modules/inventory";
+import { purchasingJobHandlers } from "@/modules/purchasing";
 import type { JobHandlers } from "@/platform/jobs";
 
 /**
@@ -12,4 +13,5 @@ import type { JobHandlers } from "@/platform/jobs";
 export const jobHandlers: JobHandlers = {
   ...inventoryJobHandlers,
   ...exitImportJobHandlers,
+  ...purchasingJobHandlers,
 };
