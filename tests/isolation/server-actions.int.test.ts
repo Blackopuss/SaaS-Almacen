@@ -18,6 +18,18 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  receivePurchaseOrderAction: {
+    input: "id de orden, id de ubicación, remisión y clave de confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la orden y la ubicación se buscan solo en esa empresa",
+    coveredBy: "tests/purchasing/receipts.int.test.ts",
+  },
+  checkReceiptAction: {
+    input: "clave de confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo encuentra recepciones de esa persona en esa empresa",
+    coveredBy: "tests/purchasing/receipts.int.test.ts",
+  },
   sendPurchaseOrderAction: {
     input: "id de orden",
     identity:

@@ -27,7 +27,7 @@ import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 export type InventoryActor = { organizationId: string; userId: string };
 
 /** A balance beyond this is a mistake, not stock. */
-const MAX_BALANCE = "999999999999.999";
+export const MAX_BALANCE = "999999999999.999";
 
 /** Random text chosen by whoever shows the form: a UUID fits. */
 export const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,64}$/;
@@ -611,6 +611,7 @@ export const MOVEMENT_TYPE_LABELS = {
   ADJUSTMENT: "Ajuste",
   INITIAL: "Saldo inicial",
   REVERSAL: "Reversa",
+  RECEIPT: "Recepción de compra",
 } as const;
 
 export type MovementType = keyof typeof MOVEMENT_TYPE_LABELS;
@@ -1684,6 +1685,14 @@ export async function reverseMovement(
         return stop(
           "not_allowed",
           "Una reversa no se puede reversar. Si hace falta, registra de nuevo el movimiento correcto.",
+        );
+      }
+      // NEG-22: a receipt is a document of Compras; undoing only its stock
+      // would leave the order saying it arrived.
+      if (original.type === "RECEIPT") {
+        return stop(
+          "not_allowed",
+          "Esta entrada es la recepción de una orden de compra: no se reversa desde Inventario. Lo que llegó de más o mal se devuelve al proveedor desde Compras.",
         );
       }
       const already = await tx.stockMovement.findFirst({

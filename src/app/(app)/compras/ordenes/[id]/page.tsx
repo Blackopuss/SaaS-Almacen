@@ -12,12 +12,18 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatDateTime } from "@/lib";
-import { getOrderDeliveries, getPurchaseOrder } from "@/modules/purchasing";
+import { formatDate, formatDateTime, newId } from "@/lib";
+import { listStockLocations } from "@/modules/inventory";
+import {
+  getOrderDeliveries,
+  getOrderReceipts,
+  getPurchaseOrder,
+} from "@/modules/purchasing";
 import { getModuleAccess } from "@/platform/billing";
 
 import { DeliveryPanel } from "./delivery-panel";
 import { CancelOrder, SubmitOrder } from "./order-buttons";
+import { ReceiveOrder } from "./receive-order";
 import { RemoveLine } from "./remove-line";
 
 export const metadata: Metadata = { title: "Orden de compra" };
@@ -65,9 +71,10 @@ export default async function OrdenPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const [order, delivery] = await Promise.all([
+  const [order, delivery, receipts] = await Promise.all([
     getPurchaseOrder(actor, id),
     getOrderDeliveries(actor, id),
+    access.can("purchasing.receipt.read") ? getOrderReceipts(actor, id) : null,
   ]);
   if (!order || !delivery) notFound();
   const canEdit =
@@ -79,6 +86,12 @@ export default async function OrdenPage({
     order.canSubmit && active && access.allows("purchasing.order.submit");
   const canCancel =
     order.canCancel && active && access.allows("purchasing.order.cancel");
+  const canReceive =
+    !!receipts?.canReceive &&
+    active &&
+    access.allows("purchasing.receipt.create") &&
+    access.can("inventory.location.read");
+  const locations = canReceive ? await listStockLocations(actor) : [];
   // The PDF carries prices: for who may export orders (not Consulta).
   const canExport = access.can("purchasing.order.export");
   const zone = access.organization.timeZone;
@@ -101,8 +114,30 @@ export default async function OrdenPage({
         title={`Orden ${order.numberText}`}
         description={order.supplierName}
         actions={
-          canEdit || canExport ? (
+          canEdit || canExport || canReceive ? (
             <>
+              {canReceive && receipts && (
+                <ReceiveOrder
+                  orderId={order.id}
+                  numberText={order.numberText}
+                  idempotencyKey={newId()}
+                  pending={receipts.lines
+                    .filter((line) => line.pendingText)
+                    .map((line) => ({
+                      id: line.orderLineId,
+                      text: `${line.productName} · ${line.pendingText}`,
+                    }))}
+                  locations={locations.map((location) => ({
+                    id: location.id,
+                    label: location.path,
+                  }))}
+                  defaultLocationId={
+                    locations.find((location) => location.isDefault)?.id ??
+                    locations[0]?.id ??
+                    ""
+                  }
+                />
+              )}
               {canExport && (
                 <Button asChild variant="outline">
                   <a href={`/api/compras/ordenes/${order.id}/pdf`} download>
@@ -294,6 +329,63 @@ export default async function OrdenPage({
           </p>
         )}
       </section>
+      {receipts && receipts.receipts.length > 0 && (
+        <section
+          aria-labelledby="recepciones-orden"
+          className="max-w-3xl rounded-xl border bg-card"
+        >
+          <h2
+            id="recepciones-orden"
+            className="border-b px-4 py-3 font-medium sm:px-5"
+          >
+            Recepciones
+          </h2>
+          {receipts.lines.some((line) => line.pendingText) && (
+            <ul className="divide-y border-b">
+              {receipts.lines.map((line) => (
+                <li
+                  key={line.orderLineId}
+                  className="flex flex-wrap justify-between gap-x-4 gap-y-1 p-4 text-sm sm:px-5"
+                >
+                  <span className="[overflow-wrap:anywhere]">
+                    {line.productName}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {line.receivedText
+                      ? `Llegó ${line.receivedText} de ${line.orderedText}`
+                      : `Pediste ${line.orderedText}`}
+                    {line.pendingText ? ` · faltan ${line.pendingText}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ol className="divide-y">
+            {receipts.receipts.map((receipt) => (
+              <li key={receipt.id} className="space-y-2 p-4 sm:px-5">
+                <p className="text-sm text-muted-foreground">
+                  {formatDateTime(receipt.createdAt, zone)}
+                  {receipt.authorName && ` · ${receipt.authorName}`}
+                  {receipt.reference && ` · Remisión ${receipt.reference}`}
+                </p>
+                <ul className="space-y-1">
+                  {receipt.lines.map((line, index) => (
+                    <li
+                      key={index}
+                      className="[overflow-wrap:anywhere] tabular-nums"
+                    >
+                      {line.quantityText} de {line.productName}{" "}
+                      <span className="text-muted-foreground">
+                        ({line.sku}) · {line.locationPath}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {showDelivery && (
         <DeliveryPanel
           orderId={order.id}
@@ -340,7 +432,7 @@ export default async function OrdenPage({
             ? "Es un borrador: agrega al menos un producto para poder confirmarla."
             : "Es un borrador: puedes cambiarlo las veces que haga falta. Al confirmarla queda como enviada y sus productos ya no cambian."
           : order.status === "SENT"
-            ? "Está confirmada como enviada: sus productos ya no cambian. Mandarla por correo no cambia su estado. Recibirla llega en los siguientes pasos."
+            ? "Está confirmada como enviada: sus productos ya no cambian. Mandarla por correo no cambia su estado. Cuando llegue la mercancía, usa «Recibir mercancía»: entra al inventario y la orden queda recibida."
             : order.status === "CANCELLED"
               ? "Está cancelada: se conserva como historia y ya no cambia."
               : order.status === "PARTIAL"

@@ -465,6 +465,7 @@ export default async function MovimientosPage({
                 </ul>
                 {canReverse &&
                   movement.type !== "REVERSAL" &&
+                  movement.type !== "RECEIPT" &&
                   !movement.reversedByMovementId && (
                     <ReverseMovement
                       movementId={movement.id}

@@ -56,6 +56,19 @@ export {
 export type { PurchaseOrderStatus } from "./order-states";
 export { buildOrderPdf, type OrderPdf } from "./order-pdf";
 export {
+  findReceiptConfirmation,
+  getOrderReceipts,
+  receivePurchaseOrder,
+} from "./receipts";
+export type {
+  OrderReceipts,
+  PendingLine,
+  ReceiptSummary,
+  ReceiveField,
+  ReceiveInput,
+  ReceiveResult,
+} from "./receipts";
+export {
   ORDER_DELIVERY_JOB_TYPE,
   ORDER_DELIVERY_MAX_ATTEMPTS,
   ORDER_DELIVERY_STATUS_LABELS,

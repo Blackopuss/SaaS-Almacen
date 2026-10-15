@@ -38,6 +38,12 @@ export type {
   TransferInput,
   TransferResult,
 } from "./movements";
+export { postReceiptEntry } from "./receipt-entry";
+export type {
+  ReceiptEntryInput,
+  ReceiptEntryLine,
+  ReceiptEntryResult,
+} from "./receipt-entry";
 export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";

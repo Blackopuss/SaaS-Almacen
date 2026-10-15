@@ -299,9 +299,10 @@ beforeAll(async () => {
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const orderLineId = newId();
     await db.purchaseOrderLine.create({
       data: {
-        id: newId(),
+        id: orderLineId,
         organizationId,
         orderId: purchaseOrderId,
         lineNumber: 1,
@@ -330,6 +331,42 @@ beforeAll(async () => {
         recipient: "ventas@ferretera.example",
         jobId: newId(),
         requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    // A receipt (CMP-07): its own movement, the receipt and its line.
+    const receiptMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: receiptMovementId,
+        organizationId,
+        type: "RECEIPT",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const receiptId = newId();
+    await db.purchaseReceipt.create({
+      data: {
+        id: receiptId,
+        organizationId,
+        orderId: purchaseOrderId,
+        movementId: receiptMovementId,
+        idempotencyKey: newId(),
+        receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.purchaseReceiptLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receiptId,
+        lineNumber: 1,
+        orderLineId,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "5",
+        factor: "1",
+        baseQuantity: "5",
+        unitCode: "piece",
       },
     });
     const exitImportId = newId();

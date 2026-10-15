@@ -8,12 +8,15 @@ import {
   addOrderLine,
   cancelPurchaseOrder,
   createPurchaseOrder,
+  findReceiptConfirmation,
+  receivePurchaseOrder,
   removeOrderLine,
   requestOrderDelivery,
   submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
   type OrderField,
+  type ReceiveField,
 } from "@/modules/purchasing";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
@@ -334,4 +337,77 @@ export async function sendPurchaseOrderAction(
     }
     throw error;
   }
+}
+
+export type ReceiveFormState = {
+  fieldErrors: Partial<Record<ReceiveField, string>>;
+  formError?: string;
+  values: { locationId: string; reference: string };
+  /** Changes with every answer, so selects show what was chosen. */
+  answers: number;
+  /** The receipt went through: what to tell the person. */
+  done?: string;
+};
+
+/**
+ * Receives what is pending of an order into one location (CMP-07). The
+ * order and the location are looked for only inside the company of the
+ * session; the key makes a repeated confirmation receive once.
+ */
+export async function receivePurchaseOrderAction(
+  orderId: string,
+  prev: ReceiveFormState,
+  formData: FormData,
+): Promise<ReceiveFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const values = {
+    locationId: String(formData.get("locationId") ?? "").slice(0, 36),
+    reference: String(formData.get("reference") ?? "").slice(0, 200),
+  };
+  const answers = prev.answers + 1;
+  let result;
+  try {
+    result = await receivePurchaseOrder(
+      { organizationId: organization.id, userId: user.id },
+      String(orderId),
+      {
+        ...values,
+        idempotencyKey: String(formData.get("idempotencyKey") ?? "").slice(
+          0,
+          64,
+        ),
+      },
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { fieldErrors: {}, formError: error.message, values, answers };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError,
+      values,
+      answers,
+    };
+  }
+  revalidatePath("/compras");
+  revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+  return { fieldErrors: {}, values, answers, done: result.summary };
+}
+
+/**
+ * After a lost answer (INV-22): whether the receipt with that key was
+ * registered for this person in the company of the session.
+ */
+export async function checkReceiptAction(
+  idempotencyKey: string,
+): Promise<{ received: boolean }> {
+  const { user, organization } = await requireOrganizationContext();
+  const found = await findReceiptConfirmation(
+    { organizationId: organization.id, userId: user.id },
+    String(idempotencyKey ?? "").slice(0, 64),
+  );
+  return { received: found !== null };
 }
