@@ -125,7 +125,13 @@ export default async function OrdenPage({
                     .filter((line) => line.pendingText)
                     .map((line) => ({
                       id: line.orderLineId,
-                      text: `${line.productName} · ${line.pendingText}`,
+                      productName: line.productName,
+                      sku: line.sku,
+                      pendingText: line.receivedText
+                        ? `faltan ${line.pendingText} de ${line.orderedText}`
+                        : `pediste ${line.orderedText}`,
+                      pendingQuantity: line.pendingQuantity,
+                      unitText: line.unitText,
                     }))}
                   locations={locations.map((location) => ({
                     id: location.id,
@@ -352,7 +358,7 @@ export default async function OrdenPage({
                   </span>
                   <span className="text-muted-foreground tabular-nums">
                     {line.receivedText
-                      ? `Llegó ${line.receivedText} de ${line.orderedText}`
+                      ? `Recibido: ${line.receivedText} de ${line.orderedText}`
                       : `Pediste ${line.orderedText}`}
                     {line.pendingText ? ` · faltan ${line.pendingText}` : ""}
                   </span>
@@ -436,7 +442,7 @@ export default async function OrdenPage({
             : order.status === "CANCELLED"
               ? "Está cancelada: se conserva como historia y ya no cambia."
               : order.status === "PARTIAL"
-                ? "Ya se recibió una parte."
+                ? "Ya se recibió una parte: lo que falta aparece en Recepciones y se recibe cuando llegue."
                 : "Ya se recibió completa."}
       </p>
     </PageContainer>

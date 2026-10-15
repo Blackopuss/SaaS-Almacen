@@ -342,7 +342,14 @@ export async function sendPurchaseOrderAction(
 export type ReceiveFormState = {
   fieldErrors: Partial<Record<ReceiveField, string>>;
   formError?: string;
-  values: { locationId: string; reference: string };
+  /** Problem of each line, by the id of the order line. */
+  lineErrors?: Record<string, string>;
+  values: {
+    locationId: string;
+    reference: string;
+    /** What was typed for each line, by the id of the order line. */
+    quantities: Record<string, string>;
+  };
   /** Changes with every answer, so selects show what was chosen. */
   answers: number;
   /** The receipt went through: what to tell the person. */
@@ -360,9 +367,17 @@ export async function receivePurchaseOrderAction(
   formData: FormData,
 ): Promise<ReceiveFormState> {
   const { user, organization } = await requireOrganizationContext();
+  // One field per line of the order: `q:<id of the order line>`.
+  const quantities: Record<string, string> = {};
+  for (const [name, value] of formData.entries()) {
+    if (!name.startsWith("q:") || typeof value !== "string") continue;
+    if (Object.keys(quantities).length >= 200) break;
+    quantities[name.slice(2, 38)] = value.slice(0, 40);
+  }
   const values = {
     locationId: String(formData.get("locationId") ?? "").slice(0, 36),
     reference: String(formData.get("reference") ?? "").slice(0, 200),
+    quantities,
   };
   const answers = prev.answers + 1;
   let result;
@@ -371,7 +386,12 @@ export async function receivePurchaseOrderAction(
       { organizationId: organization.id, userId: user.id },
       String(orderId),
       {
-        ...values,
+        locationId: values.locationId,
+        reference: values.reference,
+        lines: Object.entries(quantities).map(([orderLineId, quantity]) => ({
+          orderLineId,
+          quantity,
+        })),
         idempotencyKey: String(formData.get("idempotencyKey") ?? "").slice(
           0,
           64,
@@ -388,6 +408,7 @@ export async function receivePurchaseOrderAction(
     return {
       fieldErrors: result.fieldErrors,
       formError: result.formError,
+      lineErrors: result.lineErrors,
       values,
       answers,
     };

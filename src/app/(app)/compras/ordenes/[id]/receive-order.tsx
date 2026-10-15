@@ -26,10 +26,25 @@ import {
   type ReceiveFormState,
 } from "../actions";
 
+/** A line still pending, as the server describes it. */
+export type PendingReceiptLine = {
+  id: string;
+  productName: string;
+  sku: string;
+  /** «Faltan 2 cajas de 3». */
+  pendingText: string;
+  /** Plain number to start the field with: everything pending. */
+  pendingQuantity: string;
+  /** «cajas», «piezas». */
+  unitText: string;
+};
+
 /**
- * Receives everything pending of an order (CMP-07): says what enters,
- * asks where it goes and the supplier's delivery note, and confirms once
- * even if the button is pressed twice or the answer is lost.
+ * Receives what arrived of an order (CMP-07/08): each pending product
+ * starts with all that is missing, and the person writes what really
+ * came; what did not come stays pending. Asks where it goes and the
+ * supplier's delivery note, and confirms once even if the button is
+ * pressed twice or the answer is lost.
  */
 export function ReceiveOrder({
   orderId,
@@ -43,8 +58,7 @@ export function ReceiveOrder({
   numberText: string;
   /** Created by the server when the page is drawn. */
   idempotencyKey: string;
-  /** «Tornillo · 3 cajas»: what will enter, as it was ordered. */
-  pending: { id: string; text: string }[];
+  pending: PendingReceiptLine[];
   locations: { id: string; label: string }[];
   defaultLocationId: string;
 }) {
@@ -83,7 +97,13 @@ export function ReceiveOrder({
     },
     {
       fieldErrors: {},
-      values: { locationId: defaultLocationId, reference: "" },
+      values: {
+        locationId: defaultLocationId,
+        reference: "",
+        quantities: Object.fromEntries(
+          pending.map((line) => [line.id, line.pendingQuantity]),
+        ),
+      },
       answers: 0,
     },
   );
@@ -102,17 +122,57 @@ export function ReceiveOrder({
           <DialogHeader>
             <DialogTitle>Recibir la orden {numberText}</DialogTitle>
             <DialogDescription>
-              Entra al inventario todo lo que falta de esta orden y queda
-              recibida. Revisa que llegó completo antes de confirmar.
+              Escribe lo que llegó de cada producto; ya viene lo que falta. Lo
+              que no llegó queda pendiente para otra recepción (deja 0).
             </DialogDescription>
           </DialogHeader>
           <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-          <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-3 text-sm">
-            {pending.map((line) => (
-              <li key={line.id} className="[overflow-wrap:anywhere]">
-                {line.text}
-              </li>
-            ))}
+          <ul className="max-h-[40vh] divide-y overflow-y-auto rounded-lg border">
+            {pending.map((line) => {
+              const fieldId = `receive-q-${line.id}`;
+              const error = state.lineErrors?.[line.id];
+              return (
+                <li
+                  key={line.id}
+                  className="grid gap-2 p-3 sm:grid-cols-[1fr_9rem] sm:items-center"
+                >
+                  <label htmlFor={fieldId} className="min-w-0 text-sm">
+                    <span className="block font-medium [overflow-wrap:anywhere]">
+                      {line.productName}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {line.sku} · {line.pendingText}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      key={`${line.id}-${answers}`}
+                      id={fieldId}
+                      name={`q:${line.id}`}
+                      inputMode="decimal"
+                      autoComplete="off"
+                      defaultValue={
+                        state.values.quantities[line.id] ?? line.pendingQuantity
+                      }
+                      aria-invalid={error ? true : undefined}
+                      aria-describedby={error ? `${fieldId}-error` : undefined}
+                      className="tabular-nums"
+                    />
+                    <span className="shrink-0 text-sm text-muted-foreground">
+                      {line.unitText}
+                    </span>
+                  </div>
+                  {error && (
+                    <p
+                      id={`${fieldId}-error`}
+                      className="text-sm text-destructive sm:col-span-2"
+                    >
+                      {error}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {state.formError && (
             <div

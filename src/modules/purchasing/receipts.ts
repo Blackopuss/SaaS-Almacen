@@ -6,7 +6,12 @@ import { dec, formatDecimal, newId } from "@/lib";
 import { formatStock, postReceiptEntry } from "@/modules/inventory";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
-import { pluralizeName, type Capture } from "@/platform/catalog";
+import {
+  getUnit,
+  parseQuantity,
+  pluralizeName,
+  type Capture,
+} from "@/platform/catalog";
 import { formatLocationPath } from "@/platform/locations";
 import {
   LOCKING_TRANSACTION,
@@ -70,6 +75,19 @@ const receiveSchema = z.object({
   idempotencyKey: z
     .string()
     .regex(KEY, "Recarga la página para registrar la recepción."),
+  /**
+   * What arrived of each line, in the terms it was ordered in (CMP-08).
+   * Absent = everything pending; a line left out or empty did not arrive.
+   */
+  lines: z
+    .array(
+      z.object({
+        orderLineId: z.string().trim().max(36),
+        quantity: z.string().trim().max(40),
+      }),
+    )
+    .max(PURCHASE_ORDER_MAX_LINES)
+    .optional(),
 });
 
 export type ReceiveInput = z.input<typeof receiveSchema>;
@@ -90,6 +108,8 @@ export type ReceiveResult =
       reason: "invalid" | "not_found" | "not_allowed" | "invalid_transition";
       fieldErrors: Partial<Record<ReceiveField, string>>;
       formError?: string;
+      /** Problem of each line, by the id of the order line. */
+      lineErrors?: Record<string, string>;
     };
 
 type Failure = Extract<ReceiveResult, { ok: false }>;
@@ -111,6 +131,23 @@ const refuse = (
     reason,
     fieldErrors: field ? { [field]: message } : {},
     ...(field ? {} : { formError: message }),
+  });
+};
+
+const refuseLines = (
+  lineErrors: Record<string, string>,
+  formError?: string,
+): never => {
+  throw new Rejected({
+    ok: false,
+    reason: "invalid",
+    fieldErrors: {},
+    formError:
+      formError ??
+      (Object.keys(lineErrors).length === 1
+        ? "Revisa la cantidad marcada."
+        : "Revisa las cantidades marcadas."),
+    lineErrors,
   });
 };
 
@@ -239,6 +276,9 @@ export async function receivePurchaseOrder(
               productId: true,
               capturedQuantity: true,
               presentationId: true,
+              unitCode: true,
+              product: { select: { quantityStep: true } },
+              presentation: { select: { name: true } },
             },
           },
         },
@@ -258,21 +298,26 @@ export async function receivePurchaseOrder(
         tx,
         current.lines.map((line) => line.id),
       );
-      const pending = current.lines
-        .map((line) => ({
-          line,
-          quantity: dec(line.capturedQuantity.toString()).minus(
+      const left = new Map(
+        current.lines.map((line) => [
+          line.id,
+          dec(line.capturedQuantity.toString()).minus(
             received.get(line.id) ?? 0,
           ),
-        }))
-        .filter((entry) => entry.quantity.greaterThan(0));
-      if (pending.length === 0) {
+        ]),
+      );
+      if (![...left.values()].some((quantity) => quantity.greaterThan(0))) {
         return refuse(
           "invalid",
           null,
           "Ya se recibió todo lo que pide esta orden.",
         );
       }
+      const pending = data.lines
+        ? chosenLines(current.lines, left, data.lines)
+        : current.lines
+            .map((line) => ({ line, quantity: left.get(line.id)! }))
+            .filter((entry) => entry.quantity.greaterThan(0));
 
       const numberText = formatOrderNumber(current.number);
       const entry = await postReceiptEntry(
@@ -301,11 +346,13 @@ export async function receivePurchaseOrder(
         },
       );
       if (!entry.ok) {
-        return refuse(
-          "invalid",
-          entry.line === null ? "locationId" : null,
-          entry.error,
-        );
+        if (entry.line !== null && pending[entry.line]) {
+          return refuseLines(
+            { [pending[entry.line]!.line.id]: entry.error },
+            entry.error,
+          );
+        }
+        return refuse("invalid", "locationId", entry.error);
       }
 
       const receiptId = newId();
@@ -338,8 +385,15 @@ export async function receivePurchaseOrder(
         })),
       });
 
-      // Everything pending arrived: the order is received.
-      const status: PurchaseOrderStatus = "RECEIVED";
+      // Received when nothing is left of any line; in part otherwise.
+      for (const { line, quantity } of pending) {
+        left.set(line.id, left.get(line.id)!.minus(quantity));
+      }
+      const missing = [...left.values()].filter((quantity) =>
+        quantity.greaterThan(0),
+      ).length;
+      const status: PurchaseOrderStatus =
+        missing === 0 ? "RECEIVED" : "PARTIAL";
       await advanceOrderOnReceipt(tx, current.id, status);
       await recordAuditEvent(tx, {
         organizationId,
@@ -360,7 +414,11 @@ export async function receivePurchaseOrder(
         ok: true as const,
         receiptId,
         status,
-        summary: `Recibiste ${count === 1 ? "1 producto" : `${count} productos`} de ${numberText} en ${entry.locationName}. La orden quedó recibida.`,
+        summary: `Recibiste ${count === 1 ? "1 producto" : `${count} productos`} de ${numberText} en ${entry.locationName}. ${
+          missing === 0
+            ? "La orden quedó recibida."
+            : `La orden quedó recibida en parte: ${missing === 1 ? "falta 1 producto" : `faltan ${missing} productos`}.`
+        }`,
       };
     }, LOCKING_TRANSACTION);
   } catch (error) {
@@ -382,6 +440,81 @@ export async function receivePurchaseOrder(
     }
     throw error;
   }
+}
+
+type OrderLineRow = {
+  id: string;
+  productId: string;
+  presentationId: string | null;
+  unitCode: string;
+  product: { quantityStep: { toString(): string } };
+  presentation: { name: string } | null;
+};
+
+/**
+ * The lines the person said arrived, with their quantities checked: each
+ * one a line of this order, once, a valid quantity for how it was ordered
+ * (whole boxes; the product's step) and never more than what is pending
+ * (NEG-24). Empty or zero = it did not arrive this time.
+ */
+function chosenLines(
+  lines: OrderLineRow[],
+  left: Map<string, Decimal>,
+  requested: { orderLineId: string; quantity: string }[],
+): { line: OrderLineRow; quantity: Decimal }[] {
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  const errors: Record<string, string> = {};
+  const chosen: { line: OrderLineRow; quantity: Decimal }[] = [];
+  const seen = new Set<string>();
+  for (const item of requested) {
+    const line = byId.get(item.orderLineId);
+    if (!line || seen.has(line.id)) {
+      return refuse(
+        "invalid",
+        null,
+        "Lo que mandaste no corresponde a esta orden. Recarga la página.",
+      );
+    }
+    seen.add(line.id);
+    const text = item.quantity.trim();
+    if (text === "" || /^0+([.,]0*)?$/.test(text)) continue;
+    const parsed = parseQuantity(
+      line.presentationId
+        ? { unitCode: "piece", quantityStep: "1" }
+        : {
+            unitCode: line.unitCode,
+            quantityStep: line.product.quantityStep.toString(),
+          },
+      text,
+    );
+    if (!parsed.ok) {
+      errors[line.id] =
+        line.presentationId && /completas/.test(parsed.error)
+          ? `Escribe ${line.presentation ? pluralizeName(line.presentation.name, dec(2)) : "presentaciones"} completas.`
+          : parsed.error;
+      continue;
+    }
+    const pending = left.get(line.id)!;
+    if (pending.lessThanOrEqualTo(0)) {
+      errors[line.id] = "Este producto ya llegó completo.";
+      continue;
+    }
+    if (parsed.quantity.greaterThan(pending)) {
+      errors[line.id] =
+        `Solo faltan ${inTermsOf(pending, line.presentation, line.unitCode)}. Lo que llegó de más no se recibe en esta orden.`;
+      continue;
+    }
+    chosen.push({ line, quantity: parsed.quantity });
+  }
+  if (Object.keys(errors).length > 0) return refuseLines(errors);
+  if (chosen.length === 0) {
+    return refuse(
+      "invalid",
+      null,
+      "Escribe cuánto llegó de al menos un producto.",
+    );
+  }
+  return chosen;
 }
 
 /**
@@ -419,6 +552,10 @@ export type PendingLine = {
   receivedText: string | null;
   /** Null when it all arrived. */
   pendingText: string | null;
+  /** What is pending as a plain number for a form ("2"), or "0". */
+  pendingQuantity: string;
+  /** «cajas», «piezas»: what the quantity counts. */
+  unitText: string;
 };
 
 export type ReceiptSummary = {
@@ -538,6 +675,10 @@ export async function getOrderReceipts(
       pendingText: left.greaterThan(0)
         ? inTermsOf(left, line.presentation, line.unitCode)
         : null,
+      pendingQuantity: left.greaterThan(0) ? left.toFixed() : "0",
+      unitText: line.presentation
+        ? pluralizeName(line.presentation.name, dec(2)).toLowerCase()
+        : getUnit(line.unitCode).plural,
     };
   });
 

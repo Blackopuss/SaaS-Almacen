@@ -479,3 +479,156 @@ describe("a receipt is corrected from Compras, not from Inventario (NEG-22)", ()
     ).rejects.toThrow();
   });
 });
+
+describe("partial receipts (CMP-08)", () => {
+  it("60 of 100 leaves the order received in part with 40 pending", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "100" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+
+    const first = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [{ orderLineId: line!.id, quantity: "60" }],
+    });
+    expect(first).toMatchObject({ ok: true, status: "PARTIAL" });
+    expect(first.ok && first.summary).toMatch(/recibida en parte/);
+    expect(await statusOf(orderId)).toBe("PARTIAL");
+    expect(await stockIn(actor, productId)).toBe("60");
+    const view = await getOrderReceipts(actor, orderId);
+    expect(view).toMatchObject({
+      canReceive: true,
+      lines: [
+        {
+          receivedText: "60 piezas",
+          pendingText: "40 piezas",
+          pendingQuantity: "40",
+        },
+      ],
+    });
+
+    // A received-in-part order is not cancelled.
+    expect(
+      await cancelPurchaseOrder(actor, orderId, { reason: "Ya no llega" }),
+    ).toMatchObject({ ok: false, reason: "invalid_transition" });
+
+    // The rest arrives: without lines, everything pending.
+    const rest = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+    });
+    expect(rest).toMatchObject({ ok: true, status: "RECEIVED" });
+    expect(await stockIn(actor, productId)).toBe("100");
+    expect((await getOrderReceipts(actor, orderId))?.receipts).toHaveLength(2);
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("lines that did not arrive stay pending; boxes are counted as ordered", async () => {
+    const actor = await company();
+    const screws = await product(actor);
+    const nails = await product(actor);
+    const caja = await box(actor, nails, "100");
+    const orderId = await sentOrder(actor, [
+      { productId: screws, quantity: "25" },
+      { productId: nails, capture: `p:${caja}`, quantity: "3" },
+    ]);
+    const lines = await db.purchaseOrderLine.findMany({
+      where: { orderId },
+      orderBy: { lineNumber: "asc" },
+    });
+
+    const result = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [
+        { orderLineId: lines[0]!.id, quantity: "0" },
+        { orderLineId: lines[1]!.id, quantity: "1" },
+      ],
+    });
+    expect(result).toMatchObject({ ok: true, status: "PARTIAL" });
+    expect(await stockIn(actor, screws)).toBe("0");
+    expect(await stockIn(actor, nails)).toBe("100");
+    const view = await getOrderReceipts(actor, orderId);
+    expect(view?.lines.map((line) => line.pendingText)).toEqual([
+      "25 piezas",
+      "2 cajas",
+    ]);
+    expect(view?.lines[1]?.unitText).toBe("cajas");
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("never receives more than what is pending, nor broken boxes", async () => {
+    const actor = await company();
+    const screws = await product(actor);
+    const nails = await product(actor);
+    const caja = await box(actor, nails, "100");
+    const orderId = await sentOrder(actor, [
+      { productId: screws, quantity: "10" },
+      { productId: nails, capture: `p:${caja}`, quantity: "2" },
+    ]);
+    const lines = await db.purchaseOrderLine.findMany({
+      where: { orderId },
+      orderBy: { lineNumber: "asc" },
+    });
+
+    const refused = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [
+        { orderLineId: lines[0]!.id, quantity: "11" },
+        { orderLineId: lines[1]!.id, quantity: "1.5" },
+      ],
+    });
+    expect(refused).toMatchObject({ ok: false, reason: "invalid" });
+    const errors = refused.ok ? {} : (refused.lineErrors ?? {});
+    expect(errors[lines[0]!.id]).toMatch(/Solo faltan 10 piezas/);
+    expect(errors[lines[1]!.id]).toMatch(/cajas completas/);
+    expect(await statusOf(orderId)).toBe("SENT");
+    expect(await db.purchaseReceipt.count({ where: { orderId } })).toBe(0);
+
+    await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [{ orderLineId: lines[0]!.id, quantity: "10" }],
+    });
+    const again = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [{ orderLineId: lines[0]!.id, quantity: "1" }],
+    });
+    expect(again.ok ? {} : again.lineErrors).toMatchObject({
+      [lines[0]!.id]: /ya llegó completo/,
+    });
+    expect(await stockIn(actor, screws)).toBe("10");
+  });
+
+  it("nothing typed, or lines of another order, are refused", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "5" }]);
+    const other = await sentOrder(actor, [{ productId, quantity: "5" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+    const [foreign] = await db.purchaseOrderLine.findMany({
+      where: { orderId: other },
+    });
+
+    expect(
+      await receivePurchaseOrder(actor, orderId, {
+        idempotencyKey: key(),
+        lines: [{ orderLineId: line!.id, quantity: "" }],
+      }),
+    ).toMatchObject({ ok: false, formError: /al menos un producto/ });
+    expect(
+      await receivePurchaseOrder(actor, orderId, {
+        idempotencyKey: key(),
+        lines: [{ orderLineId: foreign!.id, quantity: "5" }],
+      }),
+    ).toMatchObject({ ok: false, formError: /no corresponde/ });
+    expect(
+      await receivePurchaseOrder(actor, orderId, {
+        idempotencyKey: key(),
+        lines: [
+          { orderLineId: line!.id, quantity: "2" },
+          { orderLineId: line!.id, quantity: "2" },
+        ],
+      }),
+    ).toMatchObject({ ok: false, formError: /no corresponde/ });
+    expect(await statusOf(orderId)).toBe("SENT");
+    expect(await statusOf(other)).toBe("SENT");
+  });
+});

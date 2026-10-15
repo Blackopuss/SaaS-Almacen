@@ -15,6 +15,7 @@ Recibir una orden es lo que une Compras con Inventario: la mercancía entra al a
 - **La base lo repite:** una recepción solo se inserta si su orden está enviada o recibida en parte y su movimiento es `RECEIPT`; cada línea debe ser de una línea de esa misma orden, del mismo producto y presentación, en la unidad del producto; cantidades positivas y base = recibida × factor exactos (`CHECK`).
 - **Repetir no duplica.** El formulario lleva una clave creada al pintar la pantalla; un reintento con la misma clave responde con la recepción ya hecha, y si la respuesta se perdió la pantalla pregunta por la clave antes de dejar reintentar (INV-22). Dos recepciones distintas a la vez quedan en fila por el candado de la orden: la segunda ve la orden ya recibida y se rechaza.
 - **Corrección desde Compras.** La reversa de Inventario rechaza un movimiento `RECEIPT` y la pantalla de movimientos no ofrece «Reversar» para él: lo que llegó de más o mal se devolverá al proveedor (CMP-12), que deja documento y salida juntos.
+- **Recepción parcial (CMP-08):** la persona dice cuánto llegó de cada línea (vacío o 0 = no llegó). Cada cantidad se valida con la regla de la línea (presentaciones completas, paso del producto) y contra lo pendiente, leído con la orden bloqueada: nunca más de lo que falta. La orden queda «Recibida en parte» mientras falte algo y «Recibida» cuando no falta nada.
 - **CMP-07 recibe todo lo pendiente** en una ubicación elegida (por omisión, General). La recepción parcial (CMP-08), la ubicación y presentación por línea (CMP-09) y las pruebas de concurrencia de cantidades (CMP-10) se apoyan en las mismas tablas.
 
 ## Consecuencias
@@ -25,5 +26,5 @@ Recibir una orden es lo que une Compras con Inventario: la mercancía entra al a
 
 ## A confirmar por el fundador
 
-- Si «Recibir mercancía» debe pedir confirmar producto por producto (lo hará la recepción parcial, CMP-08) o basta con «todo lo que falta» para el caso común.
+- Qué hacer cuando el proveedor manda más de lo pedido: hoy no se recibe por la orden (se registra aparte como entrada).
 - Si la remisión del proveedor debe ser obligatoria.
