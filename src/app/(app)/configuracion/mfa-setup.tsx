@@ -28,9 +28,12 @@ export type MfaSetupHeading = (props: {
 export function MfaSetup({
   onDone,
   Heading,
+  alreadyEnabled = false,
 }: {
   onDone: () => void;
   Heading: MfaSetupHeading;
+  /** MFA was already on when the screen loaded (nothing left to set up). */
+  alreadyEnabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<MfaSetupState, FormData>(
     mfaSetupAction,
@@ -70,6 +73,20 @@ export function MfaSetup({
           onClick={onDone}
         >
           Listo
+        </Button>
+      </>
+    );
+  }
+
+  if (alreadyEnabled) {
+    return (
+      <>
+        <Heading
+          title="La verificación en dos pasos ya está activada"
+          description="Puedes generar códigos de recuperación nuevos en Configuración, en la sección Seguridad."
+        />
+        <Button type="button" className="w-full" onClick={onDone}>
+          Continuar
         </Button>
       </>
     );

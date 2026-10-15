@@ -106,6 +106,11 @@ export default async function BitacoraPage({
                   {line && (
                     <p className="text-sm [overflow-wrap:anywhere]">{line}</p>
                   )}
+                  {entry.facts.length > 0 && (
+                    <p className="text-sm [overflow-wrap:anywhere]">
+                      {entry.facts.join(" · ")}
+                    </p>
+                  )}
                   {entry.reason && (
                     <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
                       Motivo: {entry.reason}

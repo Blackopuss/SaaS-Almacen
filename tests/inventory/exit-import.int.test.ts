@@ -229,7 +229,7 @@ describe("reading the file", () => {
     status: "ACTIVE",
     unitCode: "piece",
     quantityStep: "1",
-    presentations: [{ id: "caja", name: "Caja" }],
+    presentations: [{ id: "caja", name: "Caja", factor: "12" }],
     ...extra,
   });
   const PRODUCTS = [

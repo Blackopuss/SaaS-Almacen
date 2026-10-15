@@ -173,13 +173,13 @@ export default async function InventarioPage({
         <ReactivateProduct productId={product.id} name={product.name} />
       )}
       {!showArchived && canEnter && (
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost">
           <Link
             href={`/movimientos/entrada?producto=${product.id}`}
             aria-label={`Registrar entrada de ${product.name}`}
-            title="Registrar entrada"
           >
             <ArrowDownToLine aria-hidden="true" />
+            <span className="hidden sm:inline">Entrada</span>
           </Link>
         </Button>
       )}

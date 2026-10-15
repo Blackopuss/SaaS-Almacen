@@ -15,7 +15,7 @@ export default function NotFound() {
           Puede que el enlace esté incompleto o que la página ya no exista.
         </p>
         <Button asChild className="mt-6">
-          <Link href="/inventario">Ir a Inventario</Link>
+          <Link href="/inicio">Ir a Inicio</Link>
         </Button>
       </div>
     </PageContainer>

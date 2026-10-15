@@ -79,6 +79,13 @@ describe("parseQuantity", () => {
     },
   );
 
+  it("does not suggest fractions for whole-unit products", () => {
+    expect(parseQuantity(pieces, "abc")).toEqual({
+      ok: false,
+      error: "Escribe una cantidad, por ejemplo 3.",
+    });
+  });
+
   it("rejects quantities beyond the maximum", () => {
     expect(quantity(pieces, "999999999")).toBe("999999999");
     expect(parseQuantity(pieces, "1000000000")).toEqual({

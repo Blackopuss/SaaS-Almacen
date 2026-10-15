@@ -85,8 +85,85 @@ export type AuditTrailEntry = {
   rolesFrom: string[];
   rolesTo: string[];
   reason: string | null;
+  /**
+   * What the event was about, from its metadata: «Clave: TOR-001»,
+   * «Archivo: catalogo.xlsx», «Precio: 10 → 12». Only known keys, in a
+   * fixed order; internal ids and codes are never shown.
+   */
+  facts: string[];
   createdAt: Date;
 };
+
+/** Metadata keys shown in the audit screen, with their label, in order. */
+const FACT_LABELS: readonly (readonly [string, string])[] = [
+  ["orden", "Orden"],
+  ["proveedor", "Proveedor"],
+  ["correo", "Correo"],
+  ["sku", "Clave"],
+  ["producto", "Producto"],
+  ["name", "Nombre"],
+  ["nombre", "Nombre"],
+  ["presentation", "Presentación"],
+  ["content", "Contenido"],
+  ["path", "Ruta"],
+  ["before", "Antes"],
+  ["after", "Ahora"],
+  ["module", "Módulo"],
+  ["modules", "Módulos"],
+  ["productLimit", "Cupo de productos"],
+  ["users", "Personas"],
+  ["ubicacion", "Ubicación"],
+  ["antes", "Había"],
+  ["contado", "Contado"],
+  ["diferencia", "Diferencia"],
+  ["productosContados", "Productos contados"],
+  ["productosAjustados", "Productos ajustados"],
+  ["contenido", "Contenido"],
+  ["formato", "Formato"],
+  ["desde", "Desde"],
+  ["hasta", "Hasta"],
+  ["archivo", "Archivo"],
+  ["filas", "Filas"],
+  ["nuevos", "Nuevos"],
+  ["actualizados", "Actualizados"],
+  ["reactivados", "Reactivados"],
+  ["productos", "Productos"],
+  ["productosImportados", "Productos importados"],
+  ["sinImportar", "Sin importar"],
+  ["salidasRegistradas", "Salidas registradas"],
+  ["yaImportadas", "Ya importadas antes"],
+  ["conProblemas", "Con problemas"],
+  ["lugaresApartados", "Lugares apartados del plan"],
+  ["lugaresDevueltos", "Lugares devueltos al plan"],
+  ["cambios", "Cambió"],
+];
+
+const shown = (value: unknown): string | null =>
+  typeof value === "string"
+    ? value.trim() || null
+    : typeof value === "number" && Number.isFinite(value)
+      ? value.toLocaleString("es-MX")
+      : Array.isArray(value)
+        ? strings(value).join(", ") || null
+        : null;
+
+/** The metadata of an event as short lines for people. */
+export function describeAuditFacts(metadata: unknown): string[] {
+  const data = record(metadata);
+  const facts: string[] = [];
+  for (const [key, label] of FACT_LABELS) {
+    const value = shown(data[key]);
+    if (value !== null) facts.push(`${label}: ${value}`);
+  }
+  // Field by field changes of a record: { Nombre: { antes, ahora } }.
+  for (const [field, change] of Object.entries(record(data.changes))) {
+    const { antes, ahora } = record(change);
+    facts.push(
+      `${field}: ${shown(antes) ?? "(vacío)"} → ${shown(ahora) ?? "(vacío)"}`,
+    );
+  }
+  return facts;
+}
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value)
@@ -160,6 +237,7 @@ export async function listAuditTrail(
       rolesFrom: strings(metadata.from),
       rolesTo,
       reason: event.reason,
+      facts: describeAuditFacts(metadata),
       createdAt: event.createdAt,
     };
   });

@@ -4,7 +4,11 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
-import { AUDIT_ACTION_LABELS, listAuditTrail } from "@/platform/audit";
+import {
+  AUDIT_ACTION_LABELS,
+  describeAuditFacts,
+  listAuditTrail,
+} from "@/platform/audit";
 import {
   acceptInvitation,
   acceptOwnershipTransfer,
@@ -223,5 +227,28 @@ describe("every company action has a sentence for people", () => {
     for (const action of recorded) {
       expect(AUDIT_ACTION_LABELS[action], action).toBeTruthy();
     }
+  });
+});
+
+describe("details of an event", () => {
+  it("shows what the event was about, never internal ids", () => {
+    expect(
+      describeAuditFacts({
+        contenido: "Productos",
+        formato: "xlsx",
+        filas: 1250,
+        movementId: "0190-abc",
+      }),
+    ).toEqual(["Contenido: Productos", "Formato: xlsx", "Filas: 1,250"]);
+    expect(
+      describeAuditFacts({
+        sku: "TOR-001",
+        changes: { Nombre: { antes: "Tornillo", ahora: "Tornillo 1/4" } },
+      }),
+    ).toEqual(["Clave: TOR-001", "Nombre: Tornillo → Tornillo 1/4"]);
+    expect(
+      describeAuditFacts({ nombre: "Ferretera", cambios: "Correo" }),
+    ).toEqual(["Nombre: Ferretera", "Cambió: Correo"]);
+    expect(describeAuditFacts(null)).toEqual([]);
   });
 });

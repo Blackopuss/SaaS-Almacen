@@ -302,7 +302,7 @@ describe("classifyImport", () => {
       result.conflicts.map((c) => [c.row, c.column, c.header, c.value]),
     ).toEqual([
       [2, "initialStock", "Existencia inicial", "9"],
-      [3, "unit", "Unidad", "piece"],
+      [3, "unit", "Unidad", "pieza"],
       [4, "barcode", "Código de barras", "750999"],
     ]);
     expect(result.conflicts[0]!.message).toContain("ya tiene movimientos");

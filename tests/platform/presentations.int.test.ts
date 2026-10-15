@@ -156,9 +156,9 @@ describe("createPresentation", () => {
   it.each([
     ["0", "La cantidad debe ser mayor que cero."],
     ["-100", "La cantidad debe ser mayor que cero."],
-    ["", "Escribe una cantidad, por ejemplo 3 o 2.75."],
-    ["cien", "Escribe una cantidad, por ejemplo 3 o 2.75."],
-    ["1e2", "Escribe una cantidad, por ejemplo 3 o 2.75."],
+    ["", "Escribe una cantidad, por ejemplo 3."],
+    ["cien", "Escribe una cantidad, por ejemplo 3."],
+    ["1e2", "Escribe una cantidad, por ejemplo 3."],
     [
       "12.5",
       "Este producto se maneja en piezas completas: no admite fracciones.",

@@ -20,16 +20,24 @@ export const metadata: Metadata = {
  */
 export default async function ActivaDosPasosPage() {
   const { user, mfaEnabled } = await requireSession({ allowMissingMfa: true });
-  if (mfaEnabled || !(await isMfaRequired(user.id))) {
+  // Once MFA is on the screen still renders: activating it rotates the
+  // session cookie and repaints this page, and redirecting here would hide
+  // the backup codes before the person could save them.
+  if (!mfaEnabled && !(await isMfaRequired(user.id))) {
     redirect(DEFAULT_AFTER_SIGN_IN);
   }
   return (
     <WarehouseCard>
-      <p className="mb-6 rounded-lg bg-accent p-3 text-sm text-accent-foreground">
-        Tu cuenta necesita verificación en dos pasos antes de continuar: es
-        obligatoria para titulares y administradores.
-      </p>
-      <RequiredMfaSetup next={DEFAULT_AFTER_SIGN_IN} />
+      {!mfaEnabled && (
+        <p className="mb-6 rounded-lg bg-accent p-3 text-sm text-accent-foreground">
+          Tu cuenta necesita verificación en dos pasos antes de continuar: es
+          obligatoria para titulares y administradores.
+        </p>
+      )}
+      <RequiredMfaSetup
+        next={DEFAULT_AFTER_SIGN_IN}
+        alreadyEnabled={mfaEnabled}
+      />
     </WarehouseCard>
   );
 }

@@ -142,7 +142,7 @@ export type LowStockItem = {
   minimum: string;
   /** «20 piezas». */
   minimumLabel: string;
-  /** What is missing to be above the line: «16 piezas». */
+  /** What is missing to be above the line: «Faltan 16 piezas», «Falta 1 pieza». */
   missingLabel: string;
   /** Nothing left at all. */
   empty: boolean;
@@ -206,7 +206,7 @@ async function lowStock(
           stockLabel: formatStock(stock.toString(), unitCode),
           minimum: minimum.toString(),
           minimumLabel: formatStock(minimum.toString(), unitCode),
-          missingLabel: formatStock(minimum.minus(stock).toString(), unitCode),
+          missingLabel: `${minimum.minus(stock).equals(1) ? "Falta" : "Faltan"} ${formatStock(minimum.minus(stock).toString(), unitCode)}`,
           empty: stock.isZero(),
         } satisfies LowStockItem,
         // Share of the minimum that is left: 0 = nothing, 1 = at the line.

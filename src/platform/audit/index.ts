@@ -15,6 +15,7 @@ export type { AuditMetadata } from "./sanitize";
 export {
   AUDIT_ACTION_LABELS,
   describeAuditAction,
+  describeAuditFacts,
   listAuditTrail,
 } from "./trail";
 export type { AuditTrailEntry } from "./trail";

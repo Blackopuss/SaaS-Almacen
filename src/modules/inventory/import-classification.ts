@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Permission } from "@/platform/authorization";
+import { getUnit } from "@/platform/catalog";
 import { getQuotaUsage } from "@/platform/entitlements";
 import { forOrganization } from "@/server";
 
@@ -10,7 +11,11 @@ import {
   type ImportIssue,
   type ValidImportRow,
 } from "./import-validation";
-import { IMPORT_COLUMNS, type ImportColumnKey } from "./import-template";
+import {
+  IMPORT_COLUMNS,
+  TEMPLATE_EXAMPLE_KEYS,
+  type ImportColumnKey,
+} from "./import-template";
 import type { InventoryActor } from "./movements";
 
 /**
@@ -58,6 +63,11 @@ export type ImportClassification =
       conflictCount: number;
       /** Products of the file, in its order (the first ones). */
       products: ClassifiedProduct[];
+      /**
+       * Rows that are still the examples of the template (same clave and
+       * name): a warning, not a block — they may be real products.
+       */
+      exampleRows: number[];
       /** Everything is right and fits: the import could be confirmed. */
       ready: boolean;
     }
@@ -267,8 +277,9 @@ export async function planImport(
         conflict(
           first,
           "unit",
-          first.unitCode,
-          `${current.sku} ya existe y se controla en otra unidad. La unidad de un producto no se cambia al importar: corrígela en el archivo o cambia la clave.`,
+          // What the person reads (pieza), never the internal code (piece).
+          getUnit(first.unitCode).name,
+          `${current.sku} ya existe y se controla en otra unidad (${getUnit(current.unitCode).plural}). La unidad de un producto no se cambia al importar: corrígela en el archivo o cambia la clave.`,
         );
       }
       if (moved.has(current.id)) {
@@ -326,6 +337,15 @@ export async function planImport(
     conflicts: conflicts.slice(0, MAX_SHOWN),
     conflictCount: conflicts.length,
     products,
+    exampleRows: entries
+      .filter(({ first }) =>
+        TEMPLATE_EXAMPLE_KEYS.some(
+          (example) =>
+            foldName(example.sku) === foldName(first.sku) &&
+            foldName(example.name) === foldName(first.name),
+        ),
+      )
+      .map(({ first }) => first.row),
     entries,
     ready:
       valid.length > 0 &&

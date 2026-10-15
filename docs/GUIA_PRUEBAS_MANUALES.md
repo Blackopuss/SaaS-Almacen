@@ -264,7 +264,7 @@ En `/configuracion/plan` deberías ver la vigencia, las barras de productos y us
 
 **E3. Módulo no contratado**
 
-Desde la consola, reasigna el plan de una empresa sin Compras. Deberías ver: Compras desaparece de su menú y `/compras` muestra el aviso de solo lectura (su historial se conserva).
+Desde la consola, reasigna el plan de una empresa sin Compras. Deberías ver: Compras sigue en el menú para consultar su historial, pero `/compras` muestra el aviso de solo lectura y no ofrece botones para crear ni cambiar nada. Una empresa que nunca tuvo Compras no lo ve en el menú.
 
 **E4. Límite de productos**
 
@@ -547,7 +547,7 @@ Dime si el número «OC-0001» te sirve así y si necesitas descuentos o impuest
 
 **H5. PDF de la orden**
 
-1. En una orden, «Descargar PDF». Ábrelo: nombre de tu negocio, número de la orden, datos del proveedor, la tabla de productos con su conversión, costos, total antes de impuestos y notas.
+1. En una orden, «Descargar PDF». Ábrelo: nombre de tu negocio, número de la orden, datos del proveedor, la tabla de productos con su conversión, costos, total antes de impuestos y notas. La columna «Su código» trae el código del proveedor (o «—» si no lo tiene) y bajo cada producto dice «Nuestra clave: …».
 2. Descarga el de un borrador (dice «BORRADOR · todavía no es un pedido») y el de una cancelada (dice «CANCELADA» y su motivo).
 3. Haz una orden con muchos productos (40 o más): el PDF sigue en otra hoja y cada una dice «Página X de Y».
 4. Ábrelo también en tu teléfono y reenvíatelo por correo: debe verse igual.

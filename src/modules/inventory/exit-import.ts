@@ -227,7 +227,8 @@ export type ExitProduct = {
   status: "ACTIVE" | "ARCHIVED";
   unitCode: string;
   quantityStep: string;
-  presentations: { id: string; name: string }[];
+  /** With the content in force (`factor`), only to show the equivalence. */
+  presentations: { id: string; name: string; factor: string }[];
 };
 
 /** A row that passed, as it will be registered. */
@@ -240,7 +241,7 @@ export type ValidExitRow = {
   sku: string;
   productName: string;
   unitCode: string;
-  presentation: { id: string; name: string } | null;
+  presentation: { id: string; name: string; factor: string } | null;
   /** As written, with decimal point. */
   quantity: string;
   locationId: string;
@@ -712,13 +713,27 @@ export async function checkExitImport(
           status: true,
           unitCode: true,
           quantityStep: true,
-          presentations: { select: { id: true, name: true } },
+          presentations: {
+            select: {
+              id: true,
+              name: true,
+              versions: {
+                orderBy: { version: "desc" },
+                take: 1,
+                select: { factor: true },
+              },
+            },
+          },
         },
       });
       for (const product of products) {
         found.set(product.id, {
           ...product,
           quantityStep: product.quantityStep.toString(),
+          presentations: product.presentations.map(({ versions, ...item }) => ({
+            ...item,
+            factor: versions[0]?.factor.toString() ?? "1",
+          })),
         });
       }
     }
@@ -869,7 +884,7 @@ export async function reviewExitImport(
         externalId: line.externalId,
         text: `${line.productName} (${line.sku}): ${
           line.presentation
-            ? `${line.quantity} × ${line.presentation.name}`
+            ? `${line.quantity} × ${line.presentation.name} (${formatStock(dec(line.quantity).times(line.presentation.factor).toString(), line.unitCode)})`
             : formatStock(line.quantity, line.unitCode)
         } de ${line.locationPath}${checked.alreadyImported.has(line.row) ? " · ya importada" : ""}`,
       })),

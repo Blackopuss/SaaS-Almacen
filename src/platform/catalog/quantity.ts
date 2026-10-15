@@ -58,6 +58,15 @@ export function stepProblem(unitCode: string, step: string): string | null {
     : `Los productos por ${getUnit(unitCode).name} se manejan en enteros.`;
 }
 
+/** «3» for whole units, «3 o 2.75» (or a value that fits the step) otherwise. */
+function exampleQuantity(step: Decimal): string {
+  if (step.equals(1)) return "3";
+  const fraction = ["2.75", "2.5"]
+    .map((value) => dec(value))
+    .find((value) => isMultipleOf(value, step));
+  return `3 o ${formatDecimal(fraction ?? dec(2).plus(step))}`;
+}
+
 /** How a product measures its quantities. */
 export type QuantityRule = { unitCode: string; quantityStep: string };
 
@@ -91,7 +100,8 @@ export function parseQuantity(
     return {
       ok: false,
       error:
-        messages[error.code] ?? "Escribe una cantidad, por ejemplo 3 o 2.75.",
+        messages[error.code] ??
+        `Escribe una cantidad, por ejemplo ${exampleQuantity(step)}.`,
     };
   }
   if (quantity.greaterThan(MAX_QUANTITY)) {

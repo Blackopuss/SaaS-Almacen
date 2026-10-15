@@ -1,6 +1,7 @@
 "use client";
 
 import { ClipboardCheck, Loader2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -62,6 +63,7 @@ export function RemoveCapture({
 
 /** Abandons the count after confirming. */
 export function CancelCount({ countId }: { countId: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -102,6 +104,9 @@ export function CancelCount({ countId }: { countId: string }) {
                     "Conteo cancelado. Tus existencias no cambiaron.",
                   );
                   setOpen(false);
+                  // The dialog closes at once; repaint so the screen stops
+                  // offering the capture of a count that is now closed.
+                  router.refresh();
                 } else {
                   setError(result.error);
                 }

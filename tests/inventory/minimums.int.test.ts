@@ -198,12 +198,12 @@ describe("listLowStock", () => {
       stock: "0",
       stockLabel: "0 piezas",
       minimumLabel: "10 piezas",
-      missingLabel: "10 piezas",
+      missingLabel: "Faltan 10 piezas",
       empty: true,
     });
     expect(page.items[1]).toMatchObject({
       stockLabel: "2 piezas",
-      missingLabel: "8 piezas",
+      missingLabel: "Faltan 8 piezas",
       empty: false,
     });
     expect(await countLowStock(actor)).toBe(3);

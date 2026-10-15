@@ -139,8 +139,8 @@ export function NoModuleState({ module }: { module: string }) {
         {module} no está activo en tu empresa
       </h1>
       <p className="mt-1 max-w-sm text-muted-foreground">
-        Tu plan actual no incluye este módulo. El titular de la empresa puede
-        solicitarlo.
+        Tu plan actual no incluye este módulo. Las opciones están en
+        Configuración › Mi plan; solo el titular puede cambiar el plan.
       </p>
     </div>
   );
@@ -159,8 +159,9 @@ export function ReadOnlyNotice({ module }: { module: string }) {
       />
       <p>
         <span className="font-medium">{module} está en solo lectura.</span> Tu
-        información sigue aquí y puedes consultarla y exportarla, pero no
-        registrar cambios hasta renovar tu plan.
+        plan ya no lo incluye en uso completo: tu información sigue aquí y
+        puedes consultarla y exportarla, pero no registrar cambios hasta que el
+        titular lo vuelva a contratar en Configuración › Mi plan.
       </p>
     </div>
   );

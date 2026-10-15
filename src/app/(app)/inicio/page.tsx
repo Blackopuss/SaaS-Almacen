@@ -77,8 +77,11 @@ export default async function InicioPage() {
 
   const canEnter = access.allows("inventory.entry.create");
   const canExit = access.allows("inventory.exit.create");
+  // With an empty catalog there is nothing to move yet: the guide below
+  // says where to start, and these would only lead to an empty search.
+  const emptyCatalog = firstSteps !== null && !firstSteps.hasProducts;
   const actions =
-    canEnter || canExit ? (
+    (canEnter || canExit) && !emptyCatalog ? (
       <>
         {canEnter && (
           <Button asChild>

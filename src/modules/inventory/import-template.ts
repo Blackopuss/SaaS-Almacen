@@ -155,6 +155,13 @@ const EXAMPLES: ExampleRow[] = [
   },
 ];
 
+/**
+ * Clave and name of the examples, folded like the catalog compares them:
+ * a file that still has one was imported without replacing the template.
+ */
+export const TEMPLATE_EXAMPLE_KEYS: readonly { sku: string; name: string }[] =
+  EXAMPLES.map((row) => ({ sku: row.sku ?? "", name: row.name ?? "" }));
+
 const exampleRows = (): Cell[][] =>
   EXAMPLES.map((row) => IMPORT_COLUMNS.map((column) => row[column.key] ?? ""));
 

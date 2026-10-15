@@ -15,12 +15,19 @@ const PageHeading: MfaSetupHeading = ({ title, description }) => (
   </div>
 );
 
-export function RequiredMfaSetup({ next }: { next: string }) {
+export function RequiredMfaSetup({
+  next,
+  alreadyEnabled,
+}: {
+  next: string;
+  alreadyEnabled: boolean;
+}) {
   const router = useRouter();
   return (
     <div className="space-y-6">
       <MfaSetup
         Heading={PageHeading}
+        alreadyEnabled={alreadyEnabled}
         onDone={() => {
           toast.success("Verificación en dos pasos activada.");
           router.replace(next);

@@ -95,22 +95,27 @@ export function AddLocationDialog({
   const [placeId, setPlaceId] = useState(insideId);
   // React resets a form after its action; the answers count how many came
   // back so the select is rebuilt showing the place the person had chosen.
-  const [answers, setAnswers] = useState(0);
+  // The count travels in the state: a setState after an await commits on
+  // its own, before the answer, and would rebuild it with the old values.
   const [state, formAction, pending] = useActionState(
-    async (prev: LocationFormState, formData: FormData) => {
+    async (
+      prev: LocationFormState & { answers: number },
+      formData: FormData,
+    ) => {
       const next = await createLocationAction(prev, formData);
-      setAnswers((count) => count + 1);
       if (next.done) {
         toast.success("Ubicación agregada.");
         setOpen(false);
       }
-      return next;
+      return { ...next, answers: prev.answers + 1 };
     },
     {
       fieldErrors: {},
       values: { name: "", kind: "", parentId: insideId },
-    } satisfies LocationFormState,
+      answers: 0,
+    },
   );
+  const { answers } = state;
   const place = places.find((option) => option.id === placeId) ?? places[0];
   const kinds = place?.kinds ?? [];
   const prefix = `add-${insideId || "root"}`;

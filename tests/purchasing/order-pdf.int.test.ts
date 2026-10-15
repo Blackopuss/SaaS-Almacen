@@ -194,9 +194,11 @@ describe("buildOrderPdf", () => {
       "Av. Industria 100, Monterrey, N.L.",
       "20 oct 2026",
       "Enviada",
-      // The supplier's own code where it is known, ours where it is not.
+      // The supplier's own code where it is known; ours, labelled, always.
+      "Su código",
       "FN-88213",
-      "CAB-012",
+      "Nuestra clave: TOR-001",
+      "Nuestra clave: CAB-012",
       "Tornillo hexagonal 1/4",
       "3 cajas × 100 = 300 piezas",
       "$1,250.50",

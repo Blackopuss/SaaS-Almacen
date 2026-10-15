@@ -150,7 +150,7 @@ export default async function ExistenciasBajasPage({
                     </span>
                   </p>
                   <p className="text-muted-foreground tabular-nums">
-                    Faltan {item.missingLabel} para el mínimo
+                    {item.missingLabel} para el mínimo
                   </p>
                 </div>
                 {canEnter && (

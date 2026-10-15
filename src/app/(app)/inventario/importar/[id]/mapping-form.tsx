@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { FormField } from "@/components";
 import { Button } from "@/components/ui/button";
@@ -38,19 +38,21 @@ export function MappingForm({
   decimalSeparator: string;
 }) {
   // React resets a form after its action; the answers count how many came
-  // back so selects are rebuilt showing what the person had chosen.
-  const [answers, setAnswers] = useState(0);
+  // back so selects are rebuilt showing what the person had chosen. The
+  // count travels in the state: a setState after an await commits on its
+  // own, before the answer, and would rebuild them with the old values.
   const [state, formAction, pending] = useActionState(
-    async (prev: MappingState, formData: FormData) => {
-      const next = await saveMappingAction(importId, prev, formData);
-      setAnswers((count) => count + 1);
-      return next;
-    },
+    async (prev: MappingState & { answers: number }, formData: FormData) => ({
+      ...(await saveMappingAction(importId, prev, formData)),
+      answers: prev.answers + 1,
+    }),
     {
       fieldErrors: {},
       values: { mapping, decimalSeparator },
-    } satisfies MappingState,
+      answers: 0,
+    },
   );
+  const { answers } = state;
   const separatorError = state.fieldErrors.decimalSeparator;
 
   return (

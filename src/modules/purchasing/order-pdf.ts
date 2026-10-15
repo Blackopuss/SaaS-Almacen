@@ -71,7 +71,9 @@ function draw(
     page.box(MARGIN, y - 10, RIGHT - MARGIN, 16, 0.92);
     const head = { size: 8, font: "bold" as const };
     page.text(COLUMN.number + 2, y, "#", head);
-    page.text(COLUMN.code, y, "Código", head);
+    // The supplier's own code; ours goes under the product, labelled, so
+    // the two are never mistaken for one another.
+    page.text(COLUMN.code, y, "Su código", head);
     page.text(COLUMN.description, y, "Producto", head);
     page.text(quantityX, y, "Cantidad", head);
     if (costs) {
@@ -162,10 +164,23 @@ function draw(
 
   tableHeader();
   for (const line of order.lines) {
-    const name = wrapText(line.productName, descriptionWidth, 9, "regular");
+    const productName = wrapText(
+      line.productName,
+      descriptionWidth,
+      9,
+      "regular",
+    );
+    const ownKey = wrapText(
+      `Nuestra clave: ${line.sku}`,
+      descriptionWidth,
+      8,
+      "regular",
+    );
+    const name = [...productName, ...ownKey];
+    const ownKeyFrom = productName.length;
     const quantity = wrapText(line.quantityText, quantityWidth, 9, "regular");
     const code = wrapText(
-      line.supplierSku ?? line.sku,
+      line.supplierSku ?? "—",
       COLUMN.description - COLUMN.code - 8,
       9,
       "regular",
@@ -179,7 +194,12 @@ function draw(
       page.text(COLUMN.code, y + index * 11, part, text),
     );
     name.forEach((part, index) =>
-      page.text(COLUMN.description, y + index * 11, part, text),
+      page.text(
+        COLUMN.description,
+        y + index * 11,
+        part,
+        index >= ownKeyFrom ? { size: 8, gray: 0.35 } : text,
+      ),
     );
     quantity.forEach((part, index) =>
       page.text(quantityX, y + index * 11, part, text),

@@ -161,10 +161,14 @@ export function EntryForm({
   }
 
   // React resets a form after its action; the answers count how many came
-  // back so the select is rebuilt showing what the person had chosen.
-  const [answers, setAnswers] = useState(0);
+  // back so the select is rebuilt showing what the person had chosen. The
+  // count travels in the state: a setState after an await commits on its
+  // own, before the answer, and would rebuild it with the old values.
   const [state, formAction, pending] = useActionState(
-    async (prev: EntryFormState, formData: FormData) => {
+    async (
+      prev: EntryFormState & { answers: number },
+      formData: FormData,
+    ): Promise<EntryFormState & { answers: number }> => {
       let next: EntryFormState;
       try {
         next = await MODES[mode].action(productId, prev, formData);
@@ -176,10 +180,10 @@ export function EntryForm({
         // letting the person send it again (INV-22).
         next = await resolveLostAnswer(formData);
       }
-      setAnswers((count) => count + 1);
-      return next;
+      return { ...next, answers: prev.answers + 1 };
     },
     {
+      answers: 0,
       fieldErrors: {},
       values: {
         locationId: defaultLocationId,
@@ -188,8 +192,9 @@ export function EntryForm({
         reference: "",
         reason: "",
       },
-    } satisfies EntryFormState,
+    },
   );
+  const { answers } = state;
   const quantityRef = useRef<HTMLInputElement>(null);
   const [capture, setCapture] = useState(state.values.capture);
   const [preview, setPreview] = useState<EntryPreview | null>(null);

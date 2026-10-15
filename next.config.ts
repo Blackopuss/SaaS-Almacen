@@ -47,6 +47,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // An address people reach by trimming an order's: the list of orders is
+  // the Compras screen itself.
+  async redirects() {
+    return [
+      { source: "/compras/ordenes", destination: "/compras", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

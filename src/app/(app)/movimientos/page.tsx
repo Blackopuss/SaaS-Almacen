@@ -160,44 +160,35 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
-  const transferButton = access.allows("inventory.transfer.create") ? (
-    <Button asChild variant="outline">
-      <Link href="/movimientos/reubicar">
-        <ArrowLeftRight aria-hidden="true" data-icon="inline-start" />
-        Reubicar
-      </Link>
-    </Button>
-  ) : undefined;
-  const adjustmentButton = access.allows("inventory.adjustment.create") ? (
-    <Button asChild variant="outline">
-      <Link href="/movimientos/ajuste">
-        <Scale aria-hidden="true" data-icon="inline-start" />
-        Ajustar
-      </Link>
-    </Button>
-  ) : undefined;
-  const openingButton = access.allows("inventory.opening.create") ? (
-    <Button asChild variant="outline">
-      <Link href="/movimientos/saldo-inicial">
-        <ClipboardList aria-hidden="true" data-icon="inline-start" />
-        Saldo inicial
-      </Link>
-    </Button>
-  ) : undefined;
+  // The daily three are buttons; what is done now and then goes in a row of
+  // links under the title, each saying what it is for (like Inventario).
+  const occasional = [
+    access.allows("inventory.transfer.create") && {
+      href: "/movimientos/reubicar",
+      icon: ArrowLeftRight,
+      label: "Reubicar",
+      hint: "cambiar de lugar",
+    },
+    access.allows("inventory.adjustment.create") && {
+      href: "/movimientos/ajuste",
+      icon: Scale,
+      label: "Ajustar",
+      hint: "corregir lo que hay",
+    },
+    access.allows("inventory.opening.create") && {
+      href: "/movimientos/saldo-inicial",
+      icon: ClipboardList,
+      label: "Saldo inicial",
+      hint: "lo que tenías al empezar",
+    },
+  ].filter((item) => item !== false);
   const canReverse = access.allows("inventory.movement.reverse");
   const actions =
-    entryButton ||
-    exitButton ||
-    transferButton ||
-    adjustmentButton ||
-    openingButton ? (
+    entryButton || exitButton ? (
       <>
         {entryButton}
         {exitButton}
         {quickExitButton}
-        {transferButton}
-        {adjustmentButton}
-        {openingButton}
       </>
     ) : undefined;
 
@@ -209,6 +200,23 @@ export default async function MovimientosPage({
         description="Entradas, salidas, reubicaciones y ajustes."
         actions={actions}
       />
+      {occasional.length > 0 && (
+        <p className="flex flex-wrap gap-x-6">
+          {occasional.map(({ href, icon: Icon, label, hint }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              {label}
+              <span className="font-normal text-muted-foreground">
+                · {hint}
+              </span>
+            </Link>
+          ))}
+        </p>
+      )}
       {justRegistered && (
         <div
           role="status"

@@ -154,6 +154,9 @@ export default async function RevisionPage({
     moduleState === "active" &&
     access.allows("inventory.import.cancel");
   const importedItems = detail ? detail.processedItems - detail.failedItems : 0;
+  // Rows well written that still cannot go in (clashes, plan places): the
+  // header must not read as «all good».
+  const blocked = clean && editable && plan !== null && !plan.ready;
 
   return (
     <PageContainer>
@@ -167,12 +170,19 @@ export default async function RevisionPage({
       <div
         role="status"
         className={`flex max-w-3xl items-start gap-2 rounded-xl border p-4 text-sm ${
-          clean
-            ? "border-success/30 bg-success/10"
-            : "border-destructive/30 bg-destructive/10"
+          blocked
+            ? "border-warning/30 bg-warning/10"
+            : clean
+              ? "border-success/30 bg-success/10"
+              : "border-destructive/30 bg-destructive/10"
         }`}
       >
-        {clean ? (
+        {blocked ? (
+          <CircleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-warning"
+          />
+        ) : clean ? (
           <CircleCheck
             aria-hidden="true"
             className="mt-0.5 size-4 shrink-0 text-success"
@@ -184,7 +194,17 @@ export default async function RevisionPage({
           />
         )}
         <p>
-          {clean ? (
+          {blocked ? (
+            <>
+              <span className="font-medium">
+                {result.totalRows === 1
+                  ? "La fila está bien escrita"
+                  : `Las ${count(result.totalRows)} filas están bien escritas`}
+                , pero todavía no se puede importar
+              </span>
+              : abajo dice qué resolver. Todavía no se importó nada.
+            </>
+          ) : clean ? (
             <>
               <span className="font-medium">
                 {result.totalRows === 1
@@ -210,6 +230,27 @@ export default async function RevisionPage({
           )}
         </p>
       </div>
+
+      {editable && plan && plan.exampleRows.length > 0 && (
+        <div
+          role="status"
+          className="flex max-w-3xl items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-warning"
+          />
+          <p>
+            <span className="font-medium">
+              {plan.exampleRows.length === 1
+                ? `La fila ${plan.exampleRows[0]} es un ejemplo de la plantilla`
+                : `Las filas ${plan.exampleRows.join(", ")} son ejemplos de la plantilla`}
+            </span>{" "}
+            (misma clave y nombre). Si no son productos tuyos, bórralas de tu
+            archivo y súbelo de nuevo antes de importar.
+          </p>
+        </div>
+      )}
 
       {result.issues.length > 0 && (
         <section
@@ -363,14 +404,17 @@ export default async function RevisionPage({
                     : importedItems === 1
                       ? "1 producto ya se había importado y se queda en tu catálogo"
                       : `${count(importedItems)} productos ya se habían importado y se quedan en tu catálogo`}
-                  {detail.totalItems - detail.processedItems > 0 &&
+                  {importedItems > 0 &&
+                    detail.totalItems - detail.processedItems > 0 &&
                     `; ${detail.totalItems - detail.processedItems === 1 ? "1 no se importó" : `${count(detail.totalItems - detail.processedItems)} no se importaron`}`}
                   . No quedan lugares apartados de tu plan.
                 </p>
               ) : (
                 <p className="tabular-nums">
                   {count(detail.processedItems)} de {count(detail.totalItems)}{" "}
-                  productos procesados
+                  {detail.totalItems === 1
+                    ? "producto procesado"
+                    : "productos procesados"}
                   {detail.reservedPlaces > 0 &&
                     ` · ${detail.reservedPlaces === 1 ? "1 lugar apartado" : `${count(detail.reservedPlaces)} lugares apartados`} de tu plan`}
                   . Se aplica en segundo plano: puedes salir de esta pantalla y
@@ -477,7 +521,7 @@ export default async function RevisionPage({
                     </span>{" "}
                     disponibles de {count(plan.quota.limit)}.
                     {!plan.quota.fits &&
-                      ` Faltan ${count(plan.quota.required - plan.quota.available)}: quita productos del archivo, archiva los que ya no uses o pide un nivel mayor. No se importará una parte.`}
+                      ` ${plan.quota.required - plan.quota.available === 1 ? "Falta 1" : `Faltan ${count(plan.quota.required - plan.quota.available)}`}: quita productos del archivo, archiva los que ya no uses o pide un nivel mayor. Mientras no quepa todo, no se puede importar (nunca se importa solo una parte).`}
                   </>
                 )}{" "}
                 {plan.quota.fits && plan.quota.required > 0 && (
