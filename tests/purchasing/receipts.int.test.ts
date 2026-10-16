@@ -742,3 +742,143 @@ describe("destination and presentation when receiving (CMP-09)", () => {
     expect(await db.purchaseReceipt.count({ where: { orderId } })).toBe(0);
   });
 });
+
+describe("concurrent and repeated receipts (CMP-10, NEG-24)", () => {
+  it("five receipts of 1 at once against 3 pending receive exactly 3", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "3" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        receivePurchaseOrder(actor, orderId, {
+          idempotencyKey: key(),
+          lines: [{ orderLineId: line!.id, quantity: "1" }],
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(3);
+    for (const refused of results.filter((r) => !r.ok)) {
+      expect(refused).toMatchObject({
+        ok: false,
+        reason: "invalid_transition",
+      });
+    }
+    expect(await stockIn(actor, productId)).toBe("3");
+    expect(await statusOf(orderId)).toBe("RECEIVED");
+    expect(await db.purchaseReceipt.count({ where: { orderId } })).toBe(3);
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("two partial receipts at once never add up to more than pending", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "10" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+
+    const results = await Promise.all(
+      ["7", "6"].map((quantity) =>
+        receivePurchaseOrder(actor, orderId, {
+          idempotencyKey: key(),
+          lines: [{ orderLineId: line!.id, quantity }],
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const refused = results.find((r) => !r.ok);
+    expect(refused?.ok ? {} : refused?.lineErrors).toMatchObject({
+      [line!.id]: /Solo faltan/,
+    });
+    const received = await stockIn(actor, productId);
+    expect(["6", "7"]).toContain(received);
+    expect(await statusOf(orderId)).toBe("PARTIAL");
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("a key sent again with other quantities is refused, not taken as a retry", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "10" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+    const idempotencyKey = key();
+
+    const first = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey,
+      lines: [{ orderLineId: line!.id, quantity: "4" }],
+    });
+    expect(first).toMatchObject({ ok: true, status: "PARTIAL" });
+    expect(
+      await receivePurchaseOrder(actor, orderId, {
+        idempotencyKey,
+        lines: [{ orderLineId: line!.id, quantity: "4" }],
+      }),
+    ).toMatchObject({ ok: true, repeated: true });
+    expect(
+      await receivePurchaseOrder(actor, orderId, {
+        idempotencyKey,
+        lines: [{ orderLineId: line!.id, quantity: "5" }],
+      }),
+    ).toMatchObject({ ok: false, reason: "not_allowed" });
+    // Another person with the same key does not see the receipt as theirs.
+    const buyer = await member(actor.organizationId, "buyer");
+    expect(
+      await receivePurchaseOrder(buyer, orderId, {
+        idempotencyKey,
+        lines: [{ orderLineId: line!.id, quantity: "4" }],
+      }),
+    ).toMatchObject({ ok: false, reason: "not_allowed" });
+    expect(await findReceiptConfirmation(buyer, idempotencyKey)).toBeNull();
+    expect(await stockIn(actor, productId)).toBe("4");
+  });
+
+  it("a receipt and a cancellation at once: one of them, never both", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const orderId = await sentOrder(actor, [{ productId, quantity: "5" }]);
+
+    const [received, cancelled] = await Promise.all([
+      receivePurchaseOrder(actor, orderId, { idempotencyKey: key() }),
+      cancelPurchaseOrder(actor, orderId, { reason: "Ya no se ocupa" }),
+    ]);
+    expect([received.ok, cancelled.ok].filter(Boolean)).toHaveLength(1);
+    const status = await statusOf(orderId);
+    if (received.ok) {
+      expect(status).toBe("RECEIVED");
+      expect(await stockIn(actor, productId)).toBe("5");
+    } else {
+      expect(status).toBe("CANCELLED");
+      expect(await stockIn(actor, productId)).toBe("0");
+    }
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("archiving the destination at the same time never leaves stock in an archived location", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const shelf = await createLocation(actor, { kind: "SHELF", name: "C-03" });
+    if (!shelf.ok) throw new Error("location setup failed");
+    const orderId = await sentOrder(actor, [{ productId, quantity: "5" }]);
+
+    const [received, archived] = await Promise.all([
+      receivePurchaseOrder(actor, orderId, {
+        idempotencyKey: key(),
+        locationId: shelf.locationId,
+      }),
+      archiveLocation(actor, shelf.locationId),
+    ]);
+    // Archiving a location with stock is refused, so at most one wins.
+    expect(received.ok && archived.ok).toBe(false);
+    const location = await db.location.findUniqueOrThrow({
+      where: { id: shelf.locationId },
+    });
+    if (received.ok) {
+      expect(location.archivedAt).toBeNull();
+      expect(await stockIn(actor, productId, shelf.locationId)).toBe("5");
+    } else {
+      expect(location.archivedAt).not.toBeNull();
+      expect(await statusOf(orderId)).toBe("SENT");
+    }
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+});

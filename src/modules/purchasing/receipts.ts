@@ -248,10 +248,21 @@ export async function receivePurchaseOrder(
           orderId: true,
           receivedByUserId: true,
           order: { select: { status: true, number: true } },
+          lines: {
+            select: {
+              orderLineId: true,
+              capturedQuantity: true,
+              locationId: true,
+            },
+          },
         },
       });
       if (replay) {
-        if (replay.orderId !== order.id || replay.receivedByUserId !== userId) {
+        if (
+          replay.orderId !== order.id ||
+          replay.receivedByUserId !== userId ||
+          !sameReceipt(replay.lines, data)
+        ) {
           return refuse("not_allowed", null, KEY_REUSED);
         }
         return {
@@ -453,6 +464,44 @@ export async function receivePurchaseOrder(
     }
     throw error;
   }
+}
+
+/**
+ * Whether a repeated confirmation asks for what its key already received
+ * (CMP-10): the same lines, quantities and, when chosen, locations. A key
+ * sent again with other quantities is not a retry but a reused form.
+ * Without lines («everything pending») there is nothing to compare.
+ */
+function sameReceipt(
+  stored: {
+    orderLineId: string;
+    capturedQuantity: { toString(): string };
+    locationId: string;
+  }[],
+  data: z.output<typeof receiveSchema>,
+): boolean {
+  if (!data.lines) return true;
+  const asked = data.lines.filter(
+    (item) =>
+      item.quantity.trim() !== "" &&
+      !/^0+([.,]0*)?$/.test(item.quantity.trim()),
+  );
+  if (asked.length !== stored.length) return false;
+  const byLine = new Map(stored.map((line) => [line.orderLineId, line]));
+  return asked.every((item) => {
+    const line = byLine.get(item.orderLineId);
+    if (!line) return false;
+    let same = false;
+    try {
+      same = dec(item.quantity.replace(/,(?=\d{3}(\D|$))/g, "")).equals(
+        line.capturedQuantity.toString(),
+      );
+    } catch {
+      return false;
+    }
+    const where = item.locationId || data.locationId;
+    return same && (!where || where === line.locationId);
+  });
 }
 
 type OrderLineRow = {
