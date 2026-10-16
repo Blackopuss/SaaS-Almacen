@@ -359,8 +359,8 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
         "tests/platform/negative-by-role.int.test.ts",
         "tests/purchasing/product-suppliers.int.test.ts",
         "tests/purchasing/reports.int.test.ts",
+        "tests/purchasing/module-guard.int.test.ts",
       ],
-      waitsFor: "CMP-16 (campos de costo en respuestas, PDF y exportaciones)",
     },
     "NEG-05": { tests: ["tests/platform/negative-by-role.int.test.ts"] },
     "NEG-06": { tests: ["tests/platform/negative-by-role.int.test.ts"] },
@@ -457,8 +457,8 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       tests: [
         "tests/inventory/exports.int.test.ts",
         "tests/purchasing/reports.int.test.ts",
+        "tests/purchasing/module-guard.int.test.ts",
       ],
-      waitsFor: "CMP-16 (campos de costo en exportaciones y PDF)",
     },
     "NEG-26": { tests: ["tests/platform/ownership.int.test.ts"] },
   };
