@@ -257,6 +257,33 @@ export function ProvisionForm({
           )}
         </FormField>
 
+        {state.openWork && state.openWork.length > 0 && (
+          <div className="space-y-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+            {state.openWork.map((item) => (
+              <div key={item.module} className="space-y-1">
+                <p className="font-medium">{item.module} tiene sin terminar:</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  {item.lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="text-muted-foreground">
+              Nada se cancela ni se borra: sus datos quedan en solo lectura y
+              siguen donde estaban si el módulo vuelve.
+            </p>
+            <Button
+              type="submit"
+              name="acceptOpenWork"
+              value="1"
+              variant="destructive"
+              disabled={pending}
+            >
+              Quitar de todos modos
+            </Button>
+          </div>
+        )}
         <Button type="submit" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
           {pending ? "Asignando…" : "Asignar plan"}

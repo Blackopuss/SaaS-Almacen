@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { moduleRegistry } from "@/modules/registry";
+import { moduleOpenWork, moduleRegistry } from "@/modules/registry";
 import {
   provisionCompany,
   requirePlatformStaff,
@@ -13,6 +13,8 @@ export type ProvisionState = {
   fieldErrors: Partial<Record<ProvisionField, string>>;
   formError?: string;
   saved?: boolean;
+  /** Modules being removed with work halfway (CMP-17). */
+  openWork?: { module: string; lines: string[] }[];
   /** What was typed, so a rejected form keeps it (React resets forms). */
   values?: { modules: string[]; validUntil: string; reason: string };
 };
@@ -59,11 +61,16 @@ export async function provisionAction(
       validUntil,
       reason: values.reason,
     },
+    {
+      openWork: moduleOpenWork,
+      acceptOpenWork: formData.get("acceptOpenWork") === "1",
+    },
   );
   if (!result.ok) {
     return {
       fieldErrors: result.fieldErrors,
       formError: result.formError,
+      openWork: result.openWork,
       values,
     };
   }

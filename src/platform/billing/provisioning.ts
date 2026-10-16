@@ -9,6 +9,7 @@ import { requireSession } from "@/platform/auth";
 import {
   ensureQuotaRows,
   getEntitlements,
+  getFreshEntitlements,
   getQuotaUsage,
   invalidateEntitlements,
 } from "@/platform/entitlements";
@@ -101,6 +102,11 @@ export type ProvisionResult =
       ok: false;
       fieldErrors: Partial<Record<ProvisionField, string>>;
       formError?: string;
+      /**
+       * Modules being removed that leave work halfway (CMP-17): saving
+       * again with `acceptOpenWork` removes them anyway.
+       */
+      openWork?: { module: string; lines: string[] }[];
     };
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -151,6 +157,12 @@ export async function provisionCompany(
   staffUserId: string,
   organizationId: string,
   input: ProvisionInput,
+  options: {
+    /** What a module would leave halfway in the company (from the modules). */
+    openWork?: (moduleId: string, organizationId: string) => Promise<string[]>;
+    /** The person saw that work and removes the modules anyway. */
+    acceptOpenWork?: boolean;
+  } = {},
 ): Promise<ProvisionResult> {
   if (!(await isPlatformStaff(staffUserId))) {
     return {
@@ -194,6 +206,28 @@ export async function provisionCompany(
     return moduleError(
       `${registry.base.name} es la base y siempre va incluido.`,
     );
+  }
+
+  // CMP-17: taking a module away while it has work halfway is warned
+  // first; the data stays readable (read-only) either way.
+  if (options.openWork && !options.acceptOpenWork) {
+    const active = (await getFreshEntitlements(organizationId)).modules;
+    const openWork: { module: string; lines: string[] }[] = [];
+    for (const id of active) {
+      if (modules.includes(id) || !registry.has(id)) continue;
+      const lines = await options.openWork(id, organizationId);
+      if (lines.length > 0) {
+        openWork.push({ module: registry.get(id).name, lines });
+      }
+    }
+    if (openWork.length > 0) {
+      return {
+        ok: false,
+        fieldErrors: {},
+        formError: `${openWork.map((item) => item.module).join(" y ")} tiene trabajo sin terminar. Revísalo; si de todos modos lo quitas, sus datos quedan en solo lectura.`,
+        openWork,
+      };
+    }
   }
 
   const done = await db.$transaction(async (tx) => {

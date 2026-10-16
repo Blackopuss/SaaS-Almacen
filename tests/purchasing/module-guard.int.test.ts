@@ -103,6 +103,8 @@ const NOT_SERVICES = new Set([
   "formatOrderNumber",
   "recordLastCost",
   "advanceOrderOnReceipt",
+  // Asked by the platform console (staff only) before removing the module.
+  "purchasingOpenWork",
 ]);
 
 const services = Object.entries(purchasing).filter(

@@ -53,3 +53,9 @@ Una orden de compra es lo que el negocio le pide a un proveedor. Es el documento
 - «Pendientes por recibir»: líneas de órdenes `SENT`/`PARTIAL` con algo por llegar, en los términos de la línea; el importe es lo pendiente × costo de la línea.
 - «Compras por proveedor»: recepciones y devoluciones entre dos días del calendario de la empresa (por omisión, el mes en curso); importe recibido = recibido × costo copiado en la línea de recepción (CMP-13), devuelto con el mismo costo; neto = recibido − devuelto. Lo que llegó sin costo se cuenta aparte, no se valúa.
 - Archivos con `buildCsv`/`buildXlsx`, permiso `purchasing.report.export`, mismas filas que la pantalla y columnas de importe solo con `purchasing.cost.read`; bitácora `purchasing.report_exported`.
+
+## Quitar el módulo Compras (CMP-17)
+
+- Quitar Compras de una empresa (consola interna, `provisionCompany`) avisa antes si hay trabajo a medias: órdenes enviadas o recibidas en parte, borradores y envíos por correo en camino. Se quita solo si la persona lo confirma (`acceptOpenWork`).
+- Nada se cancela, cierra ni borra: el derecho del módulo termina y Compras queda en solo lectura (MOD-11). Si vuelve, las órdenes siguen donde estaban.
+- La plataforma no importa módulos: la consola le pasa `moduleOpenWork` de `@/modules/registry`, que pregunta a cada módulo (`purchasingOpenWork`).

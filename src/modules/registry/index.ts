@@ -6,6 +6,8 @@ import { createModuleRegistry } from "@/platform/billing";
 
 import { crmModule, salesModule } from "./announced";
 
+export { moduleOpenWork } from "./open-work";
+
 /**
  * Installed modules. Inventario and Compras can be contracted; Ventas and
  * CRM are announced but not available, so nothing can activate them yet.

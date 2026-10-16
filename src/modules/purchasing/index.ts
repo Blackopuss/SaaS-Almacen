@@ -56,6 +56,7 @@ export {
 export type { PurchaseOrderStatus } from "./order-states";
 export { buildOrderPdf, type OrderPdf } from "./order-pdf";
 export { closePurchaseOrder, type CloseOrderResult } from "./order-close";
+export { purchasingOpenWork } from "./deactivation";
 export {
   PURCHASE_REPORT_KINDS,
   REPORT_MAX_ROWS,
