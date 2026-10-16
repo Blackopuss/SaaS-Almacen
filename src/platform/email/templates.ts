@@ -170,7 +170,8 @@ export function invitationEmail(input: {
 }): EmailMessage {
   return {
     to: input.to,
-    subject: `${input.inviterName} te invitó a ${input.organizationName} en Almacén`,
+    // Names are written by people: one line, bounded (security audit).
+    subject: `${oneLine(input.inviterName, 60)} te invitó a ${oneLine(input.organizationName, 80)} en Almacén`,
     actionUrl: input.url,
     text: [
       "Hola:",

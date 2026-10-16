@@ -26,7 +26,9 @@ export type Sheet = {
  * program show it as plain text (OWASP, CSV injection).
  */
 export function neutralizeFormula(text: string): string {
-  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  // Also after leading spaces, and the full-width signs some programs
+  // read as the usual ones (security audit).
+  return /^[\s 　]*[=+\-@＝＋－＠]|^[\t\r\n]/.test(text) ? `'${text}` : text;
 }
 
 const cellText = (cell: Cell): string =>

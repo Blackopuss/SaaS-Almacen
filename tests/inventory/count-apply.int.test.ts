@@ -19,9 +19,9 @@ import {
 import { moduleRegistry } from "@/modules/registry";
 import type { Role } from "@/platform/authorization";
 import { provisionCompany } from "@/platform/billing";
-import { createProduct } from "@/platform/catalog";
+import { archiveProduct, createProduct } from "@/platform/catalog";
 import { invalidateEntitlements } from "@/platform/entitlements";
-import { createLocation } from "@/platform/locations";
+import { archiveLocation, createLocation } from "@/platform/locations";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
@@ -222,6 +222,54 @@ describe("applyCount", () => {
     });
     expect(await stock("Tornillo")).toBe("35");
     expect(await adjustments(actor)).toBe(before + 1);
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("never puts stock back on something archived (security audit)", async () => {
+    const { countId, locationId, products, stock } = await scene(
+      actor,
+      { Broca: "0" },
+      { Broca: "5" },
+    );
+    // While the count is open, neither the product nor the shelf is archived.
+    expect(await archiveProduct(actor, products.Broca!)).toMatchObject({
+      ok: false,
+      reason: "has_open_count",
+    });
+    expect(await archiveLocation(actor, locationId)).toMatchObject({
+      ok: false,
+      reason: "not_allowed",
+    });
+    // And should either be archived anyway, applying refuses.
+    await db.location.update({
+      where: { id: locationId },
+      data: { archivedAt: new Date() },
+    });
+    expect(await applyCount(actor, { countId, reason: REASON })).toMatchObject({
+      ok: false,
+      reason: "not_allowed",
+    });
+    await db.location.update({
+      where: { id: locationId },
+      data: { archivedAt: null },
+    });
+    await db.product.update({
+      where: { id: products.Broca! },
+      data: { status: "ARCHIVED" },
+    });
+    expect(await applyCount(actor, { countId, reason: REASON })).toMatchObject({
+      ok: false,
+      reason: "not_allowed",
+    });
+    await db.product.update({
+      where: { id: products.Broca! },
+      data: { status: "ACTIVE" },
+    });
+    expect(await stock("Broca")).toBe("0");
+    expect(await applyCount(actor, { countId, reason: REASON })).toMatchObject({
+      ok: true,
+    });
+    expect(await stock("Broca")).toBe("5");
     expect(await reconcileStock(actor.organizationId)).toEqual([]);
   });
 

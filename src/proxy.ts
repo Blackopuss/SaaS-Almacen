@@ -38,7 +38,9 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // The same paths as PROTECTED (security audit: some were missing).
   matcher: [
+    "/inicio/:path*",
     "/inventario/:path*",
     "/movimientos/:path*",
     "/ubicaciones/:path*",
@@ -48,5 +50,9 @@ export const config = {
     "/activa-dos-pasos",
     "/crear-empresa",
     "/interno/:path*",
+    "/api/archivos/:path*",
+    "/api/importaciones/:path*",
+    "/api/exportaciones/:path*",
+    "/api/compras/:path*",
   ],
 };

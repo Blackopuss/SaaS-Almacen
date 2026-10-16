@@ -1073,6 +1073,31 @@ export async function applyCount(
             // Someone captured another product meanwhile: start over.
             return "retry" as const;
           }
+          // Nothing archived gets stock back (INV-19B, NEG-21; security
+          // audit): archiving refuses while a count is open, and this is
+          // the second check. Order: products → location, as movements.
+          await lockRows(tx, "location", [count.locationId]);
+          const location = await tx.location.findFirst({
+            where: { id: count.locationId },
+            select: { archivedAt: true },
+          });
+          if (!location || location.archivedAt) {
+            return reject(
+              "not_allowed",
+              "La ubicación de este conteo está archivada. Restáurala o cancela el conteo.",
+            );
+          }
+          const archived = await tx.product.findMany({
+            where: { id: { in: [...locked] }, status: { not: "ACTIVE" } },
+            take: 3,
+            select: { name: true },
+          });
+          if (archived.length > 0) {
+            return reject(
+              "not_allowed",
+              `Hay productos archivados en este conteo (${archived.map((product) => product.name).join(", ")}). Reactívalos o cancela el conteo.`,
+            );
+          }
 
           const balances = new Map(
             (

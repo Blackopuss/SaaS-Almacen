@@ -79,5 +79,6 @@ export type {
 export { applyImportedProduct } from "./imported-products";
 export type {
   ImportedProduct,
+  ImportedProductKind,
   ImportedProductResult,
 } from "./imported-products";

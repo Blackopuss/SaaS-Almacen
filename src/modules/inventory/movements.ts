@@ -1952,7 +1952,8 @@ export async function listMovements(
     ? new Date(toStart.getTime() + 24 * 60 * 60 * 1000)
     : null;
   const type =
-    filters.type && filters.type in MOVEMENT_TYPE_LABELS
+    // Own keys only: "constructor" or "toString" are not movement types.
+    filters.type && Object.hasOwn(MOVEMENT_TYPE_LABELS, filters.type)
       ? (filters.type as MovementType)
       : null;
   const productId = filters.productId

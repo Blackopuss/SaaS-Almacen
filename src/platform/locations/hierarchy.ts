@@ -86,7 +86,7 @@ const reject = (
 
 type Tx = Pick<
   TenantDb,
-  "facility" | "location" | "auditEvent" | "stockBalance"
+  "facility" | "location" | "auditEvent" | "stockBalance" | "stockCount"
 >;
 
 type Row = {
@@ -434,6 +434,17 @@ export async function archiveLocation(
         stocked === 1
           ? "Todavía hay existencias de un producto aquí. Regístralas como salida o ajústalas a cero antes de archivarla."
           : `Todavía hay existencias de ${stocked} productos aquí. Regístralas como salida o ajústalas a cero antes de archivarla.`,
+      );
+    }
+    // Nor one being counted: applying the count would put stock back in
+    // an archived location (security audit).
+    const counting = await tx.stockCount.count({
+      where: { locationId: location.id, status: "OPEN" },
+    });
+    if (counting > 0) {
+      reject(
+        "not_allowed",
+        "Hay un conteo abierto en esta ubicación. Aplícalo o cancélalo antes de archivarla.",
       );
     }
     const inside = await tx.location.count({

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { dec, newId } from "@/lib";
+import { dec, isMultipleOf, newId } from "@/lib";
 import {
   confirmReservation,
   consumeQuota,
@@ -34,6 +34,9 @@ export type ImportedProduct = {
   presentation: { name: string; content: string } | null;
 };
 
+/** What applying a row does to the catalog. */
+export type ImportedProductKind = "new" | "update" | "reactivate";
+
 export type ImportedProductResult =
   | {
       ok: true;
@@ -47,6 +50,8 @@ export type ImportedProductResult =
       presentationVersionId: string | null;
       /** Unit the product is kept in. */
       unitCode: string;
+      /** Increment of the product, to check what else the row brings. */
+      quantityStep: string;
     }
   | { ok: false; error: string };
 
@@ -67,13 +72,55 @@ export async function applyImportedProduct(
   options: {
     /** The import still holds places of the plan. */
     hasReservation: boolean;
+    /**
+     * Whether what the row turns out to do — decided by the catalog now,
+     * not when the import was confirmed — was authorized (security
+     * audit: a product archived meanwhile must not come back unless the
+     * person may reactivate).
+     */
+    allows: (kind: ImportedProductKind) => boolean;
   },
 ): Promise<ImportedProductResult> {
   const { organizationId, userId } = actor;
   const existing = await tx.product.findFirst({
     where: { sku: input.sku },
-    select: { id: true, status: true, unitCode: true, barcode: true },
+    select: {
+      id: true,
+      status: true,
+      unitCode: true,
+      barcode: true,
+      quantityStep: true,
+    },
   });
+  const kind: ImportedProductKind = !existing
+    ? "new"
+    : existing.status === "ACTIVE"
+      ? "update"
+      : "reactivate";
+  if (!options.allows(kind)) {
+    return {
+      ok: false,
+      error:
+        kind === "reactivate"
+          ? "El producto se archivó después de confirmar la importación y no tienes permiso para reactivarlo."
+          : "El catálogo cambió después de confirmar la importación y no tienes permiso para este cambio.",
+    };
+  }
+  const quantityStep = existing
+    ? existing.quantityStep.toString()
+    : defaultStep(input.unitCode);
+  // The content of a presentation is checked against the product's own
+  // increment, as a manual change would (security audit).
+  if (
+    input.presentation &&
+    !isMultipleOf(input.presentation.content, quantityStep)
+  ) {
+    return {
+      ok: false,
+      error:
+        "El contenido de la presentación no cabe en la precisión del producto.",
+    };
+  }
   if (existing && existing.unitCode !== input.unitCode) {
     return {
       ok: false,
@@ -227,5 +274,6 @@ export async function applyImportedProduct(
     presentationId,
     presentationVersionId,
     unitCode: input.unitCode,
+    quantityStep,
   };
 }

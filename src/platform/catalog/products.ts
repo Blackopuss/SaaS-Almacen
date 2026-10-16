@@ -582,6 +582,9 @@ export async function updateProduct(
 
   try {
     await forOrganization(organizationId).$transaction(async (tx) => {
+      // Movements lock the product too: the first one cannot slip in
+      // between deciding the unit may change and changing it.
+      await lockRows(tx, "product", [id]);
       const current = await tx.product.findFirst({
         where: { id },
         select: {
@@ -748,7 +751,8 @@ export type ProductStatusResult =
         | "unchanged"
         | "limit_reached"
         | "has_stock"
-        | "has_open_orders";
+        | "has_open_orders"
+        | "has_open_count";
       error: string;
     };
 
@@ -820,6 +824,20 @@ export async function archiveProduct(
             ok: false,
             reason: "has_open_orders",
             error: `Este producto todavía está por llegar en ${open.length === 1 ? "la orden" : "las órdenes"} ${listed}${open.length > 3 ? ` y ${open.length - 3} más` : ""}. Recíbela, ciérrala con faltante o cancélala antes de archivarlo.`,
+          });
+        }
+        // Nor one being counted: applying the count would put stock back
+        // on an archived product (security audit). Captures lock the
+        // product first, so no count takes it in while we decide.
+        const counting = await tx.stockCountLine.count({
+          where: { productId: id, count: { status: "OPEN" } },
+        });
+        if (counting > 0) {
+          throw new StatusRejected({
+            ok: false,
+            reason: "has_open_count",
+            error:
+              "Este producto está en un conteo abierto. Aplica o cancela el conteo antes de archivarlo.",
           });
         }
       }

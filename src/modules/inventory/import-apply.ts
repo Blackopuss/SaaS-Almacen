@@ -1,10 +1,14 @@
 import "server-only";
 
-import { isAppError, newId } from "@/lib";
+import { isAppError, isMultipleOf, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
-import { isPermission } from "@/platform/authorization";
+import { isPermission, type Permission } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
-import { applyImportedProduct } from "@/platform/catalog";
+import {
+  applyImportedProduct,
+  defaultStep,
+  type ImportedProductKind,
+} from "@/platform/catalog";
 import { releaseReservation } from "@/platform/entitlements";
 import type { JobHandlers } from "@/platform/jobs";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
@@ -51,6 +55,13 @@ export type ImportItemData = {
   }[];
 };
 
+/** Permission each thing a row may do needs. */
+const KIND_PERMISSION: Record<ImportedProductKind, Permission> = {
+  new: "inventory.product.create",
+  update: "inventory.product.update",
+  reactivate: "inventory.product.reactivate",
+};
+
 /** Products applied per transaction. */
 const BATCH = 50;
 
@@ -88,6 +99,27 @@ export async function applyImport(
         requiredPermissions: true,
       },
     });
+    // What the person may do to the catalog now, whatever was planned: the
+    // catalog may have changed since confirming (security audit). Read
+    // here, outside the batch's transaction.
+    const may = new Set<Permission>();
+    if (gate && (gate.status === "CONFIRMED" || gate.status === "RUNNING")) {
+      for (const permission of [
+        ...Object.values(KIND_PERMISSION),
+        "inventory.presentation.update" as const,
+      ]) {
+        try {
+          await assertModulePermission(
+            organizationId,
+            gate.confirmedByUserId ?? gate.createdByUserId,
+            permission,
+          );
+          may.add(permission);
+        } catch (error) {
+          if (!isAppError(error) || error.kind !== "forbidden") throw error;
+        }
+      }
+    }
     if (gate && (gate.status === "CONFIRMED" || gate.status === "RUNNING")) {
       // Everything its operations need, as fixed when it was confirmed.
       const needed = new Set(["inventory.import.confirm"]);
@@ -268,6 +300,24 @@ export async function applyImport(
               continue;
             }
           }
+          // The minimum fits the product's own increment, as by hand —
+          // checked before the product is touched (security audit).
+          if (data.minimum) {
+            const own = await tx.product.findFirst({
+              where: { sku: item.sku },
+              select: { quantityStep: true },
+            });
+            const step = own
+              ? own.quantityStep.toString()
+              : defaultStep(data.unitCode);
+            if (!isMultipleOf(data.minimum, step)) {
+              await fail(
+                item.id,
+                "El mínimo no cabe en la precisión del producto.",
+              );
+              continue;
+            }
+          }
           const applied = await applyImportedProduct(
             tx,
             actor,
@@ -281,7 +331,16 @@ export async function applyImport(
               unitCode: data.unitCode,
               presentation: data.presentation,
             },
-            { hasReservation: reserved > 0 },
+            {
+              hasReservation: reserved > 0,
+              // What the catalog makes of the row now must have been
+              // authorized, even if it was planned as something else.
+              allows: (kind) =>
+                may.has(KIND_PERMISSION[kind]) &&
+                (kind === "new" ||
+                  !data.presentation ||
+                  may.has("inventory.presentation.update")),
+            },
           );
           if (!applied.ok) {
             await fail(item.id, applied.error);
