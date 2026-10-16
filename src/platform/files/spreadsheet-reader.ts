@@ -58,9 +58,13 @@ const TOO_MANY_COLUMNS = `El archivo tiene más de ${READ_LIMITS.columns} column
 const NOT_XLSX =
   "No pudimos leer el archivo como Excel (.xlsx). Ábrelo en Excel y guárdalo de nuevo como «Libro de Excel (.xlsx)».";
 
-/** Text of a cell: no control characters, trimmed, bounded. */
+/**
+ * Text of a cell: no control characters, trimmed, bounded. It is cut
+ * before cleaning too, so a huge cell costs no more than a long one.
+ */
 function clean(text: string): string {
   return text
+    .slice(0, READ_LIMITS.cell * 4)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .replace(/\r\n?|\n/g, " ")
     .trim()
@@ -293,7 +297,7 @@ function unescapeXml(text: string): string {
       String.fromCharCode(parseInt(hex, 16)),
     )
     .replace(
-      /&(#x[0-9A-Fa-f]{1,6}|#\d{1,7}|[a-z]+);/g,
+      /&(#x[0-9A-Fa-f]{1,6}|#\d{1,7}|[a-z]{1,8});/g,
       (whole, name: string) => {
         if (name.startsWith("#")) {
           const code =
@@ -310,12 +314,92 @@ function unescapeXml(text: string): string {
 const attribute = (tag: string, name: string): string | null =>
   new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
 
+/** Longest start tag accepted; Excel's are a few dozen characters. */
+const MAX_TAG = 4_096;
+
+/** Whether `xml` has `<name` at `at` as a whole tag name. */
+function isTagAt(xml: string, at: number, name: string): boolean {
+  const after = xml.charCodeAt(at + 1 + name.length);
+  // ">", "/", space, tab, line feed or carriage return.
+  return (
+    after === 62 ||
+    after === 47 ||
+    after === 32 ||
+    after === 9 ||
+    after === 10 ||
+    after === 13
+  );
+}
+
+/** Where the next `<name` tag starts, or -1. */
+function nextTag(xml: string, name: string, from: number): number {
+  for (let at = xml.indexOf(`<${name}`, from); at >= 0;) {
+    if (isTagAt(xml, at, name)) return at;
+    at = xml.indexOf(`<${name}`, at + 1);
+  }
+  return -1;
+}
+
+/** Whether a `<name` tag appears anywhere in `xml`. */
+const hasTag = (xml: string, name: string): boolean =>
+  nextTag(xml, name, 0) >= 0;
+
+/**
+ * The `<name …>…</name>` elements of `xml`, in order, found with plain
+ * searches: each character is looked at a bounded number of times, so a
+ * broken or hostile file costs one pass. (Regular expressions with lazy
+ * repeats went quadratic on tags left open: a file of under a kilobyte
+ * held the server for seconds.) A tag left open is a broken file.
+ */
+function* elements(
+  xml: string,
+  name: string,
+): Generator<{ tag: string; body: string }> {
+  const close = `</${name}>`;
+  for (let at = nextTag(xml, name, 0); at >= 0;) {
+    const end = xml.indexOf(">", at);
+    if (end < 0 || end - at > MAX_TAG) fail("format", NOT_XLSX);
+    const tag = xml.slice(at + 1 + name.length, end);
+    if (tag.endsWith("/")) {
+      yield { tag: tag.slice(0, -1), body: "" };
+      at = nextTag(xml, name, end + 1);
+      continue;
+    }
+    const finish = xml.indexOf(close, end + 1);
+    if (finish < 0) fail("format", NOT_XLSX);
+    yield { tag, body: xml.slice(end + 1, finish) };
+    at = nextTag(xml, name, finish + close.length);
+  }
+}
+
+/** The body of the first `<name>` element, or "". */
+function firstBody(xml: string, name: string): string {
+  for (const element of elements(xml, name)) return element.body;
+  return "";
+}
+
+/** `xml` without its `<name>…</name>` elements. */
+function without(xml: string, name: string): string {
+  const close = `</${name}>`;
+  let kept = "";
+  let from = 0;
+  for (let at = nextTag(xml, name, 0); at >= 0;) {
+    const finish = xml.indexOf(close, at);
+    if (finish < 0) fail("format", NOT_XLSX);
+    kept += xml.slice(from, at);
+    from = finish + close.length;
+    at = nextTag(xml, name, from);
+  }
+  return kept + xml.slice(from);
+}
+
 /** All the text of a string item: its runs, without phonetic guides. */
 function textOf(item: string): string {
-  const visible = item.replace(/<rPh[\s\S]*?<\/rPh>/g, "");
   let text = "";
-  for (const match of visible.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)) {
-    text += unescapeXml(match[1]!);
+  for (const { body } of elements(without(item, "rPh"), "t")) {
+    text += unescapeXml(body);
+    // Only the start of a cell is kept: no reason to build more.
+    if (text.length > READ_LIMITS.cell * 4) break;
   }
   return text;
 }
@@ -351,6 +435,9 @@ function numberText(stored: string): string {
     : short;
 }
 
+/** Cell elements read in one sheet, empty ones included. */
+const MAX_CELL_ELEMENTS = READ_LIMITS.rows * 100;
+
 function readSheet(
   xml: string,
   shared: string[],
@@ -358,32 +445,34 @@ function readSheet(
   const rows: string[][] = [];
   let formulaCells = 0;
   let next = 0;
-  for (const rowMatch of xml.matchAll(
-    /<row(\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/row>)/g,
-  )) {
-    const declared = Number(attribute(rowMatch[1] ?? "", "r"));
+  // What the file holds is counted, not just where it says things go: a
+  // row or cell repeated without an address must not slip past the limits.
+  let rowElements = 0;
+  let cellElements = 0;
+  for (const { tag: rowTag, body: rowBody } of elements(xml, "row")) {
+    if (++rowElements > READ_LIMITS.rows) fail("too_large", TOO_MANY_ROWS);
+    const declared = Number(attribute(rowTag, "r"));
     const index = declared >= 1 ? declared - 1 : next;
     next = index + 1;
     if (index >= READ_LIMITS.rows) fail("too_large", TOO_MANY_ROWS);
     const row: string[] = [];
     let column = 0;
-    for (const cell of (rowMatch[2] ?? "").matchAll(
-      /<c(\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/c>)/g,
-    )) {
-      const tag = cell[1] ?? "";
-      const body = cell[2] ?? "";
+    for (const { tag, body } of elements(rowBody, "c")) {
+      if (++cellElements > MAX_CELL_ELEMENTS) fail("too_large", TOO_MANY_ROWS);
       const reference = attribute(tag, "r");
       const at = reference ? columnIndex(reference) : column;
       column = at + 1;
       if (at < 0) continue;
       if (at >= READ_LIMITS.columns) {
         // Stray content far to the right is ignored unless it is text.
-        if (/<v>|<is>/.test(body)) fail("too_large", TOO_MANY_COLUMNS);
+        if (hasTag(body, "v") || hasTag(body, "is")) {
+          fail("too_large", TOO_MANY_COLUMNS);
+        }
         continue;
       }
-      if (/<f[\s>/]/.test(body)) formulaCells++;
+      if (hasTag(body, "f")) formulaCells++;
       const type = attribute(tag, "t") ?? "n";
-      const value = /<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? "";
+      const value = firstBody(body, "v");
       let text = "";
       if (type === "s") text = shared[Number(value)] ?? "";
       else if (type === "inlineStr") text = textOf(body);
@@ -421,11 +510,12 @@ export function readXlsx(bytes: Uint8Array): ReadSpreadsheetResult {
     );
     const workbook = xmlText(parts.get("xl/workbook.xml"));
     const relations = new Map<string, string>();
-    for (const match of xmlText(
-      parts.get("xl/_rels/workbook.xml.rels"),
-    ).matchAll(/<Relationship\s[^>]*>/g)) {
-      const id = attribute(match[0], "Id");
-      const target = attribute(match[0], "Target");
+    for (const { tag } of elements(
+      xmlText(parts.get("xl/_rels/workbook.xml.rels")),
+      "Relationship",
+    )) {
+      const id = attribute(tag, "Id");
+      const target = attribute(tag, "Target");
       if (id && target) {
         relations.set(
           id,
@@ -433,27 +523,25 @@ export function readXlsx(bytes: Uint8Array): ReadSpreadsheetResult {
         );
       }
     }
-    const sheets = [...workbook.matchAll(/<sheet\s[^>]*>/g)].flatMap(
-      (match) => {
-        const name = attribute(match[0], "name");
-        const id = attribute(match[0], "r:id");
-        const path = id ? relations.get(id) : undefined;
-        // Hidden sheets hold lists and helpers, not what the person filled in.
-        const hidden = attribute(match[0], "state");
-        return name && path && !hidden
-          ? [{ name: unescapeXml(name), path }]
-          : [];
-      },
-    );
+    const sheets = [...elements(workbook, "sheet")].flatMap(({ tag }) => {
+      const name = attribute(tag, "name");
+      const id = attribute(tag, "r:id");
+      const path = id ? relations.get(id) : undefined;
+      // Hidden sheets hold lists and helpers, not what the person filled in.
+      const hidden = attribute(tag, "state");
+      return name && path && !hidden ? [{ name: unescapeXml(name), path }] : [];
+    });
     const chosen =
       sheets.find((sheet) => sheet.name.trim().toLowerCase() === "productos") ??
       sheets[0];
     if (!chosen) return fail("format", NOT_XLSX);
 
     const sharedPart = parts.get("xl/sharedStrings.xml");
+    // Cut to what a cell keeps, so a long string used by many cells is
+    // cleaned at that size each time, not at its full length.
     const shared = sharedPart
-      ? [...xmlText(sharedPart).matchAll(/<si>([\s\S]*?)<\/si>|<si\/>/g)].map(
-          (match) => textOf(match[1] ?? ""),
+      ? Array.from(elements(xmlText(sharedPart), "si"), ({ body }) =>
+          textOf(body).slice(0, READ_LIMITS.cell * 4),
         )
       : [];
     const sheet = readSheet(xmlText(parts.get(chosen.path)), shared);

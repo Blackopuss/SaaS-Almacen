@@ -366,6 +366,68 @@ describe("readXlsx", () => {
     expect(readXlsx(huge)).toMatchObject({ ok: false, reason: "too_large" });
   });
 
+  it("costs one pass even when tags are left open (security audit)", () => {
+    // Each of these took seconds with the lazy regular expressions: a
+    // file of under a kilobyte held the whole server.
+    const hostile = [
+      "<row>".repeat(100_000),
+      `<row r="1">${"<c>".repeat(100_000)}</row>`,
+      `<row r="1"><c t="inlineStr"><is>${"<t>".repeat(100_000)}</is></c></row>`,
+      `<row r="1"><c t="inlineStr"><is>${"<rPh>".repeat(100_000)}</is></c></row>`,
+      `<row r="1"><c>${"<v>".repeat(100_000)}</c></row>`,
+    ];
+    for (const sheetData of hostile) {
+      const started = performance.now();
+      expect(readXlsx(workbook(sheetData))).toMatchObject({
+        ok: false,
+        reason: "format",
+      });
+      expect(performance.now() - started).toBeLessThan(500);
+    }
+    const strings = readXlsx(
+      workbook('<row r="1"><c r="A1" t="s"><v>0</v></c></row>', {
+        "xl/sharedStrings.xml": `<sst ${NS}>${"<si>".repeat(100_000)}</sst>`,
+      }),
+    );
+    expect(strings).toMatchObject({ ok: false, reason: "format" });
+    // A start tag no spreadsheet would write.
+    expect(
+      readXlsx(workbook(`<row r="1" x="${"a".repeat(10_000)}"></row>`)),
+    ).toMatchObject({ ok: false, reason: "format" });
+  });
+
+  it("does not clean a long shared string once per cell", () => {
+    const cells = '<c r="A1" t="s"><v>0</v></c>';
+    const rows = Array.from(
+      { length: 2_000 },
+      (_, i) => `<row r="${i + 1}">${cells.replace("A1", `A${i + 1}`)}</row>`,
+    ).join("");
+    const started = performance.now();
+    const result = readXlsx(
+      workbook(rows, {
+        "xl/sharedStrings.xml": `<sst ${NS}><si><t>${"x".repeat(1_000_000)}</t></si></sst>`,
+      }),
+    );
+    expect(performance.now() - started).toBeLessThan(1_000);
+    const read = rowsOf(result);
+    expect(read).toHaveLength(2_000);
+    expect(read[1_999]![0]).toHaveLength(READ_LIMITS.cell);
+  });
+
+  it("counts rows and cells as written, not only where they say they go", () => {
+    // Rows that all claim to be row 1 still count.
+    expect(
+      readXlsx(workbook('<row r="1"/>'.repeat(READ_LIMITS.rows + 1))),
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    expect(
+      readXlsx(
+        workbook(
+          `<row r="1">${'<c r="A1"/>'.repeat(READ_LIMITS.rows * 100 + 1)}</row>`,
+        ),
+      ),
+    ).toMatchObject({ ok: false, reason: "too_large" });
+  });
+
   it("explains protected, old and broken files", () => {
     const ole = Buffer.concat([
       Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
