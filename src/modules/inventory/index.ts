@@ -20,6 +20,7 @@ export {
   registerInitialBalance,
   registerTransfer,
   reverseMovement,
+  startOfDay,
 } from "./movements";
 export type {
   AdjustmentInput,

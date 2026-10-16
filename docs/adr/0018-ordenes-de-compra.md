@@ -46,3 +46,10 @@ Una orden de compra es lo que el negocio le pide a un proveedor. Es el documento
 - Proveedor: el del último costo más reciente; si no hay, el primer vínculo. Proveedores archivados no cuentan.
 - Generar: el navegador manda solo ids de productos; el servidor los bloquea (`lockRows`) y recalcula, crea un borrador por proveedor (en partes si pasa del máximo de líneas) con el último costo solo si era para la misma presentación y la persona tiene `purchasing.cost.record`. Dos generaciones a la vez quedan en fila por los candados y la segunda ve los borradores de la primera como «en camino».
 - A confirmar por el fundador: si se pide hasta el mínimo o hasta un máximo/cantidad de reorden, y si los borradores deben contar como «en camino».
+
+## Reportes de compras (CMP-15)
+
+- Se derivan cada vez de órdenes, recepciones y devoluciones; no hay tablas de reportes.
+- «Pendientes por recibir»: líneas de órdenes `SENT`/`PARTIAL` con algo por llegar, en los términos de la línea; el importe es lo pendiente × costo de la línea.
+- «Compras por proveedor»: recepciones y devoluciones entre dos días del calendario de la empresa (por omisión, el mes en curso); importe recibido = recibido × costo copiado en la línea de recepción (CMP-13), devuelto con el mismo costo; neto = recibido − devuelto. Lo que llegó sin costo se cuenta aparte, no se valúa.
+- Archivos con `buildCsv`/`buildXlsx`, permiso `purchasing.report.export`, mismas filas que la pantalla y columnas de importe solo con `purchasing.cost.read`; bitácora `purchasing.report_exported`.

@@ -57,6 +57,20 @@ export type { PurchaseOrderStatus } from "./order-states";
 export { buildOrderPdf, type OrderPdf } from "./order-pdf";
 export { closePurchaseOrder, type CloseOrderResult } from "./order-close";
 export {
+  PURCHASE_REPORT_KINDS,
+  REPORT_MAX_ROWS,
+  buildPurchaseReport,
+  getPendingReport,
+  getPurchasesBySupplier,
+  isPurchaseReportKind,
+  type PendingReport,
+  type PendingRow,
+  type PurchaseReportFile,
+  type PurchaseReportKind,
+  type SupplierReport,
+  type SupplierRow,
+} from "./reports";
+export {
   generateSuggestedOrders,
   getPurchaseSuggestions,
   type GenerateSuggestedResult,
