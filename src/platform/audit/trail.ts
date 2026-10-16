@@ -39,6 +39,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "purchase_order.closed": "Cerró una orden de compra con faltante",
   "purchase_order.exported": "Descargó el PDF de una orden de compra",
   "purchase_order.received": "Recibió mercancía de una orden de compra",
+  "purchase_order.returned": "Devolvió mercancía al proveedor",
   "purchase_order.delivery_requested":
     "Pidió enviar una orden de compra por correo",
   "purchase_order.delivered": "Se envió una orden de compra por correo",

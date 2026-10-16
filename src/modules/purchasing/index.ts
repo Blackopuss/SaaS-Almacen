@@ -57,6 +57,12 @@ export type { PurchaseOrderStatus } from "./order-states";
 export { buildOrderPdf, type OrderPdf } from "./order-pdf";
 export { closePurchaseOrder, type CloseOrderResult } from "./order-close";
 export {
+  findReturnConfirmation,
+  returnToSupplier,
+  type ReturnInput,
+  type ReturnResult,
+} from "./returns";
+export {
   findReceiptConfirmation,
   getOrderReceipts,
   receivePurchaseOrder,

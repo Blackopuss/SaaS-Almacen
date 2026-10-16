@@ -51,6 +51,8 @@ export const TENANT_MODELS = [
   "PurchaseOrderLine",
   "PurchaseReceipt",
   "PurchaseReceiptLine",
+  "PurchaseReturn",
+  "PurchaseReturnLine",
   "QuotaUsage",
   "StockBalance",
   "StockCount",

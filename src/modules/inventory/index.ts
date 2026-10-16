@@ -44,6 +44,11 @@ export type {
   ReceiptEntryLine,
   ReceiptEntryResult,
 } from "./receipt-entry";
+export {
+  postReturnExit,
+  type ReturnExitLine,
+  type ReturnExitResult,
+} from "./return-exit";
 export { reconcileStock } from "./reconciliation";
 export type { StockDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";

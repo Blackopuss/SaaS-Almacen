@@ -354,9 +354,10 @@ beforeAll(async () => {
         receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const receiptLineId = newId();
     await db.purchaseReceiptLine.create({
       data: {
-        id: newId(),
+        id: receiptLineId,
         organizationId,
         receiptId,
         lineNumber: 1,
@@ -366,6 +367,43 @@ beforeAll(async () => {
         capturedQuantity: "5",
         factor: "1",
         baseQuantity: "5",
+        unitCode: "piece",
+      },
+    });
+    // A return of that receipt (CMP-12): its movement, the return and its line.
+    const returnMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: returnMovementId,
+        organizationId,
+        type: "RETURN",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const returnId = newId();
+    await db.purchaseReturn.create({
+      data: {
+        id: returnId,
+        organizationId,
+        receiptId,
+        movementId: returnMovementId,
+        reason: "Llegó dañado",
+        idempotencyKey: newId(),
+        returnedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.purchaseReturnLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        returnId,
+        lineNumber: 1,
+        receiptLineId,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "1",
+        factor: "1",
+        baseQuantity: "1",
         unitCode: "piece",
       },
     });

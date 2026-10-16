@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { dec, formatDecimal, newId } from "@/lib";
+import { dec, formatDecimal, isAppError, newId } from "@/lib";
 import { formatStock, postReceiptEntry } from "@/modules/inventory";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
@@ -638,21 +638,82 @@ export type ReceiptSummary = {
   authorName: string | null;
   reference: string | null;
   lines: {
+    receiptLineId: string;
     productName: string;
     sku: string;
     /** «3 cajas × 100 = 300 piezas» with the content it was received with. */
     quantityText: string;
     locationPath: string;
+    /** Where it was put: where a return takes it from by default. */
+    locationId: string;
+    /** What may still go back to the supplier ("2"), or "0" (CMP-12). */
+    returnableQuantity: string;
+    /** «2 cajas»; null when everything already went back. */
+    returnableText: string | null;
+    /** «1 caja» already returned; null while nothing was. */
+    returnedText: string | null;
+    /** «cajas», «piezas». */
+    unitText: string;
+  }[];
+  /** Absent for who may not see returns (`purchasing.return.read`). */
+  returns?: {
+    id: string;
+    createdAt: Date;
+    authorName: string | null;
+    reason: string;
+    lines: {
+      productName: string;
+      sku: string;
+      /** «1 caja × 100 = 100 piezas». */
+      quantityText: string;
+      locationPath: string;
+    }[];
   }[];
 };
 
 export type OrderReceipts = {
   /** Something of it is still pending and the order is waiting for it. */
   canReceive: boolean;
+  /** Something received may still go back to the supplier (CMP-12). */
+  canReturn: boolean;
   lines: PendingLine[];
   /** Newest first. */
   receipts: ReceiptSummary[];
 };
+
+const placeSelect = {
+  name: true,
+  parent: { select: { name: true, parent: { select: { name: true } } } },
+} as const;
+
+/** «Zona A › Pasillo 2 › A-01». */
+function pathOf(location: {
+  name: string;
+  parent: { name: string; parent: { name: string } | null } | null;
+}): string {
+  return formatLocationPath(
+    [
+      location.parent?.parent?.name,
+      location.parent?.name,
+      location.name,
+    ].filter((name): name is string => Boolean(name)),
+  );
+}
+
+/** Whether the person may see returns: never an error, just yes or no. */
+async function mayReadReturns(actor: PurchasingActor): Promise<boolean> {
+  try {
+    await assertModulePermission(
+      actor.organizationId,
+      actor.userId,
+      "purchasing.return.read",
+    );
+    return true;
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") return false;
+    throw error;
+  }
+}
 
 /** «3 cajas», «2.5 metros»: a quantity in the terms of an order line. */
 export function inTermsOf(
@@ -717,18 +778,37 @@ export async function getOrderReceipts(
           lines: {
             orderBy: { lineNumber: "asc" },
             select: {
+              id: true,
               capturedQuantity: true,
               factor: true,
               baseQuantity: true,
               unitCode: true,
+              locationId: true,
               product: { select: { name: true, sku: true } },
               presentation: { select: { name: true } },
-              location: {
+              location: { select: placeSelect },
+              returnLines: { select: { capturedQuantity: true } },
+            },
+          },
+          returns: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 50,
+            select: {
+              id: true,
+              createdAt: true,
+              reason: true,
+              returnedByUserId: true,
+              lines: {
+                orderBy: { lineNumber: "asc" },
                 select: {
-                  name: true,
-                  parent: {
-                    select: { name: true, parent: { select: { name: true } } },
+                  capturedQuantity: true,
+                  factor: true,
+                  unitCode: true,
+                  product: { select: { name: true, sku: true } },
+                  receiptLine: {
+                    select: { presentation: { select: { name: true } } },
                   },
+                  location: { select: placeSelect },
                 },
               },
             },
@@ -781,44 +861,94 @@ export async function getOrderReceipts(
     };
   });
 
+  const seeReturns = await mayReadReturns(actor);
   const authors = await client.membership.findMany({
     where: {
       userId: {
-        in: [...new Set(order.receipts.map((r) => r.receivedByUserId))],
+        in: [
+          ...new Set([
+            ...order.receipts.map((r) => r.receivedByUserId),
+            ...order.receipts.flatMap((r) =>
+              r.returns.map((back) => back.returnedByUserId),
+            ),
+          ]),
+        ],
       },
     },
     select: { userId: true, user: { select: { name: true } } },
   });
   const names = new Map(authors.map((row) => [row.userId, row.user.name]));
 
+  const receipts = order.receipts.map((receipt): ReceiptSummary => ({
+    id: receipt.id,
+    createdAt: receipt.createdAt,
+    authorName: names.get(receipt.receivedByUserId) ?? null,
+    reference: receipt.reference,
+    lines: receipt.lines.map((line) => {
+      const captured = dec(line.capturedQuantity.toString());
+      const base = formatStock(line.baseQuantity.toString(), line.unitCode);
+      const back = line.returnLines.reduce(
+        (sum, row) => sum.plus(row.capturedQuantity.toString()),
+        dec(0),
+      );
+      const left = captured.minus(back);
+      return {
+        receiptLineId: line.id,
+        productName: line.product.name,
+        sku: line.product.sku,
+        quantityText: line.presentation
+          ? `${inTermsOf(captured, line.presentation, line.unitCode)} × ${formatDecimal(line.factor.toString())} = ${base}`
+          : base,
+        locationPath: pathOf(line.location),
+        locationId: line.locationId,
+        returnableQuantity: left.greaterThan(0) ? left.toFixed() : "0",
+        returnableText: left.greaterThan(0)
+          ? inTermsOf(left, line.presentation, line.unitCode)
+          : null,
+        returnedText: back.greaterThan(0)
+          ? inTermsOf(back, line.presentation, line.unitCode)
+          : null,
+        unitText: line.presentation
+          ? pluralizeName(line.presentation.name, dec(2)).toLowerCase()
+          : getUnit(line.unitCode).plural,
+      };
+    }),
+    ...(seeReturns
+      ? {
+          returns: receipt.returns.map((back) => ({
+            id: back.id,
+            createdAt: back.createdAt,
+            authorName: names.get(back.returnedByUserId) ?? null,
+            reason: back.reason,
+            lines: back.lines.map((line) => {
+              const quantity = dec(line.capturedQuantity.toString());
+              const base = formatStock(
+                quantity.times(line.factor.toString()).toString(),
+                line.unitCode,
+              );
+              const presentation = line.receiptLine.presentation;
+              return {
+                productName: line.product.name,
+                sku: line.product.sku,
+                quantityText: presentation
+                  ? `${inTermsOf(quantity, presentation, line.unitCode)} × ${formatDecimal(line.factor.toString())} = ${base}`
+                  : base,
+                locationPath: pathOf(line.location),
+              };
+            }),
+          })),
+        }
+      : {}),
+  }));
+
   return {
     canReceive:
       (order.status === "SENT" || order.status === "PARTIAL") &&
       lines.some((line) => line.pendingText !== null),
+    canReturn: receipts.some((receipt) =>
+      receipt.lines.some((line) => line.returnableText !== null),
+    ),
     lines,
-    receipts: order.receipts.map((receipt) => ({
-      id: receipt.id,
-      createdAt: receipt.createdAt,
-      authorName: names.get(receipt.receivedByUserId) ?? null,
-      reference: receipt.reference,
-      lines: receipt.lines.map((line) => {
-        const captured = dec(line.capturedQuantity.toString());
-        const base = formatStock(line.baseQuantity.toString(), line.unitCode);
-        return {
-          productName: line.product.name,
-          sku: line.product.sku,
-          quantityText: line.presentation
-            ? `${inTermsOf(captured, line.presentation, line.unitCode)} × ${formatDecimal(line.factor.toString())} = ${base}`
-            : base,
-          locationPath: formatLocationPath(
-            [
-              line.location.parent?.parent?.name,
-              line.location.parent?.name,
-              line.location.name,
-            ].filter((name): name is string => Boolean(name)),
-          ),
-        };
-      }),
-    })),
+    receipts,
   };
 }

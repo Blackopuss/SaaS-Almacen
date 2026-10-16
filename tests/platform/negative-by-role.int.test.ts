@@ -437,6 +437,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       tests: [
         "tests/inventory/reversals.int.test.ts",
         "tests/purchasing/receipts.int.test.ts",
+        "tests/purchasing/returns.int.test.ts",
       ],
     },
     "NEG-23": {
@@ -446,8 +447,10 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
       ],
     },
     "NEG-24": {
-      tests: ["tests/purchasing/receipts.int.test.ts"],
-      waitsFor: "CMP-12 (devoluciones a proveedor)",
+      tests: [
+        "tests/purchasing/receipts.int.test.ts",
+        "tests/purchasing/returns.int.test.ts",
+      ],
     },
     "NEG-25": {
       tests: ["tests/inventory/exports.int.test.ts"],

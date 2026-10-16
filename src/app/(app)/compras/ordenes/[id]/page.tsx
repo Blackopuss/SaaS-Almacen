@@ -23,6 +23,7 @@ import { getModuleAccess } from "@/platform/billing";
 
 import { DeliveryPanel } from "./delivery-panel";
 import { CancelOrder, CloseOrder, SubmitOrder } from "./order-buttons";
+import { ReturnReceipt } from "./return-receipt";
 import { ReceiveOrder } from "./receive-order";
 import { RemoveLine } from "./remove-line";
 
@@ -98,7 +99,13 @@ export default async function OrdenPage({
     active &&
     access.allows("purchasing.receipt.create") &&
     access.can("inventory.location.read");
-  const locations = canReceive ? await listStockLocations(actor) : [];
+  const canReturn =
+    !!receipts?.canReturn &&
+    active &&
+    access.allows("purchasing.return.create") &&
+    access.can("inventory.location.read");
+  const locations =
+    canReceive || canReturn ? await listStockLocations(actor) : [];
   // The PDF carries prices: for who may export orders (not Consulta).
   const canExport = access.can("purchasing.order.export");
   const zone = access.organization.timeZone;
@@ -390,28 +397,83 @@ ${order.closeReason ?? ""}`,
             </ul>
           )}
           <ol className="divide-y">
-            {receipts.receipts.map((receipt) => (
-              <li key={receipt.id} className="space-y-2 p-4 sm:px-5">
-                <p className="text-sm text-muted-foreground">
-                  {formatDateTime(receipt.createdAt, zone)}
-                  {receipt.authorName && ` · ${receipt.authorName}`}
-                  {receipt.reference && ` · Remisión ${receipt.reference}`}
-                </p>
-                <ul className="space-y-1">
-                  {receipt.lines.map((line, index) => (
-                    <li
-                      key={index}
-                      className="[overflow-wrap:anywhere] tabular-nums"
-                    >
-                      {line.quantityText} de {line.productName}{" "}
-                      <span className="text-muted-foreground">
-                        ({line.sku}) · {line.locationPath}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+            {receipts.receipts.map((receipt) => {
+              const returnable = receipt.lines.filter(
+                (line) => line.returnableText,
+              );
+              return (
+                <li key={receipt.id} className="space-y-2 p-4 sm:px-5">
+                  <p className="text-sm text-muted-foreground">
+                    {formatDateTime(receipt.createdAt, zone)}
+                    {receipt.authorName && ` · ${receipt.authorName}`}
+                    {receipt.reference && ` · Remisión ${receipt.reference}`}
+                  </p>
+                  <ul className="space-y-1">
+                    {receipt.lines.map((line) => (
+                      <li
+                        key={line.receiptLineId}
+                        className="[overflow-wrap:anywhere] tabular-nums"
+                      >
+                        {line.quantityText} de {line.productName}{" "}
+                        <span className="text-muted-foreground">
+                          ({line.sku}) · {line.locationPath}
+                          {line.returnedText &&
+                            ` · devuelto: ${line.returnedText}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {receipt.returns && receipt.returns.length > 0 && (
+                    <ul className="space-y-2 border-l-2 pl-3">
+                      {receipt.returns.map((back) => (
+                        <li key={back.id} className="space-y-1 text-sm">
+                          <p className="text-muted-foreground">
+                            Devolución · {formatDateTime(back.createdAt, zone)}
+                            {back.authorName && ` · ${back.authorName}`}
+                          </p>
+                          {back.lines.map((line, index) => (
+                            <p
+                              key={index}
+                              className="[overflow-wrap:anywhere] tabular-nums"
+                            >
+                              {line.quantityText} de {line.productName}{" "}
+                              <span className="text-muted-foreground">
+                                ({line.sku}) · {line.locationPath}
+                              </span>
+                            </p>
+                          ))}
+                          <p className="[overflow-wrap:anywhere] text-muted-foreground">
+                            Motivo: {back.reason}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {canReturn && returnable.length > 0 && (
+                    <ReturnReceipt
+                      orderId={order.id}
+                      receiptId={receipt.id}
+                      receiptText={`la recepción del ${formatDateTime(receipt.createdAt, zone).replace(/\.$/, "")}`}
+                      idempotencyKey={newId()}
+                      lines={returnable.map((line) => ({
+                        id: line.receiptLineId,
+                        productName: line.productName,
+                        sku: line.sku,
+                        detail: line.returnedText
+                          ? `puedes devolver ${line.returnableText} (ya devolviste ${line.returnedText})`
+                          : `llegaron ${line.returnableText}`,
+                        unitText: line.unitText,
+                        locationId: line.locationId,
+                      }))}
+                      locations={locations.map((location) => ({
+                        id: location.id,
+                        label: location.path,
+                      }))}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}

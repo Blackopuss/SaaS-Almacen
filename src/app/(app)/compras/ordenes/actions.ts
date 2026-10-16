@@ -10,9 +10,11 @@ import {
   closePurchaseOrder,
   createPurchaseOrder,
   findReceiptConfirmation,
+  findReturnConfirmation,
   receivePurchaseOrder,
   removeOrderLine,
   requestOrderDelivery,
+  returnToSupplier,
   submitPurchaseOrder,
   updateOrderLine,
   updatePurchaseOrder,
@@ -485,4 +487,109 @@ export async function checkReceiptAction(
     String(idempotencyKey ?? "").slice(0, 64),
   );
   return { received: found !== null };
+}
+
+export type ReturnFormState = {
+  fieldErrors: { reason?: string };
+  formError?: string;
+  /** Problem of each line, by the id of the receipt line. */
+  lineErrors?: Record<string, string>;
+  values: {
+    reason: string;
+    /** What was typed for each line, by the id of the receipt line. */
+    quantities: Record<string, string>;
+    /** Where a line is taken from, when not where it was received. */
+    places: Record<string, string>;
+  };
+  /** Changes with every answer, so selects show what was chosen. */
+  answers: number;
+  /** The return went through: what to tell the person. */
+  done?: string;
+};
+
+/**
+ * Returns to the supplier what came with a receipt (CMP-12). The receipt
+ * and the locations are looked for only inside the company of the
+ * session; the key makes a repeated confirmation return once.
+ */
+export async function returnToSupplierAction(
+  orderId: string,
+  receiptId: string,
+  prev: ReturnFormState,
+  formData: FormData,
+): Promise<ReturnFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  // One field per receipt line: `q:<id>`, and `l:<id>` for where from.
+  const quantities: Record<string, string> = {};
+  const places: Record<string, string> = {};
+  for (const [name, value] of formData.entries()) {
+    if (typeof value !== "string") continue;
+    if (name.startsWith("q:") && Object.keys(quantities).length < 200) {
+      quantities[name.slice(2, 38)] = value.slice(0, 40);
+    } else if (
+      name.startsWith("l:") &&
+      value &&
+      Object.keys(places).length < 200
+    ) {
+      places[name.slice(2, 38)] = value.slice(0, 36);
+    }
+  }
+  const values = {
+    reason: String(formData.get("reason") ?? "").slice(0, 1000),
+    quantities,
+    places,
+  };
+  const answers = prev.answers + 1;
+  let result;
+  try {
+    result = await returnToSupplier(
+      { organizationId: organization.id, userId: user.id },
+      String(receiptId),
+      {
+        reason: values.reason,
+        lines: Object.entries(quantities).map(([receiptLineId, quantity]) => ({
+          receiptLineId,
+          quantity,
+          locationId: places[receiptLineId],
+        })),
+        idempotencyKey: String(formData.get("idempotencyKey") ?? "").slice(
+          0,
+          64,
+        ),
+      },
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { fieldErrors: {}, formError: error.message, values, answers };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError,
+      lineErrors: result.lineErrors,
+      values,
+      answers,
+    };
+  }
+  revalidatePath("/compras");
+  revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+  revalidatePath("/movimientos");
+  return { fieldErrors: {}, values, answers, done: result.summary };
+}
+
+/**
+ * After a lost answer (INV-22): whether the return with that key was
+ * registered for this person in the company of the session.
+ */
+export async function checkReturnAction(
+  idempotencyKey: string,
+): Promise<{ returned: boolean }> {
+  const { user, organization } = await requireOrganizationContext();
+  const found = await findReturnConfirmation(
+    { organizationId: organization.id, userId: user.id },
+    String(idempotencyKey ?? "").slice(0, 64),
+  );
+  return { returned: found !== null };
 }

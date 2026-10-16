@@ -612,6 +612,7 @@ export const MOVEMENT_TYPE_LABELS = {
   INITIAL: "Saldo inicial",
   REVERSAL: "Reversa",
   RECEIPT: "Recepción de compra",
+  RETURN: "Devolución a proveedor",
 } as const;
 
 export type MovementType = keyof typeof MOVEMENT_TYPE_LABELS;
@@ -1693,6 +1694,13 @@ export async function reverseMovement(
         return stop(
           "not_allowed",
           "Esta entrada es la recepción de una orden de compra: no se reversa desde Inventario. Lo que llegó de más o mal se devuelve al proveedor desde Compras.",
+        );
+      }
+      // Nor a return (CMP-12): its document would still say it went back.
+      if (original.type === "RETURN") {
+        return stop(
+          "not_allowed",
+          "Esta salida es una devolución al proveedor: no se reversa desde Inventario. Si regresa la mercancía, recíbela con una orden de compra.",
         );
       }
       const already = await tx.stockMovement.findFirst({
