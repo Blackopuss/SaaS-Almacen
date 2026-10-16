@@ -1328,6 +1328,9 @@ enum PurchaseOrderStatus {
   PARTIAL
   RECEIVED
   CANCELLED
+  /// Received in part and closed with what was missing (CMP-11): the rest
+  /// is no longer expected.
+  CLOSED
 }
 
 /// What the company asks a supplier for (CMP-04). It is numbered within
@@ -1353,6 +1356,11 @@ model PurchaseOrder {
   cancelledAt       DateTime?               @db.DateTime(3)
   cancelledByUserId String?                 @db.Char(36)
   cancelReason      String?                 @db.VarChar(300)
+  /// When, why and by whom it was closed with a shortage (CMP-11). The
+  /// shortage itself is ordered − received, both fixed by then.
+  closedAt          DateTime?               @db.DateTime(3)
+  closedByUserId    String?                 @db.Char(36)
+  closeReason       String?                 @db.VarChar(300)
   lines             PurchaseOrderLine[]
   deliveries        PurchaseOrderDelivery[]
   receipts          PurchaseReceipt[]

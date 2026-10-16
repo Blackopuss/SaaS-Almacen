@@ -18,6 +18,7 @@ import {
 
 import {
   cancelPurchaseOrderAction,
+  closePurchaseOrderAction,
   submitPurchaseOrderAction,
 } from "../actions";
 
@@ -172,6 +173,104 @@ export function CancelOrder({
           >
             {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
             {pending ? "Cancelando…" : "Sí, cancelar orden"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Closes an order received in part with what is missing (CMP-11): says
+ * what will no longer be expected and asks why.
+ */
+export function CloseOrder({
+  orderId,
+  numberText,
+  missing,
+}: {
+  orderId: string;
+  numberText: string;
+  /** «40 piezas de Tornillo», one per product still pending. */
+  missing: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const reasonId = useId();
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">Cerrar con faltante</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Cerrar la orden {numberText} con faltante?</DialogTitle>
+          <DialogDescription>
+            Lo que ya llegó se queda como está. Lo que falta deja de esperarse y
+            queda registrado como faltante; la orden ya no recibe nada más.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Faltante</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm tabular-nums">
+            {missing.map((text) => (
+              <li key={text} className="[overflow-wrap:anywhere]">
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="space-y-2">
+          <label htmlFor={reasonId} className="text-sm font-medium">
+            ¿Por qué se cierra?
+          </label>
+          <textarea
+            id={reasonId}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            maxLength={300}
+            placeholder="Por ejemplo: el proveedor ya no tiene existencias."
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${reasonId}-error` : undefined}
+            className={areaClass}
+          />
+          {error && (
+            <p
+              id={`${reasonId}-error`}
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              No cerrar
+            </Button>
+          </DialogClose>
+          <Button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await closePurchaseOrderAction(orderId, reason);
+                if (result.ok) {
+                  toast.success(result.message);
+                  setOpen(false);
+                } else {
+                  setError(result.error);
+                }
+              });
+            }}
+          >
+            {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
+            {pending ? "Cerrando…" : "Sí, cerrar con faltante"}
           </Button>
         </DialogFooter>
       </DialogContent>

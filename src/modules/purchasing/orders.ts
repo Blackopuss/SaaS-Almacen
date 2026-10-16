@@ -585,6 +585,21 @@ export async function submitPurchaseOrder(
     "purchasing.order.submit",
   );
   return inOrder(organizationId, async (tx) => {
+    // Its products first, as every lock that reaches a product (products
+    // → order): archiving one of them waits, and then sees the order sent
+    // and refuses (CMP-11) — or archives first, and we see it archived.
+    const products = await tx.purchaseOrderLine.findMany({
+      where: { orderId: String(orderId).slice(0, 36) },
+      take: PURCHASE_ORDER_MAX_LINES,
+      select: { productId: true },
+    });
+    const locked = new Set(
+      await lockRows(
+        tx,
+        "product",
+        products.map((line) => line.productId),
+      ),
+    );
     const order = await lockOrder(tx, orderId);
     if (order.status === "SENT") {
       return {
@@ -597,8 +612,21 @@ export async function submitPurchaseOrder(
     const lines = await tx.purchaseOrderLine.findMany({
       where: { orderId: order.id },
       take: PURCHASE_ORDER_MAX_LINES,
-      select: { product: { select: { sku: true, status: true } } },
+      select: {
+        productId: true,
+        product: { select: { sku: true, status: true } },
+      },
     });
+    if (lines.some((line) => !locked.has(line.productId))) {
+      // A product was added between reading and locking: try again.
+      throw new Rejected(
+        refuse(
+          "invalid",
+          null,
+          "La orden cambió mientras la confirmabas. Revisa sus productos y vuelve a confirmarla.",
+        ),
+      );
+    }
     if (lines.length === 0) {
       throw new Rejected(
         refuse(
@@ -795,9 +823,13 @@ export type PurchaseOrderDetail = {
   canSubmit: boolean;
   /** It can be cancelled: nothing of it was received. */
   canCancel: boolean;
+  /** It can be closed with its shortage: received in part (CMP-11). */
+  canClose: boolean;
   sentAt: Date | null;
   cancelledAt: Date | null;
   cancelReason: string | null;
+  closedAt: Date | null;
+  closeReason: string | null;
   supplierId: string;
   supplierName: string;
   /** 2026-10-15, or null. */
@@ -898,6 +930,8 @@ export async function getPurchaseOrder(
       sentAt: true,
       cancelledAt: true,
       cancelReason: true,
+      closedAt: true,
+      closeReason: true,
       contact: { select: { id: true, name: true } },
       lines: {
         orderBy: { lineNumber: "asc" },
@@ -918,9 +952,12 @@ export async function getPurchaseOrder(
     editable: row.status === "DRAFT",
     canSubmit: canTransition(row.status, "SENT") && rows.length > 0,
     canCancel: canTransition(row.status, "CANCELLED"),
+    canClose: canTransition(row.status, "CLOSED"),
     sentAt: row.sentAt,
     cancelledAt: row.cancelledAt,
     cancelReason: row.cancelReason,
+    closedAt: row.closedAt,
+    closeReason: row.closeReason,
     supplierId: row.contact.id,
     supplierName: row.contact.name,
     expectedOn: row.expectedOn

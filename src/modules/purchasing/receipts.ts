@@ -154,7 +154,7 @@ const refuseLines = (
 };
 
 /** What has arrived of each line of an order, in the terms it was ordered in. */
-async function receivedByLine(
+export async function receivedByLine(
   client: Pick<Tx, "purchaseReceiptLine">,
   orderLineIds: string[],
 ): Promise<Map<string, Decimal>> {
@@ -655,7 +655,7 @@ export type OrderReceipts = {
 };
 
 /** «3 cajas», «2.5 metros»: a quantity in the terms of an order line. */
-function inTermsOf(
+export function inTermsOf(
   quantity: Decimal,
   presentation: { name: string } | null,
   unitCode: string,

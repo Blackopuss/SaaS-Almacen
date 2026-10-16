@@ -7,6 +7,7 @@ import { isAppError } from "@/lib";
 import {
   addOrderLine,
   cancelPurchaseOrder,
+  closePurchaseOrder,
   createPurchaseOrder,
   findReceiptConfirmation,
   receivePurchaseOrder,
@@ -300,6 +301,46 @@ export async function cancelPurchaseOrderAction(
     revalidatePath("/compras");
     revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
     return { ok: true, message: "Orden cancelada." };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Closes an order received in part with its shortage (CMP-11). The order
+ * is looked for only inside the company of the session.
+ */
+export async function closePurchaseOrderAction(
+  orderId: string,
+  reason: string,
+): Promise<OrderStateActionResult> {
+  const { user, organization } = await requireOrganizationContext();
+  try {
+    const result = await closePurchaseOrder(
+      { organizationId: organization.id, userId: user.id },
+      String(orderId),
+      { reason: String(reason ?? "").slice(0, 1000) },
+    );
+    if (!result.ok) {
+      return {
+        ok: false,
+        error:
+          result.fieldErrors.reason ??
+          result.formError ??
+          "No se pudo cerrar la orden.",
+      };
+    }
+    revalidatePath("/compras");
+    revalidatePath(`/compras/ordenes/${idPath(orderId)}`);
+    return {
+      ok: true,
+      message: result.repeated
+        ? "La orden ya estaba cerrada."
+        : `Orden cerrada. Faltante: ${result.shortageText}.`,
+    };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };

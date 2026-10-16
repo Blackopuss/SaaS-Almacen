@@ -48,6 +48,12 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la orden se busca solo en esa empresa",
     coveredBy: "tests/purchasing/order-transitions.int.test.ts",
   },
+  closePurchaseOrderAction: {
+    input: "id de orden y motivo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la orden se busca solo en esa empresa",
+    coveredBy: "tests/purchasing/order-close.int.test.ts",
+  },
   createPurchaseOrderAction: {
     input: "id de proveedor, día esperado y notas",
     identity:

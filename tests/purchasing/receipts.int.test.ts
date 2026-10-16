@@ -346,7 +346,16 @@ describe("receivePurchaseOrder", () => {
       { productId: kept, quantity: "2" },
       { productId: archived, quantity: "2" },
     ]);
-    expect(await archiveProduct(actor, archived)).toMatchObject({ ok: true });
+    // Archiving a product an order still waits for is refused (CMP-11);
+    // one archived before that rule (or by hand) still stops the receipt.
+    expect(await archiveProduct(actor, archived)).toMatchObject({
+      ok: false,
+      reason: "has_open_orders",
+    });
+    await db.product.update({
+      where: { id: archived },
+      data: { status: "ARCHIVED" },
+    });
     const refused = await receivePurchaseOrder(actor, orderId, {
       idempotencyKey: key(),
     });

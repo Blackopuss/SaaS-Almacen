@@ -430,8 +430,8 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
         "tests/inventory/adjustments.int.test.ts",
         "tests/inventory/stock-schema.int.test.ts",
         "tests/inventory/archive-with-stock.int.test.ts",
+        "tests/purchasing/order-close.int.test.ts",
       ],
-      waitsFor: "CMP-11 (no archivar con órdenes de compra abiertas)",
     },
     "NEG-22": {
       tests: [

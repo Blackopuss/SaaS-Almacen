@@ -6,7 +6,12 @@ import { dec, formatDecimal, isMultipleOf, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import { consumeQuota, releaseQuota } from "@/platform/entitlements";
-import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
+import {
+  LOCKING_TRANSACTION,
+  forOrganization,
+  lockRows,
+  type TenantDb,
+} from "@/server";
 
 import { defaultStep, stepProblem } from "./quantity";
 import { getUnit, isUnitCode } from "./units";
@@ -738,7 +743,12 @@ export type ProductStatusResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "not_found" | "unchanged" | "limit_reached" | "has_stock";
+      reason:
+        | "not_found"
+        | "unchanged"
+        | "limit_reached"
+        | "has_stock"
+        | "has_open_orders";
       error: string;
     };
 
@@ -797,6 +807,22 @@ export async function archiveProduct(
           error: `Todavía hay ${formatDecimal(total)} ${total.equals(1) ? unit.name : unit.plural} de este producto${stock._count > 1 ? ` en ${stock._count} ubicaciones` : ""}. Regístralas como salida o ajústalas a cero antes de archivarlo.`,
         });
       }
+      // Nor one still expected from a supplier (CMP-11): a purchase order
+      // sent or received in part with something of it pending. Receipts
+      // and confirming an order lock the product first, so what we read
+      // here does not change until we finish. A draft does not count: it
+      // cannot be confirmed with an archived product.
+      if (product.status === "ACTIVE") {
+        const open = await openOrdersFor(tx, id);
+        if (open.length > 0) {
+          const listed = open.slice(0, 3).join(", ");
+          throw new StatusRejected({
+            ok: false,
+            reason: "has_open_orders",
+            error: `Este producto todavía está por llegar en ${open.length === 1 ? "la orden" : "las órdenes"} ${listed}${open.length > 3 ? ` y ${open.length - 3} más` : ""}. Recíbela, ciérrala con faltante o cancélala antes de archivarlo.`,
+          });
+        }
+      }
       // The status in the filter decides between two simultaneous requests.
       const archived = await tx.product.updateMany({
         where: { id, status: "ACTIVE" },
@@ -826,6 +852,47 @@ export async function archiveProduct(
     throw error;
   }
   return { ok: true };
+}
+
+/**
+ * Purchase orders («OC-0007») sent or received in part that still wait for
+ * some of this product. Read by archiving, in its transaction; the numbers
+ * are formatted here because the platform does not import modules.
+ */
+async function openOrdersFor(
+  tx: Pick<TenantDb, "purchaseOrderLine" | "purchaseReceiptLine">,
+  productId: string,
+): Promise<string[]> {
+  const lines = await tx.purchaseOrderLine.findMany({
+    where: { productId, order: { status: { in: ["SENT", "PARTIAL"] } } },
+    orderBy: { order: { number: "asc" } },
+    take: 200,
+    select: {
+      id: true,
+      capturedQuantity: true,
+      order: { select: { number: true } },
+    },
+  });
+  if (lines.length === 0) return [];
+  const received = await tx.purchaseReceiptLine.groupBy({
+    by: ["orderLineId"],
+    where: { orderLineId: { in: lines.map((line) => line.id) } },
+    _sum: { capturedQuantity: true },
+  });
+  const got = new Map(
+    received.map((row) => [
+      row.orderLineId,
+      dec(row._sum.capturedQuantity?.toString() ?? 0),
+    ]),
+  );
+  const numbers = lines
+    .filter((line) =>
+      dec(line.capturedQuantity.toString()).greaterThan(
+        got.get(line.id) ?? dec(0),
+      ),
+    )
+    .map((line) => `OC-${String(line.order.number).padStart(4, "0")}`);
+  return [...new Set(numbers)];
 }
 
 /** Brings an archived product back. It needs a free place of the quota. */

@@ -25,12 +25,14 @@ describe("states of a purchase order", () => {
       "SENT → RECEIVED",
       "SENT → CANCELLED",
       "PARTIAL → RECEIVED",
+      "PARTIAL → CLOSED",
     ]);
   });
 
   it("nothing leaves a final state, goes back, or stays where it is", () => {
     expect(PURCHASE_ORDER_TRANSITIONS.RECEIVED).toEqual([]);
     expect(PURCHASE_ORDER_TRANSITIONS.CANCELLED).toEqual([]);
+    expect(PURCHASE_ORDER_TRANSITIONS.CLOSED).toEqual([]);
     for (const status of PURCHASE_ORDER_STATUSES) {
       expect(canTransition(status, status), status).toBe(false);
       if (status !== "DRAFT") {
@@ -42,6 +44,9 @@ describe("states of a purchase order", () => {
     expect(canTransition("DRAFT", "RECEIVED")).toBe(false);
     expect(canTransition("PARTIAL", "CANCELLED")).toBe(false);
     expect(canTransition("PARTIAL", "SENT")).toBe(false);
+    // Closing with a shortage needs something received (CMP-11).
+    expect(canTransition("SENT", "CLOSED")).toBe(false);
+    expect(canTransition("DRAFT", "CLOSED")).toBe(false);
   });
 
   it("every refusal has a reason for people; every allowed move has none", () => {
@@ -60,6 +65,8 @@ describe("states of a purchase order", () => {
       "no se cancela",
     );
     expect(transitionProblem("CANCELLED", "SENT")).toContain("cancelada");
+    expect(transitionProblem("SENT", "CLOSED")).toContain("cancélala");
+    expect(transitionProblem("CLOSED", "RECEIVED")).toContain("faltante");
     expect(transitionProblem("SENT", "DRAFT")).toContain(
       "no vuelve a ser borrador",
     );

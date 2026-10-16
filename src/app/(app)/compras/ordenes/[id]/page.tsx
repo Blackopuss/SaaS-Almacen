@@ -22,7 +22,7 @@ import {
 import { getModuleAccess } from "@/platform/billing";
 
 import { DeliveryPanel } from "./delivery-panel";
-import { CancelOrder, SubmitOrder } from "./order-buttons";
+import { CancelOrder, CloseOrder, SubmitOrder } from "./order-buttons";
 import { ReceiveOrder } from "./receive-order";
 import { RemoveLine } from "./remove-line";
 
@@ -86,6 +86,13 @@ export default async function OrdenPage({
     order.canSubmit && active && access.allows("purchasing.order.submit");
   const canCancel =
     order.canCancel && active && access.allows("purchasing.order.cancel");
+  // What is missing comes from the receipts: who closes must see them.
+  const canClose =
+    order.canClose &&
+    !!receipts &&
+    active &&
+    access.allows("purchasing.order.close");
+  const closed = order.status === "CLOSED";
   const canReceive =
     !!receipts?.canReceive &&
     active &&
@@ -181,7 +188,8 @@ export default async function OrdenPage({
                   variant={
                     order.status === "DRAFT"
                       ? "secondary"
-                      : order.status === "CANCELLED"
+                      : order.status === "CANCELLED" ||
+                          order.status === "CLOSED"
                         ? "outline"
                         : "default"
                   }
@@ -199,6 +207,15 @@ export default async function OrdenPage({
                     [
                       "Cancelada",
                       `${formatDateTime(order.cancelledAt, zone)}\n${order.cancelReason ?? ""}`,
+                    ],
+                  ] as const)
+                : []),
+              ...(order.closedAt
+                ? ([
+                    [
+                      "Cerrada",
+                      `${formatDateTime(order.closedAt, zone)}
+${order.closeReason ?? ""}`,
                     ],
                   ] as const)
                 : []),
@@ -362,7 +379,11 @@ export default async function OrdenPage({
                     {line.receivedText
                       ? `Recibido: ${line.receivedText} de ${line.orderedText}`
                       : `Pediste ${line.orderedText}`}
-                    {line.pendingText ? ` · faltan ${line.pendingText}` : ""}
+                    {line.pendingText
+                      ? closed
+                        ? ` · faltante: ${line.pendingText}`
+                        : ` · faltan ${line.pendingText}`
+                      : ""}
                   </span>
                 </li>
               ))}
@@ -415,7 +436,7 @@ export default async function OrdenPage({
           }))}
         />
       )}
-      {(canSubmit || canCancel) && (
+      {(canSubmit || canCancel || canClose) && (
         <div className="flex max-w-3xl flex-wrap gap-3">
           {canSubmit && (
             <SubmitOrder
@@ -432,6 +453,15 @@ export default async function OrdenPage({
               sent={order.status !== "DRAFT"}
             />
           )}
+          {canClose && receipts && (
+            <CloseOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              missing={receipts.lines
+                .filter((line) => line.pendingText)
+                .map((line) => `${line.pendingText} de ${line.productName}`)}
+            />
+          )}
         </div>
       )}
       <p className="max-w-3xl text-sm text-muted-foreground">
@@ -444,8 +474,10 @@ export default async function OrdenPage({
             : order.status === "CANCELLED"
               ? "Está cancelada: se conserva como historia y ya no cambia."
               : order.status === "PARTIAL"
-                ? "Ya se recibió una parte: lo que falta aparece en Recepciones y se recibe cuando llegue."
-                : "Ya se recibió completa."}
+                ? "Ya se recibió una parte: lo que falta aparece en Recepciones y se recibe cuando llegue. Si el resto ya no va a llegar, ciérrala con faltante."
+                : order.status === "CLOSED"
+                  ? "Se cerró con faltante: lo que llegó se queda como está y lo que faltó ya no se espera. Si todavía lo necesitas, pídelo en otra orden."
+                  : "Ya se recibió completa."}
       </p>
     </PageContainer>
   );
