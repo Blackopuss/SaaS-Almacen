@@ -7,8 +7,7 @@ import { z } from "zod";
 import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import {
-  blockedFor,
-  recordAttempt,
+  reserveAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "@/platform/auth";
@@ -163,10 +162,6 @@ export async function createInvitation(
     return invalid({ email: email.error.issues[0]!.message });
   }
 
-  const key = [throttleKeys.inviteOrganization(organizationId)];
-  const wait = await blockedFor(key);
-  if (wait > 0) return invalid({}, tooManyAttemptsMessage(wait));
-
   const member = await forOrganization(organizationId).membership.findFirst({
     where: { user: { email: email.data } },
     select: { status: true },
@@ -179,7 +174,9 @@ export async function createInvitation(
           : "Esta persona está desactivada en tu equipo. Reactívala en lugar de invitarla.",
     });
   }
-  await recordAttempt(key);
+  const key = [throttleKeys.inviteOrganization(organizationId)];
+  const wait = await reserveAttempt(key);
+  if (wait > 0) return invalid({}, tooManyAttemptsMessage(wait));
 
   let issued: Awaited<ReturnType<typeof issue>>;
   try {
@@ -233,9 +230,8 @@ export async function resendInvitation(
   }
 
   const key = [throttleKeys.inviteOrganization(organizationId)];
-  const wait = await blockedFor(key);
+  const wait = await reserveAttempt(key);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
-  await recordAttempt(key);
 
   // Same invitation, new token: the old link stops working and the row
   // keeps its id (the screen may still be showing it).

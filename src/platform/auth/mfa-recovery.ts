@@ -16,10 +16,11 @@ import { normalizeBackupCode } from "./backup-codes";
 import { normalizeTotpCode } from "./mfa";
 import { isMfaRequired } from "./mfa-policy";
 import {
-  blockedFor,
   clearAttempts,
   clientIp,
-  recordAttempt,
+  refundAttempt,
+  reserveAttempt,
+  settleFailure,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";
@@ -55,7 +56,7 @@ export async function regenerateBackupCodes(
     return { ok: false, error: "Escribe tu contraseña para continuar." };
   }
   const key = throttleKeys.mfaSetup(userId);
-  const wait = await blockedFor([key]);
+  const wait = await reserveAttempt([key]);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
 
   try {
@@ -76,9 +77,10 @@ export async function regenerateBackupCodes(
     return { ok: true, backupCodes: result.backupCodes };
   } catch (error) {
     if (isAPIError(error) && error.body?.code === "INVALID_PASSWORD") {
-      await recordAttempt([key]);
+      await settleFailure([key]);
       return { ok: false, error: WRONG_PASSWORD };
     }
+    await refundAttempt([key]);
     if (isAPIError(error) && error.body?.code === "TWO_FACTOR_NOT_ENABLED") {
       return {
         ok: false,
@@ -128,7 +130,7 @@ export async function disableMfa(
     };
   }
   const key = throttleKeys.mfaSetup(userId);
-  const wait = await blockedFor([key]);
+  const wait = await reserveAttempt([key]);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
 
   try {
@@ -138,7 +140,7 @@ export async function disableMfa(
     });
   } catch (error) {
     if (isAPIError(error) && error.body?.code === "INVALID_PASSWORD") {
-      await recordAttempt([key]);
+      await settleFailure([key]);
       return { ok: false, error: WRONG_PASSWORD };
     }
     throw error;
@@ -150,7 +152,7 @@ export async function disableMfa(
   } catch (error) {
     const code = isAPIError(error) ? String(error.body?.code ?? "") : "";
     if (code === "INVALID_CODE" || code === "INVALID_BACKUP_CODE") {
-      await recordAttempt([key]);
+      await settleFailure([key]);
       return { ok: false, error: "El código no es válido." };
     }
     throw error;

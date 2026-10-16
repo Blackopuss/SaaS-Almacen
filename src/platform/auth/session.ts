@@ -11,10 +11,11 @@ import { recordSecurityEvent } from "@/platform/audit";
 import { auth } from "./auth";
 import { isMfaRequired } from "./mfa-policy";
 import {
-  blockedFor,
   clearAttempts,
   clientIp,
-  recordAttempt,
+  refundAttempt,
+  reserveAttempt,
+  settleFailure,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";
@@ -92,7 +93,9 @@ export async function signIn(
   const keys = [throttleKeys.signInIp(ip)];
   if (email) keys.push(throttleKeys.signInAccount(email));
 
-  const wait = await blockedFor(keys);
+  // The attempt is counted before the password is checked: requests sent
+  // all at once each take a place, and those past the limit are refused.
+  const wait = await reserveAttempt(keys);
   if (wait > 0) {
     return {
       ok: false,
@@ -101,7 +104,7 @@ export async function signIn(
     };
   }
   if (!parsed.success || !email || !parsed.data.password) {
-    await recordAttempt(keys);
+    await settleFailure(keys);
     return { ok: false, reason: "invalid" };
   }
 
@@ -111,6 +114,7 @@ export async function signIn(
       headers: requestHeaders,
     });
     await clearAttempts([throttleKeys.signInAccount(email)]);
+    await refundAttempt([throttleKeys.signInIp(ip)]);
     // MFA on: Better Auth kept no session and set a short-lived challenge
     // cookie; the code is checked by verifySignInCode (./mfa.ts).
     if ("twoFactorRedirect" in result && result.twoFactorRedirect) {
@@ -128,13 +132,16 @@ export async function signIn(
       if (error.body?.code === "EMAIL_NOT_VERIFIED") {
         // Right password: not a guessing attempt.
         await clearAttempts([throttleKeys.signInAccount(email)]);
+        await refundAttempt([throttleKeys.signInIp(ip)]);
         return { ok: false, reason: "unverified" };
       }
       if (error.status === "UNAUTHORIZED" || error.statusCode === 401) {
-        await recordAttempt(keys);
+        await settleFailure(keys);
         return { ok: false, reason: "invalid" };
       }
     }
+    // Not a wrong guess: the attempt is given back.
+    await refundAttempt(keys);
     console.error("signIn failed", error);
     return { ok: false, reason: "unavailable" };
   }

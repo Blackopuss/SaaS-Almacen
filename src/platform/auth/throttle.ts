@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { db } from "@/server";
+import { LOCKING_TRANSACTION, db } from "@/server";
 
 /**
  * Brute-force protection (PLT-06). Fixed-window counters in MySQL, updated
@@ -25,6 +25,7 @@ export const RULES = {
   // Higher: several employees often share one shop connection.
   signInIp: { max: 20, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   registerIp: { max: 10, windowSeconds: 60 * 60, blockSeconds: 60 * 60 },
+  registerEmail: { max: 3, windowSeconds: 60 * 60, blockSeconds: 60 * 60 },
   resendEmail: { max: 3, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   resendIp: { max: 10, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
   resetEmail: { max: 3, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
@@ -65,6 +66,10 @@ export const throttleKeys = {
     key: `register:ip:${ip}`,
     rule: RULES.registerIp,
   }),
+  registerEmail: (email: string): ThrottleKey => ({
+    key: `register:email:${hash(email)}`,
+    rule: RULES.registerEmail,
+  }),
   resendEmail: (email: string): ThrottleKey => ({
     key: `resend:email:${hash(email)}`,
     rule: RULES.resendEmail,
@@ -104,11 +109,19 @@ export const throttleKeys = {
 };
 
 /**
- * Client IP as seen by the app. In production the app must sit behind a
- * proxy that overwrites X-Forwarded-For (documented in ADR 0003).
+ * Client IP as seen by the app (ADR 0003). Proxies add the address they
+ * saw to the end of X-Forwarded-For, after whatever the client wrote: the
+ * entry `TRUSTED_PROXY_HOPS` places from the end (1 by default: one proxy
+ * in front) is the first one nobody outside could forge. Taking the first
+ * entry let anyone pick their own IP for every limit (security audit).
  */
 export function clientIp(headers: Headers): string {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const entries = (headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
+  const forwarded = entries[Math.max(0, entries.length - hops)];
   const ip = forwarded || headers.get("x-real-ip")?.trim() || "unknown";
   return ip.slice(0, 64);
 }
@@ -145,6 +158,88 @@ export async function recordAttempt(keys: ThrottleKey[]): Promise<void> {
       rule.windowSeconds,
       rule.max,
       rule.blockSeconds,
+    );
+  }
+}
+
+/**
+ * Takes one attempt from each key **before** the guess is checked, so
+ * requests sent all at once cannot all be checked before any is counted
+ * (security audit: 20 simultaneous passwords were evaluated against a
+ * limit of 5). Returns the seconds to wait — 0 means the attempt may go
+ * ahead. A key already blocked refuses without counting; an attempt past
+ * `max` refuses and blocks. The keys stay locked only for this short
+ * transaction, never while the password is verified.
+ *
+ * Afterwards: `settleFailure` when the guess was wrong (blocks a key that
+ * reached `max`) or `refundAttempt` for the keys a success should not use
+ * up (several employees share one connection).
+ */
+export async function reserveAttempt(keys: ThrottleKey[]): Promise<number> {
+  if (keys.length === 0) return 0;
+  // A fixed order, so two requests never wait on each other's keys.
+  const sorted = [...keys].sort((a, b) => (a.key < b.key ? -1 : 1));
+  return db.$transaction(async (tx) => {
+    const blocked = await tx.$queryRawUnsafe<
+      { wait: bigint | number | null }[]
+    >(
+      `SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(3), blockedUntil) AS wait
+         FROM auth_throttle
+        WHERE \`key\` IN (${sorted.map(() => "?").join(", ")})
+        ORDER BY \`key\`
+          FOR UPDATE`,
+      ...sorted.map((k) => k.key),
+    );
+    const wait = Math.max(0, ...blocked.map((row) => Number(row.wait ?? 0)));
+    if (wait > 0) return wait;
+    let refused = 0;
+    for (const { key, rule } of sorted) {
+      await tx.$executeRawUnsafe(
+        `INSERT INTO auth_throttle (\`key\`, count, windowStart, blockedUntil)
+         VALUES (?, 1, UTC_TIMESTAMP(3), NULL)
+         ON DUPLICATE KEY UPDATE
+           count = IF(windowStart < UTC_TIMESTAMP(3) - INTERVAL ? SECOND, 1, count + 1),
+           windowStart = IF(windowStart < UTC_TIMESTAMP(3) - INTERVAL ? SECOND, UTC_TIMESTAMP(3), windowStart),
+           blockedUntil = IF(count > ?, UTC_TIMESTAMP(3) + INTERVAL ? SECOND, blockedUntil)`,
+        key,
+        rule.windowSeconds,
+        rule.windowSeconds,
+        rule.max,
+        rule.blockSeconds,
+      );
+      const [row] = await tx.$queryRawUnsafe<{ count: number }[]>(
+        "SELECT count FROM auth_throttle WHERE `key` = ?",
+        key,
+      );
+      if (Number(row?.count ?? 0) > rule.max) {
+        refused = Math.max(refused, rule.blockSeconds);
+      }
+    }
+    return refused;
+  }, LOCKING_TRANSACTION);
+}
+
+/** After a wrong guess: blocks each key whose window is used up. */
+export async function settleFailure(keys: ThrottleKey[]): Promise<void> {
+  for (const { key, rule } of keys) {
+    await db.$executeRawUnsafe(
+      `UPDATE auth_throttle
+          SET blockedUntil = UTC_TIMESTAMP(3) + INTERVAL ? SECOND
+        WHERE \`key\` = ? AND count >= ?
+          AND (blockedUntil IS NULL OR blockedUntil < UTC_TIMESTAMP(3))`,
+      rule.blockSeconds,
+      key,
+      rule.max,
+    );
+  }
+}
+
+/** Gives back an attempt taken by `reserveAttempt` that went well. */
+export async function refundAttempt(keys: ThrottleKey[]): Promise<void> {
+  for (const { key } of keys) {
+    await db.$executeRawUnsafe(
+      "UPDATE auth_throttle SET count = count - 1 WHERE `key` = ? AND count > 0",
+      key,
     );
   }
 }

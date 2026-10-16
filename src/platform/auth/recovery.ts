@@ -6,9 +6,8 @@ import { z } from "zod";
 import { auth } from "./auth";
 import { newPasswordSchema } from "./register";
 import {
-  blockedFor,
   clientIp,
-  recordAttempt,
+  reserveAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";
@@ -49,9 +48,8 @@ export async function requestPasswordReset(
     throttleKeys.resetEmail(parsed.data.email),
     throttleKeys.resetIp(clientIp(headers)),
   ];
-  const wait = await blockedFor(keys);
+  const wait = await reserveAttempt(keys);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
-  await recordAttempt(keys);
 
   try {
     await auth.api.requestPasswordReset({

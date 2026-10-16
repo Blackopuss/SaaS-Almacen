@@ -119,6 +119,18 @@ const memoryOutbox: StoredEmail[] = [];
 
 function driver(): "memory" | "log" {
   const configured = process.env.MAIL_DRIVER;
+  // On a public address (https), "log" would write reset and invitation
+  // links to the server's logs and "memory" would drop them: refused
+  // (security audit). `next start` on localhost still accepts both.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.BETTER_AUTH_URL?.startsWith("https://") &&
+    (configured === "memory" || configured === "log")
+  ) {
+    throw new Error(
+      `MAIL_DRIVER=${configured} is not allowed on a public address: configure a real email provider.`,
+    );
+  }
   if (configured === "memory" || configured === "log") return configured;
   if (process.env.NODE_ENV === "production") {
     throw new Error(

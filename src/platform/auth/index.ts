@@ -55,6 +55,9 @@ export {
   blockedFor,
   clientIp,
   recordAttempt,
+  refundAttempt,
+  reserveAttempt,
+  settleFailure,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";

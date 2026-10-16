@@ -30,8 +30,6 @@ afterAll(async () => {
 });
 
 describe("Better Auth on MySQL", () => {
-  let cookie = "";
-
   it("registers with a UUIDv7 id and a hashed password, without a session", async () => {
     const response = await auth.api.signUpEmail({
       body: { name: "Prueba Técnica", email, password },
@@ -60,18 +58,49 @@ describe("Better Auth on MySQL", () => {
     expect(memoryOutboxFor(email).length).toBe(before + 1);
   });
 
-  it("verifies the email from the link and starts a session", async () => {
+  it("verifies the email from the link without starting a session", async () => {
+    // The link proves the mailbox, not who chose the password (security
+    // audit: account pre-hijacking). Whoever opens it signs in after.
     const response = await openVerificationLink(email);
     expect([200, 302]).toContain(response.status);
-    cookie = sessionCookie(response) ?? "";
-    expect(cookie).not.toBe("");
+    expect(sessionCookie(response)).toBeUndefined();
 
-    const user = await db.user.findUniqueOrThrow({ where: { email } });
-    expect(user.emailVerified).toBe(true);
-    const session = await auth.api.getSession({
-      headers: new Headers({ cookie }),
+    const user = await db.user.findUniqueOrThrow({
+      where: { email },
+      include: { sessions: true },
     });
-    expect(session?.user.email).toBe(email);
+    expect(user.emailVerified).toBe(true);
+    expect(user.sessions).toHaveLength(0);
+  });
+
+  it("someone who registered another person's email loses it on recovery", async () => {
+    const owner = `dueno.${Date.now()}@example.test`;
+    const stranger = "la-contrasena-del-extrano-42";
+    await auth.api.signUpEmail({
+      body: { name: "Extraño", email: owner, password: stranger },
+    });
+    // The real owner opens the link: no session for an account whose
+    // password someone else chose.
+    const opened = await openVerificationLink(owner);
+    expect(sessionCookie(opened)).toBeUndefined();
+    // Not knowing the password, the owner recovers the account; the
+    // stranger's password stops working and every session closes.
+    await auth.api.requestPasswordReset({
+      body: { email: owner, redirectTo: "/restablecer-contrasena" },
+    });
+    const link = memoryOutboxFor(owner).at(-1)!.actionUrl!;
+    const token = new URL(link).pathname.split("/").at(-1)!;
+    await auth.api.resetPassword({
+      body: { token, newPassword: "la-contrasena-del-dueno-42" },
+    });
+    await expect(
+      auth.api.signInEmail({ body: { email: owner, password: stranger } }),
+    ).rejects.toThrow();
+    const response = await auth.api.signInEmail({
+      body: { email: owner, password: "la-contrasena-del-dueno-42" },
+      asResponse: true,
+    });
+    expect(response.status).toBe(200);
   });
 
   it("rejects a reused verification link", async () => {

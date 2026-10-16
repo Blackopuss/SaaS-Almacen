@@ -15,10 +15,11 @@ import { TOTP_DIGITS, auth } from "./auth";
 import { normalizeBackupCode } from "./backup-codes";
 import { isMfaRequired } from "./mfa-policy";
 import {
-  blockedFor,
   clearAttempts,
   clientIp,
-  recordAttempt,
+  refundAttempt,
+  reserveAttempt,
+  settleFailure,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";
@@ -86,7 +87,7 @@ export async function startTotpEnrollment(
     return { ok: false, error: "Escribe tu contraseña para continuar." };
   }
   const key = throttleKeys.mfaSetup(userId);
-  const wait = await blockedFor([key]);
+  const wait = await reserveAttempt([key]);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
 
   try {
@@ -105,9 +106,10 @@ export async function startTotpEnrollment(
     if (isAPIError(error)) {
       const code = String(error.body?.code ?? "");
       if (code === "INVALID_PASSWORD") {
-        await recordAttempt([key]);
+        await settleFailure([key]);
         return { ok: false, error: "La contraseña no es correcta." };
       }
+      await refundAttempt([key]);
       if (code === "TOTP_ALREADY_ENABLED") {
         return {
           ok: false,
@@ -145,10 +147,6 @@ export async function confirmTotpEnrollment(
       error: `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
     };
   }
-  const key = throttleKeys.mfaSetup(userId);
-  const wait = await blockedFor([key]);
-  if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
-
   const pending = await db.twoFactor.findUnique({
     where: { userId },
     select: { verified: true },
@@ -162,18 +160,22 @@ export async function confirmTotpEnrollment(
       error: "La verificación en dos pasos ya está activada.",
     };
   }
+  const key = throttleKeys.mfaSetup(userId);
+  const wait = await reserveAttempt([key]);
+  if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
 
   try {
     await auth.api.verifyTOTP({ body: { code }, headers });
   } catch (error) {
     if (isAPIError(error) && error.body?.code === "INVALID_CODE") {
-      await recordAttempt([key]);
+      await settleFailure([key]);
       return {
         ok: false,
         error:
           "El código no coincide. Revisa que la hora de tu teléfono sea automática y usa el código más reciente.",
       };
     }
+    await refundAttempt([key]);
     console.error("confirmTotpEnrollment failed", error);
     return {
       ok: false,
@@ -224,7 +226,7 @@ export async function verifySignInCode(
     };
   }
   const ipKey = throttleKeys.mfaChallengeIp(clientIp(headers));
-  const wait = await blockedFor([ipKey]);
+  const wait = await reserveAttempt([ipKey]);
   if (wait > 0) {
     return {
       ok: false,
@@ -245,7 +247,7 @@ export async function verifySignInCode(
   } catch (error) {
     const errorCode = isAPIError(error) ? String(error.body?.code ?? "") : "";
     if (errorCode === "INVALID_CODE" || errorCode === "INVALID_BACKUP_CODE") {
-      await recordAttempt([ipKey]);
+      await settleFailure([ipKey]);
       return {
         ok: false,
         reason: "invalid",
@@ -254,6 +256,8 @@ export async function verifySignInCode(
           : "El código no coincide. Usa el código más reciente de tu app.",
       };
     }
+    // Not a wrong code: the attempt is given back.
+    await refundAttempt([ipKey]);
     if (errorCode === "ACCOUNT_TEMPORARILY_LOCKED") {
       return {
         ok: false,
@@ -282,6 +286,7 @@ export async function verifySignInCode(
     };
   }
 
+  await refundAttempt([ipKey]);
   if (backup) {
     // Backup codes are removed when used; tell the owner how many are left.
     const left = (await readBackupCodes(session.userId)).length;
@@ -303,8 +308,10 @@ export async function verifySignInCode(
 
   // One-time use: a code seen before (e.g. read over someone's shoulder)
   // does not open a second session.
+  // Claimed in one step: two requests with the same code cannot both see
+  // it unused.
   const usedKey = throttleKeys.totpUsed(session.userId, code);
-  if ((await blockedFor([usedKey])) > 0) {
+  if ((await reserveAttempt([usedKey])) > 0) {
     await db.session.deleteMany({ where: { token: session.token } });
     return {
       ok: false,
@@ -313,7 +320,6 @@ export async function verifySignInCode(
         "Ese código ya se usó. Espera a que tu app muestre uno nuevo e inicia sesión de nuevo.",
     };
   }
-  await recordAttempt([usedKey]);
   await recordSecurityEvent({
     userId: session.userId,
     action: "sign_in.succeeded",

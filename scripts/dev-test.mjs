@@ -7,7 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 const port = process.env.TEST_PORT ?? "3100";
-const child = spawn("npx", ["next", "dev", "-p", port], {
+// Only this machine: /correos shows sign-in links (security audit).
+const child = spawn("npx", ["next", "dev", "-H", "127.0.0.1", "-p", port], {
   stdio: "inherit",
   shell: true,
   env: {

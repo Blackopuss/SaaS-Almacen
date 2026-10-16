@@ -1,5 +1,6 @@
 import { Mail } from "lucide-react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { EmptyState, PageContainer, PageHeader } from "@/components";
@@ -13,6 +14,11 @@ export const dynamic = "force-dynamic";
 /** Development-only outbox: emails written by the "log" mail driver. */
 export default async function CorreosPage() {
   if (process.env.NODE_ENV === "production") notFound();
+  // The links here open accounts: only on this machine. `npm run dev`
+  // listens only on it; with `dev:red` (other devices) the page is still
+  // only for an address of this machine.
+  const host = ((await headers()).get("host") ?? "").replace(/:\d+$/, "");
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) notFound();
   const messages = await listDevOutbox();
 
   return (

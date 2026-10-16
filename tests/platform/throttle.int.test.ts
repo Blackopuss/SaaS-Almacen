@@ -93,6 +93,54 @@ describe("per-account limit", () => {
   });
 });
 
+describe("client IP", () => {
+  it("takes what the proxy saw, not what the client wrote first", async () => {
+    const { clientIp } = await import("@/platform/auth");
+    expect(clientIp(from("198.51.100.9"))).toBe("198.51.100.9");
+    // The client forged the first entry; the proxy appended the real one.
+    expect(clientIp(from("1.2.3.4, 198.51.100.9"))).toBe("198.51.100.9");
+    expect(clientIp(new Headers())).toBe("unknown");
+  });
+});
+
+describe("attempts sent all at once (security audit)", () => {
+  it("evaluates at most 5 guesses, even the right one among 20", async () => {
+    await expireLimits();
+    const email = `rafaga.${stamp}@example.test`;
+    await auth.api.signUpEmail({ body: { name: "Ráfaga", email, password } });
+    await db.user.update({ where: { email }, data: { emailVerified: true } });
+    // The right password goes last: it must not get through the burst.
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        signIn(
+          { email, password: i === 19 ? password : `mala-${i}-123456` },
+          from(`10.9.${i}.1`),
+        ),
+      ),
+    );
+    const tally = (reason: string) =>
+      results.filter((r) => !r.ok && r.reason === reason).length;
+    const passed = results.filter((r) => r.ok).length;
+    expect(tally("invalid") + passed).toBeLessThanOrEqual(5);
+    expect(tally("throttled")).toBeGreaterThanOrEqual(15);
+    if (passed === 0) {
+      // Once blocked, even the right password waits.
+      expect(
+        await signIn({ email, password }, from("10.9.99.1")),
+      ).toMatchObject({ ok: false, reason: "throttled" });
+    }
+  }, 120_000);
+
+  it("a code used once cannot open two sessions at once", async () => {
+    const { reserveAttempt, throttleKeys } = await import("@/platform/auth");
+    const key = throttleKeys.totpUsed(`usuario.${stamp}`, "123456");
+    const claims = await Promise.all(
+      Array.from({ length: 10 }, () => reserveAttempt([key])),
+    );
+    expect(claims.filter((wait) => wait === 0)).toHaveLength(1);
+  });
+});
+
 describe("per-IP limit", () => {
   it("blocks an IP after 20 failures across different emails", async () => {
     await expireLimits();
@@ -130,6 +178,24 @@ describe("registration and verification emails", () => {
       from("198.51.100.4"),
     );
     expect(blocked.ok).toBe(false);
+    expect(!blocked.ok && blocked.formError).toMatch(/Demasiados intentos/);
+  });
+
+  it("limits registrations per address", async () => {
+    await expireLimits();
+    const email = `repetido.${stamp}@example.test`;
+    for (let i = 0; i < 3; i++) {
+      expect(
+        await registerUser(
+          { name: "Repetido", email, password },
+          from(`192.0.3.${i}`),
+        ),
+      ).toEqual({ ok: true });
+    }
+    const blocked = await registerUser(
+      { name: "Repetido", email, password },
+      from("192.0.3.200"),
+    );
     expect(!blocked.ok && blocked.formError).toMatch(/Demasiados intentos/);
   });
 

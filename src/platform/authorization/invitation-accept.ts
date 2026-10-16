@@ -3,11 +3,10 @@ import "server-only";
 import { newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import {
-  blockedFor,
   clientIp,
   insertInvitedAccount,
   prepareInvitedAccount,
-  recordAttempt,
+  reserveAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
   type InvitedAccountField,
@@ -225,7 +224,7 @@ export async function acceptInvitationAsNewUser(
   headers: Headers,
 ): Promise<AcceptAsNewUserResult> {
   const key = [throttleKeys.inviteTokenIp(clientIp(headers))];
-  const wait = await blockedFor(key);
+  const wait = await reserveAttempt(key);
   if (wait > 0) {
     return {
       ok: false,
@@ -233,7 +232,6 @@ export async function acceptInvitationAsNewUser(
       error: tooManyAttemptsMessage(wait),
     };
   }
-  await recordAttempt(key);
 
   // Check the link before the (slow) password hash.
   if (!(await findUsable(db, token, false))) {

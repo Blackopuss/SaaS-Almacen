@@ -22,6 +22,12 @@ describe("safeRedirectPath (no open redirects)", () => {
     "inventario",
     "/inventario\r\nSet-Cookie:x=1",
     `/${"a".repeat(600)}`,
+    // Dot segments that normalize into "//host" (security audit).
+    "/.//evil.example",
+    "/..//evil.example",
+    "/%2e//evil.example",
+    "/%2E%2E//evil.example",
+    "/a/..//evil.example",
   ])("falls back for %j", (value) => {
     expect(safeRedirectPath(value)).toBe(DEFAULT_AFTER_SIGN_IN);
   });

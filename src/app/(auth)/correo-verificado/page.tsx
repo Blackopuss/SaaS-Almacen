@@ -35,15 +35,27 @@ export default async function CorreoVerificadoPage({
       <p className="mt-2 text-muted-foreground">
         {failed
           ? "Puede que haya vencido o que ya lo hayas usado. Pide uno nuevo para activar tu cuenta."
-          : "Tu cuenta está activa. Ahora crea tu empresa para empezar a registrar tu inventario."}
+          : "Tu cuenta está activa. Inicia sesión con tu contraseña para crear tu empresa."}
       </p>
+      {failed ? null : (
+        <p className="mt-2 text-sm text-muted-foreground">
+          ¿No creaste tú esta cuenta o no reconoces la contraseña? Usa «Olvidé
+          mi contraseña»: la contraseña anterior deja de servir y se cierran
+          todas sus sesiones.
+        </p>
+      )}
       <Button asChild size="lg" className="mt-6 w-full">
         {failed ? (
           <Link href="/verifica-tu-correo">Pedir un enlace nuevo</Link>
         ) : (
-          <Link href="/crear-empresa">Continuar</Link>
+          <Link href="/ingresar?siguiente=/crear-empresa">Iniciar sesión</Link>
         )}
       </Button>
+      {failed ? null : (
+        <Button asChild variant="ghost" size="lg" className="mt-2 w-full">
+          <Link href="/recuperar-contrasena">Olvidé mi contraseña</Link>
+        </Button>
+      )}
     </WarehouseCard>
   );
 }

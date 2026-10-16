@@ -6,9 +6,8 @@ import { z } from "zod";
 import { auth } from "./auth";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
 import {
-  blockedFor,
   clientIp,
-  recordAttempt,
+  reserveAttempt,
   throttleKeys,
   tooManyAttemptsMessage,
 } from "./throttle";
@@ -74,8 +73,11 @@ export async function registerUser(
     return { ok: false, fieldErrors };
   }
 
-  const ipKey = throttleKeys.registerIp(clientIp(headers));
-  const wait = await blockedFor([ipKey]);
+  // Per email too: each sign-up with a taken address mails its owner.
+  const wait = await reserveAttempt([
+    throttleKeys.registerIp(clientIp(headers)),
+    throttleKeys.registerEmail(parsed.data.email),
+  ]);
   if (wait > 0) {
     return {
       ok: false,
@@ -83,7 +85,6 @@ export async function registerUser(
       formError: tooManyAttemptsMessage(wait),
     };
   }
-  await recordAttempt([ipKey]);
 
   try {
     // Email link lands on /correo-verificado, which explains the result.
@@ -143,9 +144,8 @@ export async function resendVerification(
     throttleKeys.resendEmail(parsed.data.email),
     throttleKeys.resendIp(clientIp(headers)),
   ];
-  const wait = await blockedFor(keys);
+  const wait = await reserveAttempt(keys);
   if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
-  await recordAttempt(keys);
 
   try {
     await auth.api.sendVerificationEmail({

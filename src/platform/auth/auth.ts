@@ -50,6 +50,33 @@ export const TOTP_DIGITS = 6;
 export const RESET_PASSWORD_MINUTES = 60;
 
 /**
+ * Address the links in emails are built on. When serving in production it
+ * must be set — otherwise Better Auth would take it from the request's
+ * Host header, which anyone can write — and anything but this machine must
+ * be https (security audit). The build only loads the code: not checked.
+ */
+function checkedBaseUrl(): string | undefined {
+  const configured = process.env.BETTER_AUTH_URL;
+  if (
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PHASE === "phase-production-build"
+  ) {
+    return configured;
+  }
+  let url: URL;
+  try {
+    url = new URL(configured ?? "");
+  } catch {
+    throw new Error("BETTER_AUTH_URL must be set to the site's address.");
+  }
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.protocol !== "https:" && !local) {
+    throw new Error("BETTER_AUTH_URL must use https outside this machine.");
+  }
+  return configured;
+}
+
+/**
  * Authentication (BAS-04, PLT-02, PLT-03). Email + password with database
  * sessions; no session until the email is verified. Cookies are HttpOnly,
  * SameSite=Lax and Secure in production; Better Auth rejects requests from
@@ -58,7 +85,7 @@ export const RESET_PASSWORD_MINUTES = 60;
  */
 export const auth = betterAuth({
   appName: "Almacén",
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: checkedBaseUrl(),
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, { provider: "mysql", transaction: true }),
   emailAndPassword: {
@@ -121,7 +148,12 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
     sendOnSignIn: true,
-    autoSignInAfterVerification: true,
+    // The link proves the mailbox, not who chose the password: anyone can
+    // register someone else's email. Starting a session from it would hand
+    // the mailbox owner an account whose password a stranger knows (security
+    // audit). The owner signs in with the password; if it was not theirs,
+    // recovery replaces it and closes every session.
+    autoSignInAfterVerification: false,
     expiresIn: VERIFICATION_HOURS * 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
       await sendEmail(
