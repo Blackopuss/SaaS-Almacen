@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  PackageSearch,
   Plus,
   ShoppingCart,
   Truck,
@@ -97,6 +98,27 @@ export default async function ComprasPage({
         description="Lo que le pides a tus proveedores."
         actions={newButton}
       />
+      {access.can("purchasing.suggestion.read") && (
+        <Link
+          href="/compras/sugerencias"
+          className="flex min-h-16 max-w-3xl items-center gap-3 rounded-xl border bg-card p-4 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 sm:px-5"
+        >
+          <PackageSearch
+            aria-hidden="true"
+            className="size-5 shrink-0 text-muted-foreground"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">Qué pedir</span>
+            <span className="block text-sm text-muted-foreground">
+              Lo que está en su mínimo y no viene en camino, por proveedor.
+            </span>
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+        </Link>
+      )}
       {access.can("purchasing.supplier.read") && (
         <Link
           href="/compras/proveedores"

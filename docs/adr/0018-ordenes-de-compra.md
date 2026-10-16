@@ -38,3 +38,11 @@ Una orden de compra es lo que el negocio le pide a un proveedor. Es el documento
 2. Si quiere capturar aquí descuentos o impuestos por línea, o basta el costo neto antes de impuestos.
 3. Si una misma orden debe poder pedir el mismo producto en dos líneas (hoy sí: por caja y por pieza suelta).
 4. Si una orden enviada debe poder reabrirse para corregirla. Hoy no: se cancela y se hace otra, para que lo que recibió el proveedor y lo que dice el sistema nunca difieran en silencio.
+
+## Sugerencia de compra desde mínimos (CMP-14)
+
+- Se deriva cada vez (mínimos, saldos y órdenes abiertas); no hay tabla de sugerencias ni banderas. «En camino» = lo pedido y no recibido de borradores, órdenes enviadas y recibidas en parte (en la unidad del producto, con el contenido de cada línea).
+- Cantidad sugerida: lo que falta para llegar al mínimo, en la forma en que se le compra al proveedor elegido (presentación del vínculo producto-proveedor, redondeando hacia arriba a cajas completas; o el paso del producto), al menos una.
+- Proveedor: el del último costo más reciente; si no hay, el primer vínculo. Proveedores archivados no cuentan.
+- Generar: el navegador manda solo ids de productos; el servidor los bloquea (`lockRows`) y recalcula, crea un borrador por proveedor (en partes si pasa del máximo de líneas) con el último costo solo si era para la misma presentación y la persona tiene `purchasing.cost.record`. Dos generaciones a la vez quedan en fila por los candados y la segunda ve los borradores de la primera como «en camino».
+- A confirmar por el fundador: si se pide hasta el mínimo o hasta un máximo/cantidad de reorden, y si los borradores deben contar como «en camino».

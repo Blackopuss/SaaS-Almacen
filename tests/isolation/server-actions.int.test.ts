@@ -61,6 +61,12 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); solo devoluciones de esa persona en esa empresa",
     coveredBy: "tests/purchasing/returns.int.test.ts",
   },
+  generateSuggestedOrdersAction: {
+    input: "ids de productos",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); productos, mínimos, proveedores y cantidades se calculan en el servidor solo en esa empresa",
+    coveredBy: "tests/purchasing/suggestions.int.test.ts",
+  },
   closePurchaseOrderAction: {
     input: "id de orden y motivo",
     identity:
