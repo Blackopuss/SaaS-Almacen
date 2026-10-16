@@ -349,6 +349,8 @@ export type ReceiveFormState = {
     reference: string;
     /** What was typed for each line, by the id of the order line. */
     quantities: Record<string, string>;
+    /** Location chosen for a line, when not the one of the receipt. */
+    places: Record<string, string>;
   };
   /** Changes with every answer, so selects show what was chosen. */
   answers: number;
@@ -368,16 +370,26 @@ export async function receivePurchaseOrderAction(
 ): Promise<ReceiveFormState> {
   const { user, organization } = await requireOrganizationContext();
   // One field per line of the order: `q:<id of the order line>`.
+  // and, when it goes elsewhere than the rest, `l:<id>` (CMP-09).
   const quantities: Record<string, string> = {};
+  const places: Record<string, string> = {};
   for (const [name, value] of formData.entries()) {
-    if (!name.startsWith("q:") || typeof value !== "string") continue;
-    if (Object.keys(quantities).length >= 200) break;
-    quantities[name.slice(2, 38)] = value.slice(0, 40);
+    if (typeof value !== "string") continue;
+    if (name.startsWith("q:") && Object.keys(quantities).length < 200) {
+      quantities[name.slice(2, 38)] = value.slice(0, 40);
+    } else if (
+      name.startsWith("l:") &&
+      value &&
+      Object.keys(places).length < 200
+    ) {
+      places[name.slice(2, 38)] = value.slice(0, 36);
+    }
   }
   const values = {
     locationId: String(formData.get("locationId") ?? "").slice(0, 36),
     reference: String(formData.get("reference") ?? "").slice(0, 200),
     quantities,
+    places,
   };
   const answers = prev.answers + 1;
   let result;
@@ -391,6 +403,7 @@ export async function receivePurchaseOrderAction(
         lines: Object.entries(quantities).map(([orderLineId, quantity]) => ({
           orderLineId,
           quantity,
+          locationId: places[orderLineId],
         })),
         idempotencyKey: String(formData.get("idempotencyKey") ?? "").slice(
           0,

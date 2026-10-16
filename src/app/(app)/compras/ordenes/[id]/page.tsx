@@ -132,6 +132,8 @@ export default async function OrdenPage({
                         : `pediste ${line.orderedText}`,
                       pendingQuantity: line.pendingQuantity,
                       unitText: line.unitText,
+                      contentText: line.contentText,
+                      orderedContentText: line.orderedContentText,
                     }))}
                   locations={locations.map((location) => ({
                     id: location.id,

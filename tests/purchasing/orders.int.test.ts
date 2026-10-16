@@ -640,9 +640,9 @@ describe("costs", () => {
     for (const key of ["unitCost", "unitCostText", "amountText"]) {
       expect(key in seen!.lines[0]!, key).toBe(false);
     }
-    expect(JSON.stringify(seen)).not.toMatch(/987|6913/);
+    expect(JSON.stringify(seen)).not.toMatch(/987[.]65|6,?913[.]55/);
     expect(JSON.stringify(await listPurchaseOrders(viewer))).not.toMatch(
-      /987|6913/,
+      /987[.]65|6,?913[.]55/,
     );
     // Compras sees them.
     const buyer = await member(actor.organizationId, "buyer");

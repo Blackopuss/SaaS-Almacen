@@ -632,3 +632,113 @@ describe("partial receipts (CMP-08)", () => {
     expect(await statusOf(other)).toBe("SENT");
   });
 });
+
+describe("destination and presentation when receiving (CMP-09)", () => {
+  it("2 boxes into A-01 are 200 pieces in A-01; each line may go elsewhere", async () => {
+    const actor = await company();
+    const nails = await product(actor);
+    const screws = await product(actor);
+    const caja = await box(actor, nails, "100");
+    const a01 = await createLocation(actor, { kind: "SHELF", name: "A-01" });
+    const b02 = await createLocation(actor, { kind: "SHELF", name: "B-02" });
+    if (!a01.ok || !b02.ok) throw new Error("location setup failed");
+    const orderId = await sentOrder(actor, [
+      { productId: nails, capture: `p:${caja}`, quantity: "2" },
+      { productId: screws, quantity: "30" },
+    ]);
+    const lines = await db.purchaseOrderLine.findMany({
+      where: { orderId },
+      orderBy: { lineNumber: "asc" },
+    });
+
+    const result = await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      locationId: a01.locationId,
+      lines: [
+        { orderLineId: lines[0]!.id, quantity: "2" },
+        {
+          orderLineId: lines[1]!.id,
+          quantity: "30",
+          locationId: b02.locationId,
+        },
+      ],
+    });
+    expect(result).toMatchObject({ ok: true, status: "RECEIVED" });
+    expect(result.ok && result.summary).toMatch(/en A-01 y B-02/);
+    expect(await stockIn(actor, nails, a01.locationId)).toBe("200");
+    expect(await stockIn(actor, screws, b02.locationId)).toBe("30");
+    expect(await stockIn(actor, screws, a01.locationId)).toBe("0");
+    const view = await getOrderReceipts(actor, orderId);
+    expect(view?.receipts[0]?.lines.map((line) => line.locationPath)).toEqual([
+      "A-01",
+      "B-02",
+    ]);
+    const movementLines = await db.stockMovementLine.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { lineNumber: "asc" },
+    });
+    expect(movementLines.map((line) => line.locationId)).toEqual([
+      a01.locationId,
+      b02.locationId,
+    ]);
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("shows the content in force and the difference with the order", async () => {
+    const actor = await company();
+    const productId = await product(actor);
+    const caja = await box(actor, productId, "100");
+    const orderId = await sentOrder(actor, [
+      { productId, capture: `p:${caja}`, quantity: "2" },
+    ]);
+    expect((await getOrderReceipts(actor, orderId))?.lines[0]).toMatchObject({
+      contentText: "1 caja = 100 piezas",
+      orderedContentText: null,
+    });
+    await changePresentationFactor(actor, caja, {
+      factor: "120",
+      reason: "Caja nueva del proveedor",
+    });
+    expect((await getOrderReceipts(actor, orderId))?.lines[0]).toMatchObject({
+      contentText: "1 caja = 120 piezas",
+      orderedContentText: "1 caja = 100 piezas",
+    });
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+    await receivePurchaseOrder(actor, orderId, {
+      idempotencyKey: key(),
+      lines: [{ orderLineId: line!.id, quantity: "1" }],
+    });
+    expect(await stockIn(actor, productId)).toBe("120");
+    expect(
+      (await getOrderReceipts(actor, orderId))?.receipts[0]?.lines[0]
+        ?.quantityText,
+    ).toBe("1 caja × 120 = 120 piezas");
+  });
+
+  it("a line location of another company or archived is refused on its line", async () => {
+    const mine = await company();
+    const theirs = await company();
+    const foreign = await createLocation(theirs, { kind: "SHELF", name: "X" });
+    const old = await createLocation(mine, { kind: "SHELF", name: "Vieja" });
+    if (!foreign.ok || !old.ok) throw new Error("location setup failed");
+    await archiveLocation(mine, old.locationId);
+    const productId = await product(mine);
+    const orderId = await sentOrder(mine, [{ productId, quantity: "3" }]);
+    const [line] = await db.purchaseOrderLine.findMany({ where: { orderId } });
+
+    for (const [locationId, message] of [
+      [foreign.locationId, /no existe/],
+      [old.locationId, /archivada/],
+    ] as const) {
+      const refused = await receivePurchaseOrder(mine, orderId, {
+        idempotencyKey: key(),
+        lines: [{ orderLineId: line!.id, quantity: "3", locationId }],
+      });
+      expect(refused.ok ? {} : refused.lineErrors).toMatchObject({
+        [line!.id]: message,
+      });
+    }
+    expect(await statusOf(orderId)).toBe("SENT");
+    expect(await db.purchaseReceipt.count({ where: { orderId } })).toBe(0);
+  });
+});

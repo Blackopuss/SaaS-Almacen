@@ -1,6 +1,11 @@
 "use client";
 
-import { CircleAlert, Loader2, PackageCheck } from "lucide-react";
+import {
+  CircleAlert,
+  Loader2,
+  PackageCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { unstable_rethrow } from "next/navigation";
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +42,10 @@ export type PendingReceiptLine = {
   pendingQuantity: string;
   /** «cajas», «piezas». */
   unitText: string;
+  /** «1 caja = 120 piezas»: what enters for each one, today. */
+  contentText: string | null;
+  /** «1 caja = 100 piezas» when that changed since the order. */
+  orderedContentText: string | null;
 };
 
 /**
@@ -103,6 +112,7 @@ export function ReceiveOrder({
         quantities: Object.fromEntries(
           pending.map((line) => [line.id, line.pendingQuantity]),
         ),
+        places: {},
       },
       answers: 0,
     },
@@ -127,6 +137,31 @@ export function ReceiveOrder({
             </DialogDescription>
           </DialogHeader>
           <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+          <FormField
+            id={`receive-location-${orderId}`}
+            label="¿Dónde lo guardas?"
+            hint={
+              locations.length > 1
+                ? "Para todo; si algo va en otro lugar, elígelo en su producto."
+                : undefined
+            }
+            error={state.fieldErrors.locationId}
+          >
+            {(control) => (
+              <NativeSelect
+                key={`location-${answers}`}
+                name="locationId"
+                defaultValue={state.values.locationId}
+                {...control}
+              >
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.label}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
           <ul className="max-h-[40vh] divide-y overflow-y-auto rounded-lg border">
             {pending.map((line) => {
               const fieldId = `receive-q-${line.id}`;
@@ -143,6 +178,21 @@ export function ReceiveOrder({
                     <span className="text-muted-foreground">
                       {line.sku} · {line.pendingText}
                     </span>
+                    {line.contentText && (
+                      <span className="block text-muted-foreground">
+                        Hoy {line.contentText}
+                      </span>
+                    )}
+                    {line.orderedContentText && (
+                      <span className="mt-1 flex items-start gap-1 text-foreground">
+                        <TriangleAlert
+                          aria-hidden="true"
+                          className="mt-0.5 size-4 shrink-0 text-warning"
+                        />
+                        Cambió desde la orden: era {line.orderedContentText}.
+                        Entra con el contenido de hoy.
+                      </span>
+                    )}
                   </label>
                   <div className="flex items-center gap-2">
                     <Input
@@ -162,6 +212,31 @@ export function ReceiveOrder({
                       {line.unitText}
                     </span>
                   </div>
+                  {locations.length > 1 && (
+                    <div className="flex items-center gap-2 sm:col-span-2">
+                      <label
+                        htmlFor={`${fieldId}-place`}
+                        className="shrink-0 text-sm text-muted-foreground"
+                      >
+                        Guardar en
+                      </label>
+                      <div className="min-w-0 flex-1">
+                        <NativeSelect
+                          key={`${line.id}-place-${answers}`}
+                          id={`${fieldId}-place`}
+                          name={`l:${line.id}`}
+                          defaultValue={state.values.places[line.id] ?? ""}
+                        >
+                          <option value="">La de arriba</option>
+                          {locations.map((location) => (
+                            <option key={location.id} value={location.id}>
+                              {location.label}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                    </div>
+                  )}
                   {error && (
                     <p
                       id={`${fieldId}-error`}
@@ -186,26 +261,6 @@ export function ReceiveOrder({
               <p>{state.formError}</p>
             </div>
           )}
-          <FormField
-            id={`receive-location-${orderId}`}
-            label="¿Dónde lo guardas?"
-            error={state.fieldErrors.locationId}
-          >
-            {(control) => (
-              <NativeSelect
-                key={`location-${answers}`}
-                name="locationId"
-                defaultValue={state.values.locationId}
-                {...control}
-              >
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.label}
-                  </option>
-                ))}
-              </NativeSelect>
-            )}
-          </FormField>
           <FormField
             id={`receive-reference-${orderId}`}
             label="Remisión o factura (opcional)"

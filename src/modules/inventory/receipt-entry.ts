@@ -24,7 +24,8 @@ type Decimal = ReturnType<typeof dec>;
 export type ReceiptEntryInput = {
   /** Where it is put; null = the default location, «General». */
   locationId: string | null;
-  lines: { productId: string; capture: Capture }[];
+  /** A line may go somewhere else than the rest (CMP-09). */
+  lines: { productId: string; capture: Capture; locationId?: string | null }[];
   /** «OC-0007 · Remisión 4411»: what people see in the history. */
   reference: string | null;
   reason: string | null;
@@ -33,6 +34,8 @@ export type ReceiptEntryInput = {
 export type ReceiptEntryLine = {
   lineNumber: number;
   productId: string;
+  locationId: string;
+  locationName: string;
   unitCode: string;
   capturedQuantity: Decimal;
   presentationId: string | null;
@@ -53,7 +56,7 @@ export type ReceiptEntryResult =
     }
   | {
       ok: false;
-      /** Position of the line with the problem, or null for the location. */
+      /** Position of the line with the problem, or null for the location of the receipt. */
       line: number | null;
       error: string;
     };
@@ -72,24 +75,37 @@ export async function postReceiptEntry(
     "product",
     input.lines.map((line) => line.productId),
   );
-  if (input.locationId) await lockRows(tx, "location", [input.locationId]);
+  // Every location of the receipt at once: lockRows keeps the id order.
+  const chosen = [
+    ...new Set(
+      [input.locationId, ...input.lines.map((line) => line.locationId)].filter(
+        (id): id is string => Boolean(id),
+      ),
+    ),
+  ];
+  await lockRows(tx, "location", chosen);
 
-  const location = await tx.location.findFirst({
-    where: input.locationId ? { id: input.locationId } : { isDefault: true },
-    select: { id: true, name: true, archivedAt: true },
+  const places = await tx.location.findMany({
+    where: { OR: [{ id: { in: chosen } }, { isDefault: true }] },
+    select: { id: true, name: true, archivedAt: true, isDefault: true },
   });
-  if (!location) {
+  const placeOf = (id: string | null | undefined) =>
+    id
+      ? places.find((place) => place.id === id)
+      : places.find((place) => place.isDefault === true);
+  const problemOf = (place: (typeof places)[number] | undefined) =>
+    !place
+      ? "Esa ubicación ya no existe. Elige otra."
+      : place.archivedAt
+        ? `«${place.name}» está archivada. Elige otra ubicación.`
+        : null;
+  const location = placeOf(input.locationId);
+  const locationProblem = problemOf(location);
+  if (locationProblem || !location) {
     return {
       ok: false,
       line: null,
-      error: "Esa ubicación ya no existe. Elige otra.",
-    };
-  }
-  if (location.archivedAt) {
-    return {
-      ok: false,
-      line: null,
-      error: `«${location.name}» está archivada. Elige otra ubicación.`,
+      error: locationProblem ?? "Esa ubicación ya no existe. Elige otra.",
     };
   }
 
@@ -100,8 +116,18 @@ export async function postReceiptEntry(
   const byId = new Map(products.map((product) => [product.id, product]));
 
   const lines: ReceiptEntryLine[] = [];
+  // What enters each product in each location: `<product> <location>`.
   const added = new Map<string, Decimal>();
   for (const [index, line] of input.lines.entries()) {
+    const place = line.locationId ? placeOf(line.locationId) : location;
+    const placeProblem = problemOf(place);
+    if (placeProblem || !place) {
+      return {
+        ok: false,
+        line: index,
+        error: placeProblem ?? "Esa ubicación ya no existe. Elige otra.",
+      };
+    }
     const product = byId.get(line.productId);
     if (!product) {
       return { ok: false, line: index, error: "Este producto ya no existe." };
@@ -124,10 +150,13 @@ export async function postReceiptEntry(
     }
     const { conversion } = resolved;
     const base = conversion.baseQuantity;
-    added.set(product.id, (added.get(product.id) ?? dec(0)).plus(base));
+    const slot = `${product.id} ${place.id}`;
+    added.set(slot, (added.get(slot) ?? dec(0)).plus(base));
     lines.push({
       lineNumber: index + 1,
       productId: product.id,
+      locationId: place.id,
+      locationName: place.name,
       unitCode: resolved.product.unitCode,
       capturedQuantity: conversion.capturedQuantity,
       presentationId: conversion.presentation?.id ?? null,
@@ -141,16 +170,23 @@ export async function postReceiptEntry(
   }
 
   const balances = await tx.stockBalance.findMany({
-    where: { productId: { in: [...added.keys()] }, locationId: location.id },
-    select: { id: true, productId: true, quantity: true },
+    where: {
+      productId: { in: [...new Set(lines.map((line) => line.productId))] },
+      locationId: { in: [...new Set(lines.map((line) => line.locationId))] },
+    },
+    select: { id: true, productId: true, locationId: true, quantity: true },
   });
-  const current = new Map(balances.map((row) => [row.productId, row]));
-  for (const [productId, quantity] of added) {
-    const before = dec(current.get(productId)?.quantity.toString() ?? 0);
+  const current = new Map(
+    balances.map((row) => [`${row.productId} ${row.locationId}`, row]),
+  );
+  for (const [slot, quantity] of added) {
+    const before = dec(current.get(slot)?.quantity.toString() ?? 0);
     if (before.plus(quantity).greaterThan(MAX_BALANCE)) {
       return {
         ok: false,
-        line: input.lines.findIndex((line) => line.productId === productId),
+        line: lines.findIndex(
+          (line) => `${line.productId} ${line.locationId}` === slot,
+        ),
         error:
           "Con esa cantidad el saldo sería demasiado grande. Revisa lo recibido.",
       };
@@ -175,7 +211,7 @@ export async function postReceiptEntry(
       movementId,
       lineNumber: line.lineNumber,
       productId: line.productId,
-      locationId: location.id,
+      locationId: line.locationId,
       direction: "IN" as const,
       capturedQuantity: line.capturedQuantity.toString(),
       presentationId: line.presentationId,
@@ -185,8 +221,9 @@ export async function postReceiptEntry(
       unitCode: line.unitCode,
     })),
   });
-  for (const [productId, quantity] of added) {
-    const row = current.get(productId);
+  for (const [slot, quantity] of added) {
+    const row = current.get(slot);
+    const [productId, locationId] = slot.split(" ") as [string, string];
     if (row) {
       await tx.stockBalance.updateMany({
         where: { id: row.id },
@@ -198,7 +235,7 @@ export async function postReceiptEntry(
           id: newId(),
           organizationId,
           productId,
-          locationId: location.id,
+          locationId,
           quantity: quantity.toString(),
         },
       });

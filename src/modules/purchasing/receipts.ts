@@ -84,6 +84,8 @@ const receiveSchema = z.object({
       z.object({
         orderLineId: z.string().trim().max(36),
         quantity: z.string().trim().max(40),
+        /** Somewhere else than the rest of the receipt (CMP-09). */
+        locationId: z.string().trim().max(36).optional(),
       }),
     )
     .max(PURCHASE_ORDER_MAX_LINES)
@@ -316,7 +318,11 @@ export async function receivePurchaseOrder(
       const pending = data.lines
         ? chosenLines(current.lines, left, data.lines)
         : current.lines
-            .map((line) => ({ line, quantity: left.get(line.id)! }))
+            .map((line) => ({
+              line,
+              quantity: left.get(line.id)!,
+              locationId: null as string | null,
+            }))
             .filter((entry) => entry.quantity.greaterThan(0));
 
       const numberText = formatOrderNumber(current.number);
@@ -325,8 +331,9 @@ export async function receivePurchaseOrder(
         { organizationId, userId },
         {
           locationId: data.locationId,
-          lines: pending.map(({ line, quantity }) => ({
+          lines: pending.map(({ line, quantity, locationId }) => ({
             productId: line.productId,
+            locationId,
             capture: (line.presentationId
               ? {
                   kind: "presentation",
@@ -375,7 +382,7 @@ export async function receivePurchaseOrder(
           lineNumber: line.lineNumber,
           orderLineId: pending[index]!.line.id,
           productId: line.productId,
-          locationId: entry.locationId,
+          locationId: line.locationId,
           capturedQuantity: line.capturedQuantity.toString(),
           presentationId: line.presentationId,
           presentationVersionId: line.presentationVersionId,
@@ -395,6 +402,12 @@ export async function receivePurchaseOrder(
       const status: PurchaseOrderStatus =
         missing === 0 ? "RECEIVED" : "PARTIAL";
       await advanceOrderOnReceipt(tx, current.id, status);
+      // «General», or «General y A-01» when lines went to several places.
+      const places = [...new Set(entry.lines.map((line) => line.locationName))];
+      const where =
+        places.length === 1
+          ? places[0]!
+          : `${places.slice(0, -1).join(", ")} y ${places.at(-1)}`;
       await recordAuditEvent(tx, {
         organizationId,
         actorUserId: userId,
@@ -404,7 +417,7 @@ export async function receivePurchaseOrder(
           orden: numberText,
           proveedor: current.contact.name,
           productos: entry.lines.length,
-          ubicacion: entry.locationName,
+          ubicacion: places.join(", "),
           ...(data.reference ? { remision: data.reference } : {}),
           estado: PURCHASE_ORDER_STATUS_LABELS[status],
         },
@@ -414,7 +427,7 @@ export async function receivePurchaseOrder(
         ok: true as const,
         receiptId,
         status,
-        summary: `Recibiste ${count === 1 ? "1 producto" : `${count} productos`} de ${numberText} en ${entry.locationName}. ${
+        summary: `Recibiste ${count === 1 ? "1 producto" : `${count} productos`} de ${numberText} en ${where}. ${
           missing === 0
             ? "La orden quedó recibida."
             : `La orden quedó recibida en parte: ${missing === 1 ? "falta 1 producto" : `faltan ${missing} productos`}.`
@@ -460,11 +473,15 @@ type OrderLineRow = {
 function chosenLines(
   lines: OrderLineRow[],
   left: Map<string, Decimal>,
-  requested: { orderLineId: string; quantity: string }[],
-): { line: OrderLineRow; quantity: Decimal }[] {
+  requested: { orderLineId: string; quantity: string; locationId?: string }[],
+): { line: OrderLineRow; quantity: Decimal; locationId?: string | null }[] {
   const byId = new Map(lines.map((line) => [line.id, line]));
   const errors: Record<string, string> = {};
-  const chosen: { line: OrderLineRow; quantity: Decimal }[] = [];
+  const chosen: {
+    line: OrderLineRow;
+    quantity: Decimal;
+    locationId?: string | null;
+  }[] = [];
   const seen = new Set<string>();
   for (const item of requested) {
     const line = byId.get(item.orderLineId);
@@ -504,7 +521,11 @@ function chosenLines(
         `Solo faltan ${inTermsOf(pending, line.presentation, line.unitCode)}. Lo que llegó de más no se recibe en esta orden.`;
       continue;
     }
-    chosen.push({ line, quantity: parsed.quantity });
+    chosen.push({
+      line,
+      quantity: parsed.quantity,
+      locationId: item.locationId || null,
+    });
   }
   if (Object.keys(errors).length > 0) return refuseLines(errors);
   if (chosen.length === 0) {
@@ -556,6 +577,10 @@ export type PendingLine = {
   pendingQuantity: string;
   /** «cajas», «piezas»: what the quantity counts. */
   unitText: string;
+  /** «1 caja = 120 piezas»: what will enter for each one; null by unit. */
+  contentText: string | null;
+  /** «1 caja = 100 piezas» when the content changed since it was ordered. */
+  orderedContentText: string | null;
 };
 
 export type ReceiptSummary = {
@@ -618,8 +643,18 @@ export async function getOrderReceipts(
           lineNumber: true,
           capturedQuantity: true,
           unitCode: true,
+          factor: true,
           product: { select: { name: true, sku: true } },
-          presentation: { select: { name: true } },
+          presentation: {
+            select: {
+              name: true,
+              versions: {
+                orderBy: { version: "desc" },
+                take: 1,
+                select: { factor: true },
+              },
+            },
+          },
         },
       },
       receipts: {
@@ -663,7 +698,22 @@ export async function getOrderReceipts(
     const ordered = dec(line.capturedQuantity.toString());
     const got = received.get(line.id) ?? dec(0);
     const left = ordered.minus(got);
+    // CMP-09: what one presentation holds today, which is what will enter,
+    // and what it held when it was ordered when that changed.
+    const today = line.presentation?.versions[0]?.factor.toString();
+    const one = (factor: string) =>
+      `1 ${line.presentation!.name.toLowerCase()} = ${formatStock(factor, line.unitCode)}`;
+    const content =
+      line.presentation && today
+        ? {
+            contentText: one(today),
+            orderedContentText: dec(today).equals(line.factor.toString())
+              ? null
+              : one(line.factor.toString()),
+          }
+        : { contentText: null, orderedContentText: null };
     return {
+      ...content,
       orderLineId: line.id,
       lineNumber: line.lineNumber,
       productName: line.product.name,
