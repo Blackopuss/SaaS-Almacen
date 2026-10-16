@@ -30,7 +30,7 @@ import {
   transitionProblem,
   type PurchaseOrderStatus,
 } from "./order-states";
-import type { PurchasingActor } from "./product-suppliers";
+import { recordLastCost, type PurchasingActor } from "./product-suppliers";
 
 /**
  * Receipts of purchase orders (CMP-07). Receiving writes, in one
@@ -205,6 +205,9 @@ export async function receivePurchaseOrder(
   }
   const data = parsed.data;
   const client = forOrganization(organizationId);
+  // Asked before the transaction: it reads the permissions with its own
+  // connection (MOD-08).
+  const recordCosts = await mayRecordCosts(actor);
 
   // The lines of an order that is no longer a draft never change
   // (triggers), so reading them before locking is safe; they tell which
@@ -280,6 +283,7 @@ export async function receivePurchaseOrder(
           id: true,
           number: true,
           status: true,
+          contactId: true,
           contact: { select: { name: true } },
           lines: {
             orderBy: { lineNumber: "asc" },
@@ -290,6 +294,7 @@ export async function receivePurchaseOrder(
               capturedQuantity: true,
               presentationId: true,
               unitCode: true,
+              unitCost: true,
               product: { select: { quantityStep: true } },
               presentation: { select: { name: true } },
             },
@@ -400,8 +405,24 @@ export async function receivePurchaseOrder(
           factor: line.factor.toString(),
           baseQuantity: line.baseQuantity.toString(),
           unitCode: line.unitCode,
+          unitCost: pending[index]!.line.unitCost?.toString() ?? null,
         })),
       });
+      // CMP-13: the cost of what arrived becomes the last cost of the
+      // product at this supplier (no valuation: just the last price).
+      if (recordCosts) {
+        await recordReceivedCosts(tx, {
+          organizationId,
+          userId,
+          supplierId: current.contactId,
+          lines: entry.lines.map((line, index) => ({
+            productId: line.productId,
+            presentationId: line.presentationId,
+            presentationVersionId: line.presentationVersionId,
+            unitCost: pending[index]!.line.unitCost,
+          })),
+        });
+      }
 
       // Received when nothing is left of any line; in part otherwise.
       for (const { line, quantity } of pending) {
@@ -509,6 +530,7 @@ type OrderLineRow = {
   productId: string;
   presentationId: string | null;
   unitCode: string;
+  unitCost: { toString(): string } | null;
   product: { quantityStep: { toString(): string } };
   presentation: { name: string } | null;
 };
@@ -698,6 +720,77 @@ function pathOf(location: {
       location.name,
     ].filter((name): name is string => Boolean(name)),
   );
+}
+
+/** Whether the person may record costs: never an error, just yes or no. */
+async function mayRecordCosts(actor: PurchasingActor): Promise<boolean> {
+  try {
+    await assertModulePermission(
+      actor.organizationId,
+      actor.userId,
+      "purchasing.cost.record",
+    );
+    return true;
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") return false;
+    throw error;
+  }
+}
+
+/**
+ * The last cost of each received product at the supplier of the order
+ * (CMP-13), from the cost of its order line, for the presentation version
+ * it arrived with. A product bought from a supplier it was not linked to
+ * gets the link: buying it there is what the link says. Inside the
+ * transaction of the receipt, with the products already locked.
+ */
+async function recordReceivedCosts(
+  tx: Tx,
+  input: {
+    organizationId: string;
+    userId: string;
+    supplierId: string;
+    lines: {
+      productId: string;
+      presentationId: string | null;
+      presentationVersionId: string | null;
+      unitCost: { toString(): string } | null;
+    }[];
+  },
+): Promise<void> {
+  const at = new Date();
+  for (const line of input.lines) {
+    if (line.unitCost === null) continue;
+    const linked = await tx.productSupplier.findFirst({
+      where: { productId: line.productId, contactId: input.supplierId },
+      select: { id: true },
+    });
+    if (!linked) {
+      await tx.productSupplier.create({
+        data: {
+          id: newId(),
+          organizationId: input.organizationId,
+          productId: line.productId,
+          contactId: input.supplierId,
+          presentationId: line.presentationId,
+          createdByUserId: input.userId,
+        },
+      });
+    }
+    await recordLastCost(tx, {
+      productId: line.productId,
+      supplierId: input.supplierId,
+      cost: line.unitCost.toString(),
+      presentationVersion:
+        line.presentationId && line.presentationVersionId
+          ? {
+              presentationId: line.presentationId,
+              versionId: line.presentationVersionId,
+            }
+          : null,
+      at,
+    });
+  }
 }
 
 /** Whether the person may see returns: never an error, just yes or no. */
