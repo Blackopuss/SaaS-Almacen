@@ -73,10 +73,12 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 - **Obligatoria** para el titular de cualquier empresa y, desde USR-01, para todo administrador con membresía activa (`isMfaRequired`, `src/platform/auth/mfa-policy.ts`). `requireSession()` envía a `/activa-dos-pasos` a quien la necesita y no la tiene; solo esa pantalla y su acción usan `allowMissingMfa`. Pendiente: personal de plataforma (MOD-09).
 - Restablecer la contraseña no desactiva la MFA (la recuperación no la elude).
 
-## Verificación de correo sin inicio de sesión automático (auditoría de seguridad 1)
+## Confirmar el correo con enlace y contraseña (auditorías de seguridad 1 y 2)
 
 - **Hallazgo (bajo, corregido):** cualquiera puede registrar el correo de otra persona con una contraseña que solo él conoce. Con `autoSignInAfterVerification: true`, el dueño del buzón que abría el enlace entraba a una cuenta cuya contraseña sabía un extraño; si después aceptaba una invitación con un rol sin MFA obligatoria, el extraño entraba a esa empresa con su contraseña (reproducido en `almacen_test`).
-- Corrección: el enlace solo confirma el correo (`autoSignInAfterVerification: false`). `/correo-verificado` pide iniciar sesión con la contraseña y ofrece «Olvidé mi contraseña»: restablecerla reemplaza la credencial y cierra todas las sesiones (`revokeSessionsOnPasswordReset`). Prueba: `auth.int.test.ts`.
+- Primera corrección (auditoría 1): el enlace ya no inicia sesión (`autoSignInAfterVerification: false`).
+- **Residuo (auditoría 2, corregido):** con solo eso, el dueño del buzón todavía confirmaba la cuenta del extraño al abrir el enlace. El extraño podía entrar con su contraseña, crear una empresa y activar su propia MFA; restablecer la contraseña no quitaba ese segundo factor y el dueño quedaba fuera de su propio correo. Además, `sendOnSignIn` mandaba un enlace en cada intento de inicio de sesión sobre una cuenta sin verificar, sin límite (25 intentos = 25 correos).
+- Corrección final: **confirmar el correo exige el enlace y la contraseña.** El enlace lleva a `/confirmar-correo`, que guarda el token en una cookie `httpOnly` de ese navegador (24 h) y manda a `/ingresar`; `signIn` confirma el correo (`auth.api.verifyEmail`) solo si en ese navegador se escribe la contraseña correcta y el token es de ese mismo correo. `GET /api/auth/verify-email` salió de la lista de permitidos. Quien tiene el buzón pero no la contraseña que eligió un extraño nunca activa esa cuenta: la recupera, y `onPasswordReset` la confirma con su contraseña nueva; el extraño nunca tuvo sesión. `sendOnSignIn: false`: el reenvío pasa por `resendVerification` (3 por correo y 10 por IP cada 15 min). Pruebas: `auth.int.test.ts`, `http-surface.int.test.ts`, `http.test.ts`.
 - Cuenta demo local: es titular, así que `db:seed` le activa MFA con `DEMO_TOTP_SECRET` (cifrado como lo hace Better Auth) y `npm run demo:codigo` muestra el código. `verify:ui` calcula códigos nuevos por paso de 30 s.
 
 ## Códigos de recuperación y desactivación (PLT-09)
@@ -91,7 +93,7 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 ## Superficie HTTP de Better Auth (PLT-15)
 
 - **Hallazgo alto (corregido):** Better Auth publica sus endpoints en `/api/auth/*` aunque la app no los use. Un titular con sesión podía desactivar la MFA con solo la contraseña (`POST /two-factor/disable`), saltándose «obligatoria para titulares» y «contraseña + código»; también se podía iniciar sesión sin el límite por cuenta, listar sesiones o cambiar el perfil por HTTP.
-- Corrección: **lista de permitidos** en `src/platform/auth/http.ts` (`handleAuthRequest`). Por HTTP solo llegan los enlaces de correo (`GET /verify-email`, `GET /reset-password/<token>`); todo lo demás responde 404. Las Server Actions llaman `auth.api` directamente y no pasan por esa ruta. Endpoints nuevos de futuras versiones quedan cerrados hasta revisarlos.
+- Corrección: **lista de permitidos** en `src/platform/auth/http.ts` (`handleAuthRequest`). Por HTTP solo llega el enlace de restablecimiento (`GET /reset-password/<token>`); `GET /verify-email` se cerró en la auditoría 2 (el correo se confirma con enlace + contraseña en `/confirmar-correo`); todo lo demás responde 404. Las Server Actions llaman `auth.api` directamente y no pasan por esa ruta. Endpoints nuevos de futuras versiones quedan cerrados hasta revisarlos.
 - Pruebas: `tests/isolation/http-surface.int.test.ts` (14 rutas sensibles cerradas, enlaces de correo funcionando) y `src/platform/auth/http.test.ts` (trucos de ruta).
 
 ## Requisitos de producción (revisar en BAS-09..BAS-11 y PIL-01)

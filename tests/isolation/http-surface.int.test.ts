@@ -163,14 +163,15 @@ describe("Better Auth over HTTP", () => {
     expect(response.status).toBe(404);
   });
 
-  it("the links sent by email still work", async () => {
+  it("the reset link still works; confirming an email needs the password", async () => {
+    // The confirmation link goes to /confirmar-correo (security audit 2).
     const verify = await handleAuthRequest(
       request(
         "GET",
         "/verify-email?token=invalido&callbackURL=%2Fcorreo-verificado",
       ),
     );
-    expect(verify.status).not.toBe(404);
+    expect(verify.status).toBe(404);
     const reset = await handleAuthRequest(
       request(
         "GET",

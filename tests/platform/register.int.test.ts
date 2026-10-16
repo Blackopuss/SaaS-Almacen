@@ -89,8 +89,8 @@ describe("registerUser", () => {
     expect(mail?.subject).toBe("Confirma tu correo para Almacén");
     expect(mail?.text).toContain("Hola, Ana Pérez:");
     expect(mail?.text).toContain("vence en 24 horas");
-    expect(mail?.actionUrl).toMatch(/\/api\/auth\/verify-email\?token=/);
-    expect(mail?.actionUrl).toContain("callbackURL=%2Fcorreo-verificado");
+    // It lands on /confirmar-correo: the password confirms it (audit 2).
+    expect(mail?.actionUrl).toMatch(/\/confirmar-correo\?token=/);
   });
 
   it("answers a duplicate email exactly like a new one and warns the owner", async () => {

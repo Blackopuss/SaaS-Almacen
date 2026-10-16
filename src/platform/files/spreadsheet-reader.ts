@@ -136,11 +136,21 @@ function parseCsv(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
+  // Whether the cell has anything but spaces so far: kept as a flag, not
+  // asked with `cell.trim()` per quote, which copied the whole cell each
+  // time (quadratic on a long cell full of quotes; security audit 2).
+  let filled = false;
   let quoted = false;
+  // A cell keeps only its start (`clean`): nothing past this is stored.
+  const MAX_CELL = READ_LIMITS.cell * 4;
+  const add = (text: string) => {
+    if (cell.length < MAX_CELL) cell += text;
+  };
   const endCell = () => {
     if (row.length >= READ_LIMITS.columns) fail("too_large", TOO_MANY_COLUMNS);
     row.push(clean(cell));
     cell = "";
+    filled = false;
   };
   const endRow = () => {
     endCell();
@@ -153,11 +163,11 @@ function parseCsv(text: string, delimiter: string): string[][] {
     if (quoted) {
       if (char === '"') {
         if (text[i + 1] === '"') {
-          cell += '"';
+          add('"');
           i++;
         } else quoted = false;
-      } else cell += char;
-    } else if (char === '"' && cell.trim() === "") {
+      } else add(char);
+    } else if (char === '"' && !filled) {
       cell = "";
       quoted = true;
     } else if (char === delimiter) endCell();
@@ -165,7 +175,10 @@ function parseCsv(text: string, delimiter: string): string[][] {
     else if (char === "\r") {
       if (text[i + 1] === "\n") i++;
       endRow();
-    } else cell += char;
+    } else {
+      add(char);
+      if (char.trim() !== "") filled = true;
+    }
   }
   if (cell !== "" || row.length > 0) endRow();
   return rows;

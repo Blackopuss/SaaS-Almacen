@@ -15,11 +15,11 @@ export function verificationEmail(input: {
     text: [
       `Hola, ${input.name}:`,
       "",
-      "Para activar tu cuenta de Almacén, confirma tu correo con este enlace:",
+      "Para activar tu cuenta de Almacén, abre este enlace y entra con la contraseña que elegiste:",
       input.url,
       "",
-      `El enlace vence en ${input.hours} horas y solo funciona una vez.`,
-      "Si no creaste esta cuenta, ignora este mensaje.",
+      `El enlace vence en ${input.hours} horas.`,
+      "Si no creaste esta cuenta, ignora este mensaje: sin la contraseña nadie puede activarla.",
     ].join("\n"),
   };
 }
@@ -39,6 +39,7 @@ export function existingAccountEmail(input: {
       "Recibimos un intento de crear una cuenta nueva de Almacén con este correo, pero ya tienes una.",
       "Si fuiste tú, inicia sesión con tu cuenta actual:",
       input.signInUrl,
+      "Si no recuerdas su contraseña (o no la elegiste tú), usa «¿Olvidaste tu contraseña?» en esa pantalla.",
       "",
       "Si no fuiste tú, no necesitas hacer nada: tu cuenta no cambió.",
     ].join("\n"),

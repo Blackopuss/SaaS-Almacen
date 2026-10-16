@@ -29,6 +29,12 @@ import { clearAttempts, clientIp, throttleKeys } from "./throttle";
 /** Verification links stay valid for 24 hours and work once. */
 export const VERIFICATION_HOURS = 24;
 
+/** Where the verification link lands (it keeps the token, see `signIn`). */
+export const VERIFY_EMAIL_PATH = "/confirmar-correo";
+
+/** Cookie that holds the token of a verification link in this browser. */
+export const VERIFY_EMAIL_COOKIE = "almacen-confirmar-correo";
+
 /**
  * Emails go out after the response is sent (PLT-16). Otherwise a request
  * for an existing account (which sends an email) would take longer than
@@ -147,7 +153,9 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendOnSignUp: true,
-    sendOnSignIn: true,
+    // Not on every sign-in: that mailed a link per attempt with no limit
+    // (security audit 2). `signIn` resends through the limited path.
+    sendOnSignIn: false,
     // The link proves the mailbox, not who chose the password: anyone can
     // register someone else's email. Starting a session from it would hand
     // the mailbox owner an account whose password a stranger knows (security
@@ -155,12 +163,18 @@ export const auth = betterAuth({
     // recovery replaces it and closes every session.
     autoSignInAfterVerification: false,
     expiresIn: VERIFICATION_HOURS * 60 * 60,
-    sendVerificationEmail: async ({ user, url }) => {
+    // The link does not confirm by itself (security audit 2): it lands on
+    // /confirmar-correo, which keeps the token in this browser, and the
+    // email is confirmed only when someone signs in there with the
+    // account's password (`signIn`). Whoever has the mailbox but not the
+    // password a stranger chose can never activate that account; they
+    // recover it instead, which replaces the password.
+    sendVerificationEmail: async ({ user, token }) => {
       await sendEmail(
         verificationEmail({
           to: user.email,
           name: user.name,
-          url,
+          url: `${process.env.BETTER_AUTH_URL ?? ""}${VERIFY_EMAIL_PATH}?token=${encodeURIComponent(token)}`,
           hours: VERIFICATION_HOURS,
         }),
       );

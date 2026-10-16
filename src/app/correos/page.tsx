@@ -15,8 +15,9 @@ export const dynamic = "force-dynamic";
 export default async function CorreosPage() {
   if (process.env.NODE_ENV === "production") notFound();
   // The links here open accounts: only on this machine. `npm run dev`
-  // listens only on it; with `dev:red` (other devices) the page is still
-  // only for an address of this machine.
+  // listens only on it; `dev:red` (other devices) turns the page off, since
+  // the Host header below is written by the client and proves nothing.
+  if (process.env.DEV_OUTBOX_DISABLED) notFound();
   const host = ((await headers()).get("host") ?? "").replace(/:\d+$/, "");
   if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) notFound();
   const messages = await listDevOutbox();

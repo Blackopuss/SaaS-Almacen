@@ -8,8 +8,9 @@ import { z } from "zod";
 
 import { recordSecurityEvent } from "@/platform/audit";
 
-import { auth } from "./auth";
+import { VERIFY_EMAIL_COOKIE, auth } from "./auth";
 import { isMfaRequired } from "./mfa-policy";
+import { resendVerification } from "./register";
 import {
   clearAttempts,
   clientIp,
@@ -65,6 +66,36 @@ export async function requireSession(
   };
 }
 
+/**
+ * Token of a verification link opened in this browser (kept in a cookie by
+ * /confirmar-correo), only when it is for this email. Its signature and
+ * expiry are checked by Better Auth when it is used.
+ */
+function pendingVerification(
+  requestHeaders: Headers,
+  email: string,
+): string | null {
+  const cookie = requestHeaders.get("cookie") ?? "";
+  const raw = cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${VERIFY_EMAIL_COOKIE}=`))
+    ?.slice(VERIFY_EMAIL_COOKIE.length + 1);
+  if (!raw || raw.length > 2048) return null;
+  const token = decodeURIComponent(raw);
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as { email?: unknown };
+    return typeof payload.email === "string" &&
+      payload.email.toLowerCase() === email.toLowerCase()
+      ? token
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 const signInSchema = z.object({
   email: z.string().trim().toLowerCase().max(254),
   password: z.string().max(1024),
@@ -86,6 +117,7 @@ export type SignInResult =
 export async function signIn(
   input: { email: string; password: string },
   requestHeaders: Headers,
+  afterVerifying = false,
 ): Promise<SignInResult> {
   const parsed = signInSchema.safeParse(input);
   const ip = clientIp(requestHeaders);
@@ -130,9 +162,25 @@ export async function signIn(
   } catch (error) {
     if (isAPIError(error)) {
       if (error.body?.code === "EMAIL_NOT_VERIFIED") {
-        // Right password: not a guessing attempt.
+        // Right password: not a guessing attempt on the account. The IP
+        // keeps the attempt: each one costs a password hash.
         await clearAttempts([throttleKeys.signInAccount(email)]);
-        await refundAttempt([throttleKeys.signInIp(ip)]);
+        // The verification link was opened in this browser and whoever
+        // knows the password is here: both proofs, the email is confirmed
+        // and the sign-in goes on (security audit 2: the link alone left a
+        // stranger's password on the mailbox owner's account).
+        const token = pendingVerification(requestHeaders, email);
+        if (token && !afterVerifying) {
+          try {
+            await auth.api.verifyEmail({ query: { token } });
+            return signIn(input, requestHeaders, true);
+          } catch (verifyError) {
+            if (!isAPIError(verifyError)) throw verifyError;
+            // Expired or used: a new link below.
+          }
+        }
+        // A new link, through the limited resend (never one per attempt).
+        await resendVerification({ email }, requestHeaders);
         return { ok: false, reason: "unverified" };
       }
       if (error.status === "UNAUTHORIZED" || error.statusCode === 401) {

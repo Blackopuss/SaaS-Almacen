@@ -3,6 +3,7 @@ export {
   RESET_PASSWORD_MINUTES,
   TOTP_DIGITS,
   VERIFICATION_HOURS,
+  VERIFY_EMAIL_COOKIE,
   auth,
 } from "./auth";
 export type { Session } from "./auth";

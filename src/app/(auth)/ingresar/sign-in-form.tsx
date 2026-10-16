@@ -10,7 +10,14 @@ import { Input } from "@/components/ui/input";
 
 import { signInAction, type SignInFormState } from "./actions";
 
-export function SignInForm({ next }: { next: string }) {
+export function SignInForm({
+  next,
+  confirming = false,
+}: {
+  next: string;
+  /** Arrived from a verification link: signing in confirms the email. */
+  confirming?: boolean;
+}) {
   const [state, formAction, pending] = useActionState<
     SignInFormState,
     FormData
@@ -29,8 +36,22 @@ export function SignInForm({ next }: { next: string }) {
     <WarehouseCard>
       <div className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Inicia sesión</h1>
-        <p className="text-muted-foreground">Entra a tu inventario.</p>
+        <p className="text-muted-foreground">
+          {confirming
+            ? "Para confirmar tu correo, entra con la contraseña que elegiste al crear la cuenta."
+            : "Entra a tu inventario."}
+        </p>
       </div>
+
+      {confirming && !state.error && (
+        <p
+          role="status"
+          className="mt-6 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground"
+        >
+          ¿No creaste tú esta cuenta o no conoces la contraseña? No la
+          confirmes: usa «¿Olvidaste tu contraseña?» y elige una nueva.
+        </p>
+      )}
 
       {state.error && (
         <div

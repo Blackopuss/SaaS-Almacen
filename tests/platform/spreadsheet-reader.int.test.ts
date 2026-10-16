@@ -171,6 +171,18 @@ describe("readCsv", () => {
     });
   });
 
+  it("costs one pass on a long cell full of quotes (security audit 2)", () => {
+    // 160 KB of this took 4.7 s when each quote re-read the whole cell.
+    const started = performance.now();
+    const result = readCsv(Buffer.from(`a,b\nx${'"'.repeat(2_000_000)},y\n`));
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(result.ok && result.rows[1]![0]!.length).toBe(READ_LIMITS.cell);
+    // Quotes after spaces still open a quoted cell.
+    expect(readCsv(Buffer.from('a\n  "uno, dos"\n'))).toMatchObject({
+      rows: [["a"], ["uno, dos"]],
+    });
+  });
+
   it("refuses what is not a CSV, and bounds what it reads", () => {
     expect(readCsv(Buffer.alloc(0))).toMatchObject({
       ok: false,

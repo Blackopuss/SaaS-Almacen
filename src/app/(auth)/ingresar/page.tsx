@@ -13,9 +13,9 @@ export const metadata: Metadata = {
 export default async function IngresarPage({
   searchParams,
 }: PageProps<"/ingresar">) {
-  const { siguiente } = await searchParams;
+  const { siguiente, confirmar } = await searchParams;
   const next = safeRedirectPath(siguiente);
   // Already signed in (validated against the database): go straight in.
   if (await getCurrentSession()) redirect(next);
-  return <SignInForm next={next} />;
+  return <SignInForm next={next} confirming={confirmar === "1"} />;
 }

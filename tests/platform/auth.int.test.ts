@@ -1,15 +1,25 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { isId } from "@/lib";
-import { auth } from "@/platform/auth";
+import {
+  VERIFY_EMAIL_COOKIE,
+  auth,
+  handleAuthRequest,
+  registerUser,
+  signIn,
+} from "@/platform/auth";
 import { memoryOutboxFor } from "@/platform/email";
 import { db } from "@/server";
 
 // BAS-04 + PLT-03: email/password accounts and database sessions against
-// MySQL; no session until the email is verified.
+// MySQL; no session until the email is verified. Security audits 1 and 2:
+// the email is confirmed only when the link's browser also gives the
+// password, so the mailbox alone never activates a stranger's account.
 
 const password = "correcto-caballo-bateria-42";
-const email = `spike.${Date.now()}@example.test`;
+const stamp = Date.now();
+const email = `spike.${stamp}@example.test`;
+let ip = 0;
 
 function sessionCookie(response: Response): string | undefined {
   return response.headers
@@ -18,12 +28,27 @@ function sessionCookie(response: Response): string | undefined {
     ?.split(";")[0];
 }
 
-/** Opens the latest verification link sent to `to` and returns the response. */
-async function openVerificationLink(to: string): Promise<Response> {
+/** Token of the latest verification link sent to `to`. */
+function linkToken(to: string): string {
   const mail = memoryOutboxFor(to).at(-1);
   expect(mail?.actionUrl, "verification email was sent").toBeDefined();
-  return auth.handler(new Request(mail!.actionUrl!));
+  const url = new URL(mail!.actionUrl!);
+  expect(url.pathname).toBe("/confirmar-correo");
+  return url.searchParams.get("token")!;
 }
+
+/** A browser: its own IP and, if it opened a link, the link's cookie. */
+const browser = (token?: string) =>
+  new Headers({
+    "x-forwarded-for": `198.18.${stamp % 200}.${++ip}`,
+    ...(token
+      ? { cookie: `${VERIFY_EMAIL_COOKIE}=${encodeURIComponent(token)}` }
+      : {}),
+  });
+
+const verified = async (address: string) =>
+  (await db.user.findUniqueOrThrow({ where: { email: address } }))
+    .emailVerified;
 
 afterAll(async () => {
   await db.$disconnect();
@@ -31,13 +56,12 @@ afterAll(async () => {
 
 describe("Better Auth on MySQL", () => {
   it("registers with a UUIDv7 id and a hashed password, without a session", async () => {
-    const response = await auth.api.signUpEmail({
-      body: { name: "Prueba Técnica", email, password },
-      asResponse: true,
-    });
-    expect(response.status).toBe(200);
-    expect(sessionCookie(response)).toBeUndefined();
-
+    expect(
+      await registerUser(
+        { name: "Prueba Técnica", email, password },
+        browser(),
+      ),
+    ).toEqual({ ok: true });
     const user = await db.user.findUniqueOrThrow({
       where: { email },
       include: { accounts: true, sessions: true },
@@ -50,72 +74,89 @@ describe("Better Auth on MySQL", () => {
     expect(credential?.password).not.toContain(password);
   });
 
-  it("refuses to sign in before the email is verified and resends the link", async () => {
+  it("refuses to sign in before the email is verified and resends within the limit", async () => {
     const before = memoryOutboxFor(email).length;
-    await expect(
-      auth.api.signInEmail({ body: { email, password } }),
-    ).rejects.toThrow();
+    expect(await signIn({ email, password }, browser())).toEqual({
+      ok: false,
+      reason: "unverified",
+    });
     expect(memoryOutboxFor(email).length).toBe(before + 1);
-  });
+    // Security audit 2: never one email per attempt.
+    for (let i = 0; i < 5; i++) await signIn({ email, password }, browser());
+    expect(memoryOutboxFor(email).length).toBeLessThanOrEqual(before + 3);
+  }, 60_000);
 
-  it("verifies the email from the link without starting a session", async () => {
-    // The link proves the mailbox, not who chose the password (security
-    // audit: account pre-hijacking). Whoever opens it signs in after.
-    const response = await openVerificationLink(email);
-    expect([200, 302]).toContain(response.status);
+  it("the link alone confirms nothing", async () => {
+    const token = linkToken(email);
+    const response = await handleAuthRequest(
+      new Request(
+        `${process.env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}`,
+      ),
+    );
+    expect(response.status).toBe(404);
     expect(sessionCookie(response)).toBeUndefined();
-
-    const user = await db.user.findUniqueOrThrow({
-      where: { email },
-      include: { sessions: true },
-    });
-    expect(user.emailVerified).toBe(true);
-    expect(user.sessions).toHaveLength(0);
+    expect(await verified(email)).toBe(false);
   });
 
-  it("someone who registered another person's email loses it on recovery", async () => {
-    const owner = `dueno.${Date.now()}@example.test`;
-    const stranger = "la-contrasena-del-extrano-42";
-    await auth.api.signUpEmail({
-      body: { name: "Extraño", email: owner, password: stranger },
+  it("the link's browser plus the password confirm the email and sign in", async () => {
+    const token = linkToken(email);
+    expect(await signIn({ email, password }, browser(token))).toEqual({
+      ok: true,
     });
-    // The real owner opens the link: no session for an account whose
-    // password someone else chose.
-    const opened = await openVerificationLink(owner);
-    expect(sessionCookie(opened)).toBeUndefined();
-    // Not knowing the password, the owner recovers the account; the
-    // stranger's password stops working and every session closes.
+    expect(await verified(email)).toBe(true);
+  }, 30_000);
+
+  it("a link for another email does nothing", async () => {
+    const other = `otro.${stamp}@example.test`;
+    await registerUser({ name: "Otro", email: other, password }, browser());
+    // Signing in to `other` with `email`'s link: not confirmed.
+    expect(
+      await signIn({ email: other, password }, browser(linkToken(email))),
+    ).toMatchObject({ ok: false, reason: "unverified" });
+    expect(await verified(other)).toBe(false);
+  }, 30_000);
+
+  it("a stranger's registration cannot be activated by the mailbox owner; recovery takes it over", async () => {
+    const owner = `dueno.${stamp}@example.test`;
+    const stranger = "la-contrasena-del-extrano-42";
+    await registerUser(
+      { name: "Extraño", email: owner, password: stranger },
+      browser(),
+    );
+    // The owner opens the link but does not know the stranger's password.
+    const token = linkToken(owner);
+    expect(
+      await signIn(
+        { email: owner, password: "la-contrasena-del-dueno-42" },
+        browser(token),
+      ),
+    ).toEqual({ ok: false, reason: "invalid" });
+    expect(await verified(owner)).toBe(false);
+    // The stranger never gets in: the account was never confirmed.
+    expect(
+      await signIn({ email: owner, password: stranger }, browser()),
+    ).toMatchObject({ ok: false, reason: "unverified" });
+    // The owner recovers it: the stranger's password stops working.
     await auth.api.requestPasswordReset({
       body: { email: owner, redirectTo: "/restablecer-contrasena" },
     });
     const link = memoryOutboxFor(owner).at(-1)!.actionUrl!;
-    const token = new URL(link).pathname.split("/").at(-1)!;
+    const reset = new URL(link).pathname.split("/").at(-1)!;
     await auth.api.resetPassword({
-      body: { token, newPassword: "la-contrasena-del-dueno-42" },
+      body: { token: reset, newPassword: "la-contrasena-del-dueno-42" },
     });
-    await expect(
-      auth.api.signInEmail({ body: { email: owner, password: stranger } }),
-    ).rejects.toThrow();
-    const response = await auth.api.signInEmail({
-      body: { email: owner, password: "la-contrasena-del-dueno-42" },
-      asResponse: true,
-    });
-    expect(response.status).toBe(200);
-  });
-
-  it("rejects a reused verification link", async () => {
-    const reused = await openVerificationLink(email);
-    expect(sessionCookie(reused)).toBeUndefined();
-  });
-
-  it("rejects a forged verification token", async () => {
-    const forged = await auth.handler(
-      new Request(
-        `${process.env.BETTER_AUTH_URL}/api/auth/verify-email?token=no-valido`,
+    expect(
+      await signIn({ email: owner, password: stranger }, browser()),
+    ).toEqual({ ok: false, reason: "invalid" });
+    expect(
+      await signIn(
+        { email: owner, password: "la-contrasena-del-dueno-42" },
+        browser(),
       ),
-    );
-    expect(sessionCookie(forged)).toBeUndefined();
-  });
+    ).toEqual({ ok: true });
+    const user = await db.user.findUniqueOrThrow({ where: { email: owner } });
+    expect(user.twoFactorEnabled).toBe(false);
+  }, 60_000);
 
   it("rejects short and wrong passwords", async () => {
     await expect(

@@ -6,18 +6,16 @@ const at = (method: string, path: string) =>
   new Request(`http://localhost:3000${path}`, { method });
 
 describe("isAllowedAuthRequest", () => {
-  it("lets through only the email links", () => {
-    expect(
-      isAllowedAuthRequest(at("GET", "/api/auth/verify-email?token=a")),
-    ).toBe(true);
+  it("lets through only the password reset link", () => {
     expect(
       isAllowedAuthRequest(
         at("GET", "/api/auth/reset-password/abc_DEF-123?callbackURL=%2Fx"),
       ),
     ).toBe(true);
-    expect(isAllowedAuthRequest(at("GET", "/api/auth/verify-email/"))).toBe(
-      true,
-    );
+    // Confirming an email needs the password too (/confirmar-correo).
+    expect(
+      isAllowedAuthRequest(at("GET", "/api/auth/verify-email?token=a")),
+    ).toBe(false);
   });
 
   it("refuses other methods and paths", () => {
