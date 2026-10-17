@@ -47,6 +47,8 @@
 - **Despliegue desde GitHub (manual):** el workflow `Desplegar` entra por SSH con una llave que en el servidor solo puede correr `desplegar` (comando forzado).
 - **Prueba de punta a punta:** el workflow `Despliegue de prueba` corre en Ubuntu 24.04 limpio cuando cambia `deploy/`, con certificado interno y un SMTP local.
 
+- **Conexión a MySQL por loopback:** la app acepta la llave pública de MySQL (`allowPublicKeyRetrieval`) solo si la base está en 127.0.0.1. MySQL 9 la manda en el primer inicio de sesión de un usuario sin TLS, y por loopback nadie puede suplantarla (`isLoopbackHost`). Una base en otra máquina tendría que usar TLS.
+
 ## Alternativas descartadas
 
 - **Todo en Docker Compose:** una imagen más que construir y vigilar. El worker con `tsx` y los hooks de `server-only` complican la imagen. Solo MySQL gana algo en un contenedor (la versión exacta).

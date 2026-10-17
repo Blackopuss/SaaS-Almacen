@@ -43,3 +43,17 @@ export function formatIp(ip: string | null | undefined): string | null {
   const after = groups.slice(bestStart + bestLength).join(":");
   return `${before}::${after}`;
 }
+
+/**
+ * Whether a database host is this same machine (loopback), where nothing
+ * travels over a network that someone else could intercept.
+ */
+export function isLoopbackHost(host: string): boolean {
+  const value = host.trim().toLowerCase();
+  return (
+    value === "localhost" ||
+    value === "::1" ||
+    value === "[::1]" ||
+    /^127(?:\.\d{1,3}){3}$/.test(value)
+  );
+}

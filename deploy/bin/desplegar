@@ -62,7 +62,7 @@ paso "Migraciones"
 npm run db:deploy
 trap - ERR
 
-ANTERIOR="$(readlink -f "$BASE/current" 2>/dev/null || true)"
+ANTERIOR="$(readlink -e "$BASE/current" 2>/dev/null || true)"
 cambiar_a() {
   ln -sfn "$1" "$BASE/current.nuevo"
   mv -Tf "$BASE/current.nuevo" "$BASE/current"

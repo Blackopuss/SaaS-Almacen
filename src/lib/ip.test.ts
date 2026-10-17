@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatIp } from "./ip";
+import { formatIp, isLoopbackHost } from "./ip";
 
 describe("formatIp", () => {
   it.each([
@@ -17,5 +17,19 @@ describe("formatIp", () => {
     [null, null],
   ])("%j → %j", (input, expected) => {
     expect(formatIp(input)).toBe(expected);
+  });
+});
+
+describe("isLoopbackHost", () => {
+  it.each([
+    ["127.0.0.1", true],
+    ["127.1.2.3", true],
+    ["localhost", true],
+    ["::1", true],
+    ["10.0.0.5", false],
+    ["db.almacen.mx", false],
+    ["127.0.0.1.evil.mx", false],
+  ])("%s → %s", (host, expected) => {
+    expect(isLoopbackHost(host)).toBe(expected);
   });
 });
