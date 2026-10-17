@@ -32,9 +32,13 @@ export default function proxy(request: NextRequest) {
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
   if (isProtected && !getSessionCookie(request)) {
-    const url = new URL("/ingresar", request.url);
-    url.searchParams.set("siguiente", `${pathname}${search}`);
-    return NextResponse.redirect(url);
+    // Relative, like /confirmar-correo: request.url says localhost:3000
+    // behind the proxy.
+    const target = new URLSearchParams({ siguiente: `${pathname}${search}` });
+    return new NextResponse(null, {
+      status: 307,
+      headers: { Location: `/ingresar?${target}` },
+    });
   }
 
   // Script policy with a fresh nonce per request (PLT16-04). Next reads it

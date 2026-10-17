@@ -11,10 +11,13 @@ import { VERIFY_EMAIL_COOKIE, VERIFICATION_HOURS } from "@/platform/auth";
  */
 export function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token") ?? "";
-  const response = NextResponse.redirect(
-    new URL("/ingresar?confirmar=1", request.url),
-    303,
-  );
+  // A relative address: behind the proxy (Caddy) the app sees itself as
+  // localhost:3000, and an absolute URL built from request.url sent people
+  // there. The browser resolves this one against the site it has open.
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: "/ingresar?confirmar=1" },
+  });
   // The token is in the URL: it must not travel to other sites.
   response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("Cache-Control", "no-store");
