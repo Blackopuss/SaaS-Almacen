@@ -26,19 +26,22 @@ const PROTECTED = [
   "/api/compras",
 ];
 
+/** The site people open: BETTER_AUTH_URL (required in production). */
+function publicBase(request: NextRequest): string {
+  return process.env.BETTER_AUTH_URL || request.url;
+}
+
 export default function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const isProtected = PROTECTED.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
   if (isProtected && !getSessionCookie(request)) {
-    // Relative, like /confirmar-correo: request.url says localhost:3000
-    // behind the proxy.
-    const target = new URLSearchParams({ siguiente: `${pathname}${search}` });
-    return new NextResponse(null, {
-      status: 307,
-      headers: { Location: `/ingresar?${target}` },
-    });
+    // From the public address: behind Caddy request.url says
+    // localhost:3000, and Next refuses a relative Location here.
+    const url = new URL("/ingresar", publicBase(request));
+    url.searchParams.set("siguiente", `${pathname}${search}`);
+    return NextResponse.redirect(url);
   }
 
   // Script policy with a fresh nonce per request (PLT16-04). Next reads it

@@ -24,11 +24,18 @@ describe("redirects behind the proxy", () => {
     );
   });
 
-  it("a protected screen without session goes to /ingresar on the same site", () => {
-    const response = proxy(internal("/inventario?pagina=2"));
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
-      "/ingresar?siguiente=%2Finventario%3Fpagina%3D2",
-    );
+  it("a protected screen without session goes to /ingresar on the public site", () => {
+    const saved = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://almacen.example.mx";
+    try {
+      const response = proxy(internal("/inventario?pagina=2"));
+      expect(response.status).toBe(307);
+      // Absolute (Next requires it in the proxy), never localhost.
+      expect(response.headers.get("location")).toBe(
+        "https://almacen.example.mx/ingresar?siguiente=%2Finventario%3Fpagina%3D2",
+      );
+    } finally {
+      process.env.BETTER_AUTH_URL = saved;
+    }
   });
 });
