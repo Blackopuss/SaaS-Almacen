@@ -98,7 +98,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Lectores de archivos de clientes: nada de expresiones regulares con repeticiones perezosas o anidadas sobre el contenido; recorrer con `indexOf` y contar elementos (auditoría 1).
 - `npm run dev` escucha solo en `127.0.0.1` (`/correos` muestra enlaces que abren cuentas); `npm run dev:red` para probar desde otro dispositivo (ahí `/correos` queda apagado).
 - Prisma en desarrollo: `src/server/db.ts` recrea el cliente cuando cambia el código generado; tras una migración no hace falta reiniciar `npm run dev`.
-- Correo: `src/platform/email` (`sendEmail` + plantillas en español). `MAIL_DRIVER=memory` en pruebas (`memoryOutboxFor`), `log` en desarrollo (`/correos`). Nunca revelar si un correo tiene cuenta.
+- Correo: `src/platform/email` (`sendEmail` + plantillas en español). `MAIL_DRIVER=memory` en pruebas (`memoryOutboxFor`), `log` en desarrollo (`/correos`), `smtp` en producción (ADR 0023; `npm run correo:prueba -- correo`). Nunca revelar si un correo tiene cuenta.
 - Versiones exactas (`.npmrc` con `save-exact`). Antes de actualizar una dependencia: `npm audit` y revisar su ADR.
 
 ## Estado actual (actualizar al cerrar cada paso)

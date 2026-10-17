@@ -3,12 +3,14 @@ export {
   InvalidEmailError,
   MAX_ATTACHMENTS_BYTES,
   listDevOutbox,
+  smtpSettings,
   memoryOutboxFor,
   sendEmail,
 } from "./send";
 export type {
   EmailAttachment,
   EmailMessage,
+  SmtpSettings,
   StoredAttachment,
   StoredEmail,
 } from "./send";

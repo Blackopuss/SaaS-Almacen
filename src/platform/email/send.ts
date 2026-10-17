@@ -3,6 +3,9 @@ import "server-only";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { createTransport } from "nodemailer";
+import type { Transporter } from "nodemailer";
+
 import { newId } from "@/lib";
 
 /**
@@ -10,8 +13,9 @@ import { newId } from "@/lib";
  * - memory: kept in this process, for tests.
  * - log: written to .local/mail (and printed) for local development; the
  *   dev-only /correos page lists them.
- * A real provider (SMTP/API) is added when hosting is chosen; production
- * refuses to start sending without one instead of dropping mail silently.
+ * - smtp: a real provider (Resend, Amazon SES, Brevo, the hosting's own
+ *   mail…) over SMTP with TLS (ADR 0023). Production refuses to send
+ *   without a real driver instead of dropping mail silently.
  *
  * What goes into a header (recipient, reply address, subject) never
  * carries a line break: a message that tried to is refused, not repaired,
@@ -117,7 +121,9 @@ function checked(message: EmailMessage): Omit<StoredEmail, "id" | "sentAt"> {
 const MAIL_DIR = path.join(process.cwd(), ".local", "mail");
 const memoryOutbox: StoredEmail[] = [];
 
-function driver(): "memory" | "log" {
+type Driver = "memory" | "log" | "smtp";
+
+function driver(): Driver {
   const configured = process.env.MAIL_DRIVER;
   // On a public address (https), "log" would write reset and invitation
   // links to the server's logs and "memory" would drop them: refused
@@ -131,13 +137,117 @@ function driver(): "memory" | "log" {
       `MAIL_DRIVER=${configured} is not allowed on a public address: configure a real email provider.`,
     );
   }
-  if (configured === "memory" || configured === "log") return configured;
+  if (
+    configured === "memory" ||
+    configured === "log" ||
+    configured === "smtp"
+  ) {
+    return configured;
+  }
+  if (configured) throw new Error(`Unknown MAIL_DRIVER: ${configured}`);
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "MAIL_DRIVER is not configured: production needs a real email provider.",
     );
   }
   return "log";
+}
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+export type SmtpSettings = {
+  host: string;
+  port: number;
+  /** "tls": encrypted from the start (port 465); "starttls": upgraded. */
+  security: "tls" | "starttls" | "none";
+  user?: string;
+  password?: string;
+  /** «Almacén <avisos@tudominio.mx>». */
+  from: string;
+};
+
+/**
+ * SMTP settings from the environment, checked once. Mail always travels
+ * encrypted: "none" is accepted only towards this same machine (a local
+ * relay or a test sink), never across the network.
+ */
+export function smtpSettings(
+  env: Record<string, string | undefined> = process.env,
+): SmtpSettings {
+  const host = env.SMTP_HOST?.trim();
+  if (!host) throw new Error("SMTP_HOST is not configured.");
+  const security = (env.SMTP_SECURITY ??
+    "starttls") as SmtpSettings["security"];
+  if (!["tls", "starttls", "none"].includes(security)) {
+    throw new Error(`Invalid SMTP_SECURITY: ${security}`);
+  }
+  if (security === "none" && !LOCAL_HOSTS.has(host)) {
+    throw new Error("SMTP_SECURITY=none is only allowed towards localhost.");
+  }
+  const port = Number(env.SMTP_PORT ?? (security === "tls" ? 465 : 587));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid SMTP_PORT: ${env.SMTP_PORT}`);
+  }
+  const from = env.MAIL_FROM?.trim() ?? "";
+  const match = /^(?:([^<>]{1,80}) )?<([^<>]+)>$/.exec(from) ?? [
+    "",
+    undefined,
+    from,
+  ];
+  if (!from || CONTROL.test(from)) {
+    throw new Error("MAIL_FROM is not configured.");
+  }
+  address(match[2] ?? "", "sender");
+  const user = env.SMTP_USER?.trim() || undefined;
+  const password = env.SMTP_PASSWORD || undefined;
+  if (Boolean(user) !== Boolean(password)) {
+    throw new Error("SMTP_USER and SMTP_PASSWORD go together.");
+  }
+  return { host, port, security, user, password, from };
+}
+
+let transport: { key: string; transporter: Transporter } | undefined;
+
+function smtpTransport(settings: SmtpSettings): Transporter {
+  const key = JSON.stringify(settings);
+  if (transport?.key === key) return transport.transporter;
+  const transporter = createTransport({
+    host: settings.host,
+    port: settings.port,
+    secure: settings.security === "tls",
+    requireTLS: settings.security === "starttls",
+    ignoreTLS: settings.security === "none",
+    auth: settings.user
+      ? { user: settings.user, pass: settings.password }
+      : undefined,
+    tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+    // Messages are built here, never from paths or URLs.
+    disableFileAccess: true,
+    disableUrlAccess: true,
+  });
+  transport = { key, transporter };
+  return transporter;
+}
+
+async function sendSmtp(stored: StoredEmail): Promise<void> {
+  const settings = smtpSettings();
+  await smtpTransport(settings).sendMail({
+    from: settings.from,
+    to: stored.to,
+    ...(stored.replyTo ? { replyTo: stored.replyTo } : {}),
+    subject: stored.subject,
+    text: stored.text,
+    attachments: stored.attachments?.map((file) => ({
+      filename: file.name,
+      contentType: file.contentType,
+      content: Buffer.from(file.content, "base64"),
+    })),
+    disableFileAccess: true,
+    disableUrlAccess: true,
+  });
 }
 
 export async function sendEmail(message: EmailMessage): Promise<void> {
@@ -155,6 +265,10 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
   }
   if (kind === "memory") {
     memoryOutbox.push(stored);
+    return;
+  }
+  if (kind === "smtp") {
+    await sendSmtp(stored);
     return;
   }
   await mkdir(MAIL_DIR, { recursive: true });

@@ -100,7 +100,7 @@ Política: 12 a 128 caracteres, cualquier carácter, sin reglas de composición,
 
 Lista única de lo que la autenticación necesita al salir de la máquina local:
 
-1. **Proveedor de correo real** (`MAIL_DRIVER`): sin él la app no arranca en producción; verificación, recuperación y avisos de seguridad dependen del correo. Con `BETTER_AUTH_URL` en `https://`, `log` y `memory` se rechazan (dejarían enlaces de restablecimiento en los registros).
+1. **Proveedor de correo real** (`MAIL_DRIVER=smtp`, ADR 0023; probar con `npm run correo:prueba`): sin él la app no arranca en producción; verificación, recuperación y avisos de seguridad dependen del correo. Con `BETTER_AUTH_URL` en `https://`, `log` y `memory` se rechazan (dejarían enlaces de restablecimiento en los registros).
 2. **Reloj del servidor sincronizado (NTP)**: los códigos de la app de autenticación se aceptan solo en el paso actual ± 30 s; un reloj desfasado rechazaría códigos válidos.
 3. **`BETTER_AUTH_SECRET` en el gestor de secretos, con respaldo y sin rotarlo a la ligera**: cifra los secretos TOTP y los códigos de recuperación. Perderlo o cambiarlo deja sin acceso a toda cuenta con MFA. Una rotación necesita un plan (secretos versionados de Better Auth o re-cifrado).
 4. **HTTPS** (cookies `Secure` con prefijo `__Secure-` se activan solas con `NODE_ENV=production`) y **proxy delante, con `TRUSTED_PROXY_HOPS`** igual al número de proxys (límites por IP).
