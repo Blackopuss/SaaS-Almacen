@@ -129,16 +129,17 @@
 
 .dark {
   color-scheme: dark;
-  /* Neutral grays (zinc); blue stays only for actions and links. */
+  /* Neutral grays (zinc), monochrome: actions are white on zinc and color
+     is left to states (success, warning, destructive). */
   --background: #0f0f10;
   --foreground: #f4f4f5;
   --card: #18181b;
   --card-foreground: #f4f4f5;
   --popover: #18181b;
   --popover-foreground: #f4f4f5;
-  --primary: #60a5fa;
-  --primary-foreground: #0f0f10;
-  --primary-hover: #93c5fd;
+  --primary: #f4f4f5;
+  --primary-foreground: #18181b;
+  --primary-hover: #d4d4d8;
   --secondary: #27272a;
   --secondary-foreground: #f4f4f5;
   --muted: #27272a;
@@ -155,9 +156,9 @@
   --qr-foreground: #000000;
   --border: #27272a;
   --input: #71717a;
-  --ring: #60a5fa;
+  --ring: #a1a1aa;
 
-  --chart-1: #60a5fa;
+  --chart-1: #e4e4e7;
   --chart-2: #2dd4bf;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
@@ -165,12 +166,12 @@
 
   --sidebar: #141416;
   --sidebar-foreground: #f4f4f5;
-  --sidebar-primary: #60a5fa;
-  --sidebar-primary-foreground: #0f0f10;
+  --sidebar-primary: #f4f4f5;
+  --sidebar-primary-foreground: #18181b;
   --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #f4f4f5;
   --sidebar-border: #27272a;
-  --sidebar-ring: #60a5fa;
+  --sidebar-ring: #a1a1aa;
 
   /* Warehouse illustration (decorative). */
   --scene-sky: #111113;
