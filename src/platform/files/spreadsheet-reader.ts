@@ -541,7 +541,10 @@ export function readXlsx(bytes: Uint8Array): ReadSpreadsheetResult {
       const id = attribute(tag, "r:id");
       const path = id ? relations.get(id) : undefined;
       // Hidden sheets hold lists and helpers, not what the person filled in.
-      const hidden = attribute(tag, "state");
+      // Only "hidden" and "veryHidden" hide: openpyxl (and others) write
+      // state="visible" on every sheet.
+      const state = attribute(tag, "state");
+      const hidden = state === "hidden" || state === "veryHidden";
       return name && path && !hidden ? [{ name: unescapeXml(name), path }] : [];
     });
     const chosen =
