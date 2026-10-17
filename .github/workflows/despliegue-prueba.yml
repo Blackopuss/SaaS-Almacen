@@ -1,0 +1,115 @@
+# BAS-09..11: proves deploy/ on a clean Ubuntu 24.04 machine, the same way
+# the founder will run it on the server: install, configure mail, deploy,
+# HTTPS + health, encrypted backup with a verified restore, a second
+# deploy and the rollback to the first.
+name: Despliegue de prueba
+
+on:
+  push:
+    branches: [pruebas]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/despliegue-prueba.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: despliegue-prueba-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  servidor:
+    name: Servidor limpio
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Llave de respaldos (en el servidor real vive fuera de él)
+        run: |
+          sudo apt-get install -yq age
+          age-keygen -o "$RUNNER_TEMP/llave.txt" 2>/dev/null
+          echo "RECIPIENT=$(age-keygen -y "$RUNNER_TEMP/llave.txt")" >> "$GITHUB_ENV"
+
+      - name: Repositorio local como origen
+        run: |
+          git clone --quiet --bare "$GITHUB_WORKSPACE" /tmp/almacen.git
+          git -C /tmp/almacen.git branch -f pruebas "$GITHUB_SHA"
+          sudo chmod -R a+rX /tmp/almacen.git
+
+      - name: Instalar el servidor
+        run: |
+          sudo bash deploy/instalar.sh --prueba \
+            --dominio localhost \
+            --clave-respaldos "$RECIPIENT" \
+            --repo /tmp/almacen.git --rama pruebas
+
+      - name: Configurar correo (servidor SMTP local de prueba)
+        run: |
+          sudo apt-get install -yq python3-aiosmtpd
+          nohup python3 -u -m aiosmtpd -n -l 127.0.0.1:2525 > /tmp/smtp.log 2>&1 &
+          sudo sed -i \
+            -e 's|^SMTP_HOST=.*|SMTP_HOST=127.0.0.1|' \
+            -e 's|^SMTP_PORT=.*|SMTP_PORT=2525|' \
+            -e 's|^SMTP_SECURITY=.*|SMTP_SECURITY=none|' \
+            -e 's|^MAIL_FROM=.*|MAIL_FROM=Almacén <avisos@almacen.test>|' \
+            /srv/almacen/shared/.env.local
+
+      - name: Primer despliegue
+        run: sudo -u almacen /usr/local/lib/almacen/desplegar
+
+      - name: HTTPS, CSP y salud
+        run: |
+          curl -fsSk https://localhost/ -o /dev/null -D /tmp/cabeceras
+          grep -i "content-security-policy: .*'nonce-" /tmp/cabeceras
+          grep -i "strict-transport-security" /tmp/cabeceras
+          for i in $(seq 1 30); do
+            curl -sk https://localhost/api/salud | tee /tmp/salud.json
+            jq -e '.checks.database == "ok" and .checks.worker == "ok" and .checks.queue == "ok" and .checks.backup == "ok"' /tmp/salud.json && break
+            sleep 2
+          done
+          jq -e '.ok == true' /tmp/salud.json
+
+      - name: Correo de prueba
+        run: |
+          almacen correo:prueba prueba@example.test
+          sleep 2; grep -q "prueba@example.test" /tmp/smtp.log
+
+      - name: Respaldo cifrado que se puede abrir
+        run: |
+          sudo systemctl start almacen-respaldo.service
+          ULTIMO="$(sudo ls -t /srv/almacen/backups | grep '^almacen-' | head -1)"
+          sudo age -d -i "$RUNNER_TEMP/llave.txt" "/srv/almacen/backups/$ULTIMO" | gunzip | grep -q "CREATE TABLE \`organization\`"
+          sudo journalctl -u almacen-respaldo -n 20 --no-pager
+
+      - name: Segundo despliegue y vuelta a la versión anterior
+        run: |
+          PRIMERA="$(readlink -f /srv/almacen/current)"
+          sudo -u almacen /usr/local/lib/almacen/desplegar "$GITHUB_SHA"
+          [ "$(readlink -f /srv/almacen/current)" != "$PRIMERA" ]
+          sudo -u almacen /usr/local/lib/almacen/volver
+          [ "$(readlink -f /srv/almacen/current)" = "$PRIMERA" ]
+          curl -fsSk https://localhost/precios -o /dev/null
+
+      - name: Reinstalar no cambia secretos ni datos
+        run: |
+          ANTES="$(sudo sha256sum /srv/almacen/shared/.env.local)"
+          sudo bash deploy/instalar.sh --prueba \
+            --dominio localhost \
+            --clave-respaldos "$RECIPIENT" \
+            --repo /tmp/almacen.git --rama pruebas
+          [ "$(sudo sha256sum /srv/almacen/shared/.env.local)" = "$ANTES" ]
+
+      - name: Registros si algo falló
+        if: failure()
+        run: |
+          sudo journalctl -u almacen-web -n 80 --no-pager || true
+          sudo journalctl -u almacen-worker -n 40 --no-pager || true
+          sudo journalctl -u almacen-respaldo -n 40 --no-pager || true
+          sudo journalctl -u caddy -n 40 --no-pager || true
+          cat /tmp/smtp.log || true

@@ -1,0 +1,3 @@
+# Lo único que la cuenta «almacen» puede hacer como root: reiniciar sus
+# servicios y pedir un respaldo antes de migrar (deploy/bin/desplegar).
+almacen ALL=(root) NOPASSWD: /usr/bin/systemctl restart almacen-web.service, /usr/bin/systemctl restart almacen-worker.service, /usr/bin/systemctl start almacen-respaldo.service

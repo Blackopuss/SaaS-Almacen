@@ -1,0 +1,48 @@
+# BAS-09: deploy to the server from GitHub, by hand (Actions → Desplegar →
+# Run workflow). It only works once these repository secrets exist
+# (docs/DESPLIEGUE.md):
+#   DEPLOY_HOST         server address (almacen.mx or its IP)
+#   DEPLOY_SSH_KEY      private key whose public half went in --llave-ci
+#   DEPLOY_KNOWN_HOSTS  output of: ssh-keyscan -t ed25519 <server>
+# That key can only run the deploy script (forced command on the server).
+name: Desplegar
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o commit a desplegar"
+        required: true
+        default: pruebas
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desplegar
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Desplegar en el servidor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Validar la rama o commit
+        env:
+          REF: ${{ inputs.ref }}
+        run: '[[ "$REF" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]'
+
+      - name: Desplegar por SSH
+        env:
+          REF: ${{ inputs.ref }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/despliegue
+          chmod 600 ~/.ssh/despliegue
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/despliegue -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "almacen@$HOST" "$REF"

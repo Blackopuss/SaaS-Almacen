@@ -1,0 +1,10 @@
+[Unit]
+Description=Almacén (respaldo cifrado de la base y los archivos)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/almacen/respaldo
+Nice=10
+IOSchedulingClass=idle

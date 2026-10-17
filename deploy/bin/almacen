@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Atajo para los comandos de Almacén en el servidor, en la versión activa,
+# como la cuenta «almacen» y con la configuración de producción:
+#
+#   almacen correo:prueba tu@correo.mx
+#   almacen staff add tu@correo.mx
+#   almacen stock:reconcile
+#   almacen db:status
+set -euo pipefail
+[[ $# -gt 0 ]] || { echo "Uso: almacen <comando> [argumentos]"; exit 2; }
+[[ "$1" =~ ^[a-z][a-z:-]*$ ]] || { echo "Comando inválido: $1" >&2; exit 2; }
+CORRER='cd /srv/almacen/current && exec env NODE_ENV=production npm run --silent "$0" -- "$@"'
+if [[ "$(id -un)" == "almacen" ]]; then
+  exec bash -c "$CORRER" "$@"
+fi
+exec sudo -u almacen bash -c "$CORRER" "$@"
