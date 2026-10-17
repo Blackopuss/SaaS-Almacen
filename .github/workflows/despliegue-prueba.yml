@@ -103,13 +103,13 @@ jobs:
 
       - name: Segundo despliegue y vuelta a la versión anterior
         run: |
-          PRIMERA="$(readlink -f /srv/almacen/current)"
+          PRIMERA="$(sudo readlink -f /srv/almacen/current)"
           SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
           sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $SUMA" \
             /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"
-          [ "$(readlink -f /srv/almacen/current)" != "$PRIMERA" ]
+          [ "$(sudo readlink -f /srv/almacen/current)" != "$PRIMERA" ]
           sudo -u almacen /usr/local/lib/almacen/volver
-          [ "$(readlink -f /srv/almacen/current)" = "$PRIMERA" ]
+          [ "$(sudo readlink -f /srv/almacen/current)" = "$PRIMERA" ]
           curl -fsSk https://localhost/precios -o /dev/null
 
       - name: Reinstalar (con repositorio) no cambia secretos ni datos
