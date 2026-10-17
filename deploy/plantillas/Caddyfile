@@ -1,0 +1,25 @@
+# Caddy delante de Almacén (lo escribe deploy/instalar.sh). Pide y renueva
+# solo el certificado HTTPS y pasa todo a la app, que escucha en 127.0.0.1.
+{
+	@@CORREO_LINEA@@
+}
+
+@@DOMINIO@@ {
+	@@TLS@@
+	encode zstd gzip
+
+	# Importaciones de hasta 10 MB más el formulario (next.config.ts).
+	request_body {
+		max_size 12MB
+	}
+
+	reverse_proxy 127.0.0.1:3000
+
+	log {
+		output file /var/log/caddy/almacen.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+		format json
+	}
+}

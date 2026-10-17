@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Respaldo de Almacén (BAS-11, PIL-02). Lo corre el temporizador diario y
+# cada despliegue antes de migrar; como root:
+#
+#   sudo systemctl start almacen-respaldo.service   (o: sudo /usr/local/lib/almacen/respaldo)
+#
+# 1. Volcado de la base (transacción consistente, con disparadores).
+# 2. Restauración de prueba en una base aparte: tablas y migraciones deben
+#    coincidir con la original. Un respaldo que no se restaura no cuenta.
+# 3. Cifrado con la llave pública (age): en el servidor no queda nada
+#    legible y la llave para abrirlos vive fuera de él.
+# 4. Archivos de las empresas, también cifrados.
+# 5. Copia fuera del servidor si hay destino de rclone; limpieza de viejos.
+# Solo si todo salió bien se marca el respaldo como correcto (/api/salud).
+set -euo pipefail
+umask 077
+
+BASE=/srv/almacen
+DESTINO="$BASE/backups"
+# shellcheck disable=SC1091
+. "$BASE/shared/respaldo.env"
+[[ -n "${AGE_RECIPIENT:-}" ]] || { echo "Falta AGE_RECIPIENT en respaldo.env" >&2; exit 1; }
+RAIZ="$(cat /root/.almacen-mysql-root)"
+FECHA="$(date -u +%Y%m%d-%H%M%S)"
+TRABAJO="$(mktemp -d)"
+trap 'rm -rf "$TRABAJO"; docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 -e "DROP DATABASE IF EXISTS almacen_verificacion" >/dev/null 2>&1 || true' EXIT
+
+sql() { docker exec -i -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 -N -B "$@"; }
+
+echo "Volcado de la base…"
+# Los disparadores de una sola sentencia quedaron guardados con un «;» al
+# final, y mysqldump lo deja dentro de su comentario de versión
+# («…'; */;;»), que MySQL no acepta al restaurar: se quita aquí, en el
+# volcado, para que el respaldo se pueda restaurar tal cual.
+docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysqldump -uroot -h127.0.0.1 \
+  --single-transaction --routines --triggers --events --hex-blob \
+  --set-gtid-purged=OFF --no-tablespaces almacen |
+  sed -E '/^\/\*!50003 CREATE\*\//s/;[[:space:]]*\*\/;;$/ *\/;;/' > "$TRABAJO/almacen.sql"
+
+echo "Restauración de prueba…"
+sql -e "DROP DATABASE IF EXISTS almacen_verificacion; CREATE DATABASE almacen_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+sql almacen_verificacion < "$TRABAJO/almacen.sql"
+cuenta() {
+  sql -e "SELECT CONCAT((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$1'), '/',
+    (SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema='$1'))"
+}
+ORIGINAL="$(cuenta almacen)"
+COPIA="$(cuenta almacen_verificacion)"
+[[ "$ORIGINAL" == "$COPIA" ]] || { echo "La copia no coincide (tablas/disparadores): $ORIGINAL vs $COPIA" >&2; exit 1; }
+if [[ "$(sql -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='almacen' AND table_name='_prisma_migrations'")" == "1" ]]; then
+  M1="$(sql -e "SELECT COUNT(*) FROM almacen._prisma_migrations WHERE finished_at IS NOT NULL")"
+  M2="$(sql -e "SELECT COUNT(*) FROM almacen_verificacion._prisma_migrations WHERE finished_at IS NOT NULL")"
+  [[ "$M1" == "$M2" ]] || { echo "Migraciones distintas en la copia: $M1 vs $M2" >&2; exit 1; }
+fi
+sql -e "DROP DATABASE almacen_verificacion"
+echo "Copia verificada: $COPIA tablas/disparadores."
+
+echo "Cifrando…"
+gzip -c "$TRABAJO/almacen.sql" | age -r "$AGE_RECIPIENT" -o "$DESTINO/almacen-$FECHA.sql.gz.age"
+tar -C "$BASE/shared" -czf - storage | age -r "$AGE_RECIPIENT" -o "$DESTINO/archivos-$FECHA.tar.gz.age"
+
+if [[ -n "${RCLONE_DESTINO:-}" ]]; then
+  echo "Copiando fuera del servidor ($RCLONE_DESTINO)…"
+  rclone copy --config /root/.config/rclone/rclone.conf "$DESTINO" "$RCLONE_DESTINO" \
+    --include "*-$FECHA.*"
+fi
+
+find "$DESTINO" -maxdepth 1 -type f -name '*.age' -mtime +"${RETENER_DIAS:-14}" -delete
+
+install -o almacen -g almacen -m 640 /dev/null "$BASE/shared/run/ultimo-respaldo"
+echo "Respaldo listo: $DESTINO/almacen-$FECHA.sql.gz.age"

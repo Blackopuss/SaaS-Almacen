@@ -1,0 +1,50 @@
+import { execSync } from "node:child_process";
+
+import { migratorConnection, testDatabaseName } from "./test-db";
+
+/**
+ * Tables seeded by migrations (fixed catalogs shared by every company).
+ * They are part of the schema, not test data: never emptied.
+ */
+const REFERENCE_TABLES = ["unit"];
+
+/** Empties every table except the reference catalogs. */
+async function emptyTables(database: string): Promise<void> {
+  const conn = await migratorConnection();
+  try {
+    const tables: { name: string }[] = await conn.query(
+      `SELECT table_name AS name FROM information_schema.tables
+       WHERE table_schema = ? AND table_type = 'BASE TABLE'
+         AND table_name <> '_prisma_migrations'
+         AND table_name NOT IN (${REFERENCE_TABLES.map(() => "?").join(", ")})`,
+      [database, ...REFERENCE_TABLES],
+    );
+    await conn.query("SET FOREIGN_KEY_CHECKS = 0");
+    for (const { name } of tables) {
+      await conn.query(`TRUNCATE TABLE \`${name}\``);
+    }
+    await conn.query("SET FOREIGN_KEY_CHECKS = 1");
+  } finally {
+    await conn.end();
+  }
+}
+
+/**
+ * Runs once before integration tests: applies migrations to the test
+ * database and empties every table (except reference catalogs) so each run
+ * starts from a clean state. The tables are emptied again when the run
+ * ends: a later migration that adds a rule (a CHECK, a unique index) must
+ * never meet rows left by an older run, which would make it fail here and
+ * nowhere else.
+ */
+export default async function setup(): Promise<() => Promise<void>> {
+  const database = testDatabaseName();
+
+  execSync("npx prisma migrate deploy", {
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_NAME: database },
+  });
+
+  await emptyTables(database);
+  return () => emptyTables(database);
+}

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Despliega una versión de Almacén (BAS-09, PIL-01). Corre como «almacen».
+# Dos formas:
+#
+#   Paquete ya construido (lo normal: el workflow «Desplegar» hace el build
+#   en GitHub y lo manda por SSH; el servidor no gasta memoria en compilar):
+#     ssh almacen@servidor "paquete <commit> <sha256>" < paquete.tgz
+#
+#   Build en el servidor, desde el repositorio (si se instaló con --repo):
+#     sudo -u almacen /usr/local/lib/almacen/desplegar [rama o commit]
+#
+# Cada versión vive en su carpeta (releases/<fecha>-<commit>) y «current»
+# apunta a la activa. Orden: código → respaldo → migraciones → cambio de
+# versión → reinicio → revisión de salud. Si la versión nueva no responde,
+# se regresa sola a la anterior. Las migraciones solo agregan (nunca borran
+# ni renombran en el mismo despliegue), así la versión anterior sigue
+# funcionando con la base nueva.
+set -euo pipefail
+
+BASE=/srv/almacen
+CONSERVAR=5
+MAX_PAQUETE=$((1500 * 1024 * 1024))
+paso() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+falla() { printf '\n\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
+
+[[ "$(id -un)" == "almacen" ]] || falla "córrelo como almacen: sudo -u almacen $0"
+cd "$BASE"
+RAMA=pruebas
+# shellcheck disable=SC1091
+[[ -f "$BASE/shared/despliegue.env" ]] && . "$BASE/shared/despliegue.env"
+
+ORDEN=("$@")
+if [[ "${1:-}" == "--desde-ssh" ]]; then
+  # Llave de CI (authorized_keys, comando forzado): solo puede pedir un
+  # despliegue; lo pedido llega en SSH_ORIGINAL_COMMAND.
+  read -r -a ORDEN <<<"${SSH_ORIGINAL_COMMAND:-}"
+fi
+
+exec 9>"$BASE/shared/run/despliegue.lock"
+flock -n 9 || falla "ya hay un despliegue en curso."
+
+# Una versión que no llegó a activarse no se queda en releases/ (volver
+# podría elegirla). Corre al salir por cualquier motivo.
+ACTIVADA=0
+limpiar_fallida() {
+  if [[ $ACTIVADA -eq 0 && -n "${NUEVA:-}" && -d "$NUEVA" &&
+    "$(readlink -e "$BASE/current" 2>/dev/null || true)" != "$NUEVA" ]]; then
+    rm -rf "$NUEVA"
+  fi
+}
+trap 'limpiar_fallida' EXIT
+
+if [[ "${ORDEN[0]:-}" == "paquete" ]]; then
+  COMMIT="${ORDEN[1]:-}"
+  SUMA="${ORDEN[2]:-}"
+  [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || falla "commit inválido: $COMMIT"
+  [[ "$SUMA" =~ ^[0-9a-f]{64}$ ]] || falla "suma sha256 inválida."
+  paso "Paquete de $COMMIT"
+  VERSION="$(date -u +%Y%m%d-%H%M%S)-${COMMIT:0:7}"
+  NUEVA="$BASE/releases/$VERSION"
+  mkdir -p "$NUEVA"
+  ARCHIVO="$BASE/shared/run/paquete-$VERSION.tgz"
+  head -c "$MAX_PAQUETE" > "$ARCHIVO"
+  [[ "$(sha256sum "$ARCHIVO" | cut -d' ' -f1)" == "$SUMA" ]] || {
+    rm -f "$ARCHIVO"
+    falla "el paquete llegó incompleto o alterado (la suma no coincide)."
+  }
+  tar -xzf "$ARCHIVO" -C "$NUEVA" --no-same-owner
+  rm -f "$ARCHIVO"
+  [[ -d "$NUEVA/.next" && -d "$NUEVA/node_modules" ]] || falla "el paquete no trae el build."
+  echo "$COMMIT" > "$NUEVA/.commit"
+  ln -sfn "$BASE/shared/.env.local" "$NUEVA/.env.local"
+  cd "$NUEVA"
+else
+  [[ -d "$BASE/repo/.git" ]] || falla "este servidor no tiene el repositorio: despliega desde GitHub (Actions → Desplegar)."
+  REF="${ORDEN[0]:-$RAMA}"
+  [[ "$REF" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || falla "rama o commit inválido: $REF"
+  paso "Código: $REF"
+  git -C "$BASE/repo" fetch --quiet --prune origin
+  if git -C "$BASE/repo" rev-parse --verify --quiet "origin/$REF^{commit}" >/dev/null; then
+    COMMIT="$(git -C "$BASE/repo" rev-parse "origin/$REF^{commit}")"
+  else
+    COMMIT="$(git -C "$BASE/repo" rev-parse --verify "$REF^{commit}")" ||
+      falla "no encontré $REF en el repositorio."
+  fi
+  VERSION="$(date -u +%Y%m%d-%H%M%S)-${COMMIT:0:7}"
+  NUEVA="$BASE/releases/$VERSION"
+  mkdir -p "$NUEVA"
+  git -C "$BASE/repo" archive "$COMMIT" | tar -x -C "$NUEVA"
+  echo "$COMMIT" > "$NUEVA/.commit"
+  ln -sfn "$BASE/shared/.env.local" "$NUEVA/.env.local"
+
+  paso "Dependencias y build"
+  cd "$NUEVA"
+  npm ci --include=dev --no-audit --no-fund --loglevel=error
+  NODE_ENV=production npm run build
+fi
+
+paso "Respaldo antes de migrar"
+sudo /usr/bin/systemctl start almacen-respaldo.service
+
+paso "Migraciones"
+npm run db:deploy
+
+ANTERIOR="$(readlink -e "$BASE/current" 2>/dev/null || true)"
+cambiar_a() {
+  ln -sfn "$1" "$BASE/current.nuevo"
+  mv -Tf "$BASE/current.nuevo" "$BASE/current"
+  sudo /usr/bin/systemctl restart almacen-web.service
+  sudo /usr/bin/systemctl restart almacen-worker.service
+}
+# La versión sirve si responde y llega a la base (un 503 por otra cosa,
+# como un respaldo atrasado, no es culpa del despliegue).
+sano() {
+  for _ in $(seq 1 45); do
+    if curl -sS --max-time 5 http://127.0.0.1:3000/api/salud 2>/dev/null |
+      jq -e '.checks.database == "ok"' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+paso "Activando $VERSION"
+cambiar_a "$NUEVA"
+if ! sano; then
+  if [[ -n "$ANTERIOR" && -d "$ANTERIOR" ]]; then
+    cambiar_a "$ANTERIOR"
+    falla "la versión nueva no respondió; se regresó a $(basename "$ANTERIOR"). Revisa: journalctl -u almacen-web -n 100"
+  fi
+  falla "la versión nueva no respondió. Revisa: journalctl -u almacen-web -n 100"
+fi
+
+paso "Limpieza (se conservan $CONSERVAR versiones)"
+ACTIVA="$(readlink -f "$BASE/current")"
+find "$BASE/releases" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((CONSERVAR + 1)) |
+  while read -r vieja; do
+    [[ "$vieja" == "$ACTIVA" ]] || rm -rf "$vieja"
+  done
+
+ACTIVADA=1
+printf '\n\033[1;32mDesplegado:\033[0m %s (%s)\n' "$VERSION" "$COMMIT"

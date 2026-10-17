@@ -1,0 +1,546 @@
+import { ChevronLeft, Download, Pencil, Plus } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import {
+  NoAccessState,
+  NoModuleState,
+  PageContainer,
+  PageHeader,
+  ReadOnlyNotice,
+} from "@/components";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { formatDate, formatDateTime, newId } from "@/lib";
+import { listStockLocations } from "@/modules/inventory";
+import {
+  getOrderDeliveries,
+  getOrderReceipts,
+  getPurchaseOrder,
+} from "@/modules/purchasing";
+import { getModuleAccess } from "@/platform/billing";
+
+import { DeliveryPanel } from "./delivery-panel";
+import { CancelOrder, CloseOrder, SubmitOrder } from "./order-buttons";
+import { ReturnReceipt } from "./return-receipt";
+import { ReceiveOrder } from "./receive-order";
+import { RemoveLine } from "./remove-line";
+
+export const metadata: Metadata = { title: "Orden de compra" };
+
+const textLink =
+  "rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/**
+ * A purchase order with its lines (CMP-04). Each line shows what was
+ * asked for and what it amounts to in the product's unit; costs and the
+ * total appear only for who may see them.
+ */
+export default async function OrdenPage({
+  params,
+}: PageProps<"/compras/ordenes/[id]">) {
+  const access = await getModuleAccess();
+  const back = (
+    <Link
+      href="/compras"
+      className="inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <ChevronLeft aria-hidden="true" className="size-4" />
+      Compras
+    </Link>
+  );
+  if (!access.can("purchasing.order.read")) {
+    return (
+      <PageContainer>
+        {back}
+        <NoAccessState />
+      </PageContainer>
+    );
+  }
+  const moduleState = access.moduleState("purchasing");
+  if (moduleState === "none") {
+    return (
+      <PageContainer>
+        {back}
+        <NoModuleState module="Compras" />
+      </PageContainer>
+    );
+  }
+  const { id } = await params;
+  const actor = {
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  };
+  const [order, delivery, receipts] = await Promise.all([
+    getPurchaseOrder(actor, id),
+    getOrderDeliveries(actor, id),
+    access.can("purchasing.receipt.read") ? getOrderReceipts(actor, id) : null,
+  ]);
+  if (!order || !delivery) notFound();
+  const canEdit =
+    order.editable &&
+    moduleState === "active" &&
+    access.allows("purchasing.order.update");
+  const active = moduleState === "active";
+  const canSubmit =
+    order.canSubmit && active && access.allows("purchasing.order.submit");
+  const canCancel =
+    order.canCancel && active && access.allows("purchasing.order.cancel");
+  // What is missing comes from the receipts: who closes must see them.
+  const canClose =
+    order.canClose &&
+    !!receipts &&
+    active &&
+    access.allows("purchasing.order.close");
+  const closed = order.status === "CLOSED";
+  const canReceive =
+    !!receipts?.canReceive &&
+    active &&
+    access.allows("purchasing.receipt.create") &&
+    access.can("inventory.location.read");
+  const canReturn =
+    !!receipts?.canReturn &&
+    active &&
+    access.allows("purchasing.return.create") &&
+    access.can("inventory.location.read");
+  const locations =
+    canReceive || canReturn ? await listStockLocations(actor) : [];
+  // The PDF carries prices: for who may export orders (not Consulta).
+  const canExport = access.can("purchasing.order.export");
+  const zone = access.organization.timeZone;
+  // By mail it goes once it is an order (not a draft); what was sent
+  // stays in sight afterwards, whatever became of the order.
+  const showDelivery =
+    order.status === "SENT" ||
+    order.status === "PARTIAL" ||
+    delivery.deliveries.length > 0;
+  const addHref = `/compras/ordenes/${order.id}/linea`;
+  const expected = order.expectedOn
+    ? formatDate(new Date(`${order.expectedOn}T12:00:00.000Z`), "UTC")
+    : null;
+
+  return (
+    <PageContainer>
+      {back}
+      {moduleState === "read_only" && <ReadOnlyNotice module="Compras" />}
+      <PageHeader
+        title={`Orden ${order.numberText}`}
+        description={order.supplierName}
+        actions={
+          canEdit || canExport || canReceive ? (
+            <>
+              {canReceive && receipts && (
+                <ReceiveOrder
+                  orderId={order.id}
+                  numberText={order.numberText}
+                  idempotencyKey={newId()}
+                  pending={receipts.lines
+                    .filter((line) => line.pendingText)
+                    .map((line) => ({
+                      id: line.orderLineId,
+                      productName: line.productName,
+                      sku: line.sku,
+                      pendingText: line.receivedText
+                        ? `faltan ${line.pendingText} de ${line.orderedText}`
+                        : `pediste ${line.orderedText}`,
+                      pendingQuantity: line.pendingQuantity,
+                      unitText: line.unitText,
+                      contentText: line.contentText,
+                      orderedContentText: line.orderedContentText,
+                    }))}
+                  locations={locations.map((location) => ({
+                    id: location.id,
+                    label: location.path,
+                  }))}
+                  defaultLocationId={
+                    locations.find((location) => location.isDefault)?.id ??
+                    locations[0]?.id ??
+                    ""
+                  }
+                />
+              )}
+              {canExport && (
+                <Button asChild variant="outline">
+                  <a href={`/api/compras/ordenes/${order.id}/pdf`} download>
+                    <Download aria-hidden="true" data-icon="inline-start" />
+                    Descargar PDF
+                  </a>
+                </Button>
+              )}
+              {canEdit && (
+                <Button asChild variant="outline">
+                  <Link href={`/compras/ordenes/${order.id}/editar`}>
+                    <Pencil aria-hidden="true" data-icon="inline-start" />
+                    Editar datos
+                  </Link>
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
+      />
+
+      <section
+        aria-label="Datos de la orden"
+        className="max-w-3xl rounded-xl border bg-card"
+      >
+        <dl className="divide-y">
+          {(
+            [
+              [
+                "Estado",
+                <Badge
+                  key="status"
+                  variant={
+                    order.status === "DRAFT"
+                      ? "secondary"
+                      : order.status === "CANCELLED" ||
+                          order.status === "CLOSED"
+                        ? "outline"
+                        : "default"
+                  }
+                >
+                  {order.statusLabel}
+                </Badge>,
+              ],
+              ...(order.sentAt
+                ? ([
+                    ["Confirmada", formatDateTime(order.sentAt, zone)],
+                  ] as const)
+                : []),
+              ...(order.cancelledAt
+                ? ([
+                    [
+                      "Cancelada",
+                      `${formatDateTime(order.cancelledAt, zone)}\n${order.cancelReason ?? ""}`,
+                    ],
+                  ] as const)
+                : []),
+              ...(order.closedAt
+                ? ([
+                    [
+                      "Cerrada",
+                      `${formatDateTime(order.closedAt, zone)}
+${order.closeReason ?? ""}`,
+                    ],
+                  ] as const)
+                : []),
+              [
+                "Proveedor",
+                access.can("purchasing.supplier.read") ? (
+                  <Link
+                    key="supplier"
+                    href={`/compras/proveedores/${order.supplierId}`}
+                    className={textLink}
+                  >
+                    {order.supplierName}
+                  </Link>
+                ) : (
+                  order.supplierName
+                ),
+              ],
+              ["Se espera", expected ?? "—"],
+              ["Notas", order.notes ?? "—"],
+              [
+                "Empezada",
+                formatDate(order.createdAt, access.organization.timeZone),
+              ],
+            ] as const
+          ).map(([term, value]) => (
+            <div
+              key={term}
+              className="grid gap-1 p-4 sm:grid-cols-[10rem_1fr] sm:gap-4 sm:px-5"
+            >
+              <dt className="text-sm text-muted-foreground">{term}</dt>
+              <dd className="[overflow-wrap:anywhere] whitespace-pre-line">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section
+        aria-labelledby="lineas-orden"
+        className="max-w-3xl rounded-xl border bg-card"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2 sm:px-5">
+          <h2 id="lineas-orden" className="font-medium">
+            Productos
+            {order.lines.length > 0 && (
+              <span className="font-normal text-muted-foreground tabular-nums">
+                {" "}
+                · {order.lines.length}
+              </span>
+            )}
+          </h2>
+          {canEdit && (
+            <Button asChild>
+              <Link href={addHref}>
+                <Plus aria-hidden="true" data-icon="inline-start" />
+                Agregar producto
+              </Link>
+            </Button>
+          )}
+        </div>
+        {order.lines.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground sm:px-5">
+            {canEdit
+              ? "Esta orden todavía no pide nada. Agrega el primer producto."
+              : "Esta orden no tiene productos."}
+          </p>
+        ) : (
+          <ol className="divide-y">
+            {order.lines.map((line) => (
+              <li
+                key={line.id}
+                className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 sm:px-5"
+              >
+                <div className="min-w-0 space-y-1">
+                  <p className="font-medium [overflow-wrap:anywhere]">
+                    <span className="font-normal text-muted-foreground tabular-nums">
+                      {line.lineNumber}.{" "}
+                    </span>
+                    {line.productName}
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      · {line.sku}
+                      {line.supplierSku && ` · su código: ${line.supplierSku}`}
+                    </span>
+                  </p>
+                  {/* What was asked and what it amounts to, always visible. */}
+                  <p className="tabular-nums">{line.quantityText}</p>
+                  {order.costsVisible && (
+                    <p className="text-sm tabular-nums">
+                      {line.unitCostText ? (
+                        <>
+                          {line.unitCostText}{" "}
+                          <span className="font-medium">
+                            = {line.amountText}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Sin costo</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                {canEdit && (
+                  <div className="flex flex-wrap gap-1">
+                    <Button asChild variant="ghost">
+                      <Link
+                        href={`${addHref}?linea=${line.id}`}
+                        aria-label={`Editar ${line.productName} en la orden`}
+                      >
+                        <Pencil aria-hidden="true" data-icon="inline-start" />
+                        Editar
+                      </Link>
+                    </Button>
+                    <RemoveLine
+                      orderId={order.id}
+                      lineId={line.id}
+                      productName={line.productName}
+                    />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+        {order.costsVisible && order.lines.length > 0 && (
+          <p className="flex flex-wrap items-baseline justify-between gap-x-4 border-t p-4 sm:px-5">
+            <span className="text-sm text-muted-foreground">
+              Total antes de impuestos
+              {(order.linesWithoutCost ?? 0) > 0 &&
+                ` (${order.linesWithoutCost === 1 ? "falta el costo de 1 producto" : `falta el costo de ${order.linesWithoutCost} productos`})`}
+            </span>
+            <span className="text-lg font-semibold tabular-nums">
+              {order.totalText ?? "—"}
+            </span>
+          </p>
+        )}
+      </section>
+      {receipts && receipts.receipts.length > 0 && (
+        <section
+          aria-labelledby="recepciones-orden"
+          className="max-w-3xl rounded-xl border bg-card"
+        >
+          <h2
+            id="recepciones-orden"
+            className="border-b px-4 py-3 font-medium sm:px-5"
+          >
+            Recepciones
+          </h2>
+          {receipts.lines.some((line) => line.pendingText) && (
+            <ul className="divide-y border-b">
+              {receipts.lines.map((line) => (
+                <li
+                  key={line.orderLineId}
+                  className="flex flex-wrap justify-between gap-x-4 gap-y-1 p-4 text-sm sm:px-5"
+                >
+                  <span className="[overflow-wrap:anywhere]">
+                    {line.productName}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {line.receivedText
+                      ? `Recibido: ${line.receivedText} de ${line.orderedText}`
+                      : `Pediste ${line.orderedText}`}
+                    {line.pendingText
+                      ? closed
+                        ? ` · faltante: ${line.pendingText}`
+                        : ` · faltan ${line.pendingText}`
+                      : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ol className="divide-y">
+            {receipts.receipts.map((receipt) => {
+              const returnable = receipt.lines.filter(
+                (line) => line.returnableText,
+              );
+              return (
+                <li key={receipt.id} className="space-y-2 p-4 sm:px-5">
+                  <p className="text-sm text-muted-foreground">
+                    {formatDateTime(receipt.createdAt, zone)}
+                    {receipt.authorName && ` · ${receipt.authorName}`}
+                    {receipt.reference && ` · Remisión ${receipt.reference}`}
+                  </p>
+                  <ul className="space-y-1">
+                    {receipt.lines.map((line) => (
+                      <li
+                        key={line.receiptLineId}
+                        className="[overflow-wrap:anywhere] tabular-nums"
+                      >
+                        {line.quantityText} de {line.productName}{" "}
+                        <span className="text-muted-foreground">
+                          ({line.sku}) · {line.locationPath}
+                          {line.returnedText &&
+                            ` · devuelto: ${line.returnedText}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {receipt.returns && receipt.returns.length > 0 && (
+                    <ul className="space-y-2 border-l-2 pl-3">
+                      {receipt.returns.map((back) => (
+                        <li key={back.id} className="space-y-1 text-sm">
+                          <p className="text-muted-foreground">
+                            Devolución · {formatDateTime(back.createdAt, zone)}
+                            {back.authorName && ` · ${back.authorName}`}
+                          </p>
+                          {back.lines.map((line, index) => (
+                            <p
+                              key={index}
+                              className="[overflow-wrap:anywhere] tabular-nums"
+                            >
+                              {line.quantityText} de {line.productName}{" "}
+                              <span className="text-muted-foreground">
+                                ({line.sku}) · {line.locationPath}
+                              </span>
+                            </p>
+                          ))}
+                          <p className="[overflow-wrap:anywhere] text-muted-foreground">
+                            Motivo: {back.reason}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {canReturn && returnable.length > 0 && (
+                    <ReturnReceipt
+                      orderId={order.id}
+                      receiptId={receipt.id}
+                      receiptText={`la recepción del ${formatDateTime(receipt.createdAt, zone).replace(/\.$/, "")}`}
+                      idempotencyKey={newId()}
+                      lines={returnable.map((line) => ({
+                        id: line.receiptLineId,
+                        productName: line.productName,
+                        sku: line.sku,
+                        detail: line.returnedText
+                          ? `puedes devolver ${line.returnableText} (ya devolviste ${line.returnedText})`
+                          : `llegaron ${line.returnableText}`,
+                        unitText: line.unitText,
+                        locationId: line.locationId,
+                      }))}
+                      locations={locations.map((location) => ({
+                        id: location.id,
+                        label: location.path,
+                      }))}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+      {showDelivery && (
+        <DeliveryPanel
+          orderId={order.id}
+          numberText={order.numberText}
+          supplierName={order.supplierName}
+          inProgress={delivery.inProgress}
+          send={active ? delivery.send : undefined}
+          deliveries={delivery.deliveries.map((row) => ({
+            id: row.id,
+            recipient: row.recipient,
+            status: row.status,
+            statusLabel: row.statusLabel,
+            requestedText: formatDateTime(row.requestedAt, zone),
+            endedText: row.sentAt ? formatDateTime(row.sentAt, zone) : null,
+            failureReason: row.failureReason,
+            attempts: row.attempts,
+            maxAttempts: row.maxAttempts,
+            retrying: row.retrying,
+          }))}
+        />
+      )}
+      {(canSubmit || canCancel || canClose) && (
+        <div className="flex max-w-3xl flex-wrap gap-3">
+          {canSubmit && (
+            <SubmitOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              supplierName={order.supplierName}
+              lines={order.lines.length}
+            />
+          )}
+          {canCancel && (
+            <CancelOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              sent={order.status !== "DRAFT"}
+            />
+          )}
+          {canClose && receipts && (
+            <CloseOrder
+              orderId={order.id}
+              numberText={order.numberText}
+              missing={receipts.lines
+                .filter((line) => line.pendingText)
+                .map((line) => `${line.pendingText} de ${line.productName}`)}
+            />
+          )}
+        </div>
+      )}
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        {order.status === "DRAFT"
+          ? order.lines.length === 0
+            ? "Es un borrador: agrega al menos un producto para poder confirmarla."
+            : "Es un borrador: puedes cambiarlo las veces que haga falta. Al confirmarla queda como enviada y sus productos ya no cambian."
+          : order.status === "SENT"
+            ? "Está confirmada como enviada: sus productos ya no cambian. Mandarla por correo no cambia su estado. Cuando llegue la mercancía, usa «Recibir mercancía»: entra al inventario y la orden queda recibida."
+            : order.status === "CANCELLED"
+              ? "Está cancelada: se conserva como historia y ya no cambia."
+              : order.status === "PARTIAL"
+                ? "Ya se recibió una parte: lo que falta aparece en Recepciones y se recibe cuando llegue. Si el resto ya no va a llegar, ciérrala con faltante."
+                : order.status === "CLOSED"
+                  ? "Se cerró con faltante: lo que llegó se queda como está y lo que faltó ya no se espera. Si todavía lo necesitas, pídelo en otra orden."
+                  : "Ya se recibió completa."}
+      </p>
+    </PageContainer>
+  );
+}

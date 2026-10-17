@@ -1,0 +1,66 @@
+# BAS-09 (ADR 0024): build in GitHub and deploy to the server. Deploying
+# means moving the «produccion» branch to a commit that already passed CI
+# on «pruebas»:  git push origin pruebas:produccion
+# (or Actions → Desplegar → Run workflow, once this file is on the default
+# branch). The server never compiles: it gets
+# the finished package over SSH, checks its sha256, backs up, migrates and
+# switches versions (deploy/bin/desplegar). Needs these repository secrets
+# (docs/DESPLIEGUE.md):
+#   DEPLOY_HOST         server address
+#   DEPLOY_SSH_KEY      private key whose public half went in --llave-ci
+#   DEPLOY_KNOWN_HOSTS  output of: ssh-keyscan -t ed25519 <server>
+# That key can only run the deploy script (forced command on the server).
+name: Desplegar
+
+on:
+  push:
+    branches: [produccion]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o commit a desplegar"
+        required: true
+        default: pruebas
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desplegar
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Construir y desplegar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: produccion
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Construir el paquete
+        run: bash deploy/empaquetar.sh "$RUNNER_TEMP/paquete.tgz"
+
+      - name: Mandar al servidor y desplegar
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/despliegue
+          chmod 600 ~/.ssh/despliegue
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          COMMIT="$(git rev-parse HEAD)"
+          SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
+          ssh -i ~/.ssh/despliegue -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            "almacen@$HOST" "paquete $COMMIT $SUMA" < "$RUNNER_TEMP/paquete.tgz"

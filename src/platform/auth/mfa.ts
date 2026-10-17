@@ -1,0 +1,330 @@
+import "server-only";
+
+import { isAPIError } from "better-auth/api";
+import { z } from "zod";
+
+import {
+  backupCodeUsedEmail,
+  mfaEnabledEmail,
+  sendEmail,
+} from "@/platform/email";
+import { recordSecurityEvent } from "@/platform/audit";
+import { db } from "@/server";
+
+import { TOTP_DIGITS, auth } from "./auth";
+import { normalizeBackupCode } from "./backup-codes";
+import { isMfaRequired } from "./mfa-policy";
+import {
+  clearAttempts,
+  clientIp,
+  refundAttempt,
+  reserveAttempt,
+  settleFailure,
+  throttleKeys,
+  tooManyAttemptsMessage,
+} from "./throttle";
+
+/**
+ * MFA enrollment with an authenticator app (PLT-08A). Two steps, both for
+ * the signed-in user (`headers` carry the session cookie):
+ * 1. `startTotpEnrollment` re-checks the password and creates a new secret
+ *    (stored encrypted, not active yet).
+ * 2. `confirmTotpEnrollment` checks the first code from the app; only then
+ *    is MFA on for the account. Better Auth also rotates the session.
+ * Wrong passwords and codes are limited per user (RULES.mfaSetup).
+ */
+
+export { isMfaRequired } from "./mfa-policy";
+
+export type MfaStatus = {
+  enabled: boolean;
+  required: boolean;
+  /** Unused backup codes (PLT-09); 0 when MFA is off. */
+  backupCodesLeft: number;
+};
+
+/** Current backup codes of a user (decrypted on the server only). */
+export async function readBackupCodes(userId: string): Promise<string[]> {
+  try {
+    const result = await auth.api.viewBackupCodes({ body: { userId } });
+    return result.backupCodes;
+  } catch {
+    return [];
+  }
+}
+
+export async function getMfaStatus(userId: string): Promise<MfaStatus> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { twoFactorEnabled: true },
+  });
+  return {
+    enabled: user?.twoFactorEnabled ?? false,
+    required: await isMfaRequired(userId),
+    backupCodesLeft: user?.twoFactorEnabled
+      ? (await readBackupCodes(userId)).length
+      : 0,
+  };
+}
+
+export type StartTotpResult =
+  | {
+      ok: true;
+      /** otpauth:// link for the QR code. */
+      totpUri: string;
+      /** Same secret in base32, for typing it by hand. */
+      secret: string;
+    }
+  | { ok: false; error: string };
+
+export async function startTotpEnrollment(
+  userId: string,
+  input: { password: string },
+  headers: Headers,
+): Promise<StartTotpResult> {
+  const password = z.string().max(1024).safeParse(input.password);
+  if (!password.success || !password.data) {
+    return { ok: false, error: "Escribe tu contraseña para continuar." };
+  }
+  const key = throttleKeys.mfaSetup(userId);
+  const wait = await reserveAttempt([key]);
+  if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
+
+  try {
+    const result = await auth.api.enableTwoFactor({
+      body: { password: password.data, method: "totp" },
+      headers,
+    });
+    if (result.method !== "totp" || !result.totpURI) {
+      throw new Error("enableTwoFactor did not return a TOTP URI");
+    }
+    const secret = new URL(result.totpURI).searchParams.get("secret") ?? "";
+    // The right password proves who this is: start the count over.
+    await clearAttempts([key]);
+    return { ok: true, totpUri: result.totpURI, secret };
+  } catch (error) {
+    if (isAPIError(error)) {
+      const code = String(error.body?.code ?? "");
+      if (code === "INVALID_PASSWORD") {
+        await settleFailure([key]);
+        return { ok: false, error: "La contraseña no es correcta." };
+      }
+      await refundAttempt([key]);
+      if (code === "TOTP_ALREADY_ENABLED") {
+        return {
+          ok: false,
+          error: "La verificación en dos pasos ya está activada.",
+        };
+      }
+    }
+    console.error("startTotpEnrollment failed", error);
+    return {
+      ok: false,
+      error: "No pudimos iniciar la activación. Inténtalo de nuevo.",
+    };
+  }
+}
+
+/** Accepts "123 456" or "123456"; returns the digits or null. */
+export function normalizeTotpCode(value: string): string | null {
+  const digits = value.replace(/[\s-]/g, "");
+  return new RegExp(`^\\d{${TOTP_DIGITS}}$`).test(digits) ? digits : null;
+}
+
+export type ConfirmTotpResult =
+  /** `backupCodes` are shown once so the person can save them (PLT-09). */
+  { ok: true; backupCodes: string[] } | { ok: false; error: string };
+
+export async function confirmTotpEnrollment(
+  userId: string,
+  input: { code: string },
+  headers: Headers,
+): Promise<ConfirmTotpResult> {
+  const code = normalizeTotpCode(String(input.code ?? ""));
+  if (!code) {
+    return {
+      ok: false,
+      error: `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
+    };
+  }
+  const pending = await db.twoFactor.findUnique({
+    where: { userId },
+    select: { verified: true },
+  });
+  if (!pending) {
+    return { ok: false, error: "Vuelve a empezar la activación." };
+  }
+  if (pending.verified) {
+    return {
+      ok: false,
+      error: "La verificación en dos pasos ya está activada.",
+    };
+  }
+  const key = throttleKeys.mfaSetup(userId);
+  const wait = await reserveAttempt([key]);
+  if (wait > 0) return { ok: false, error: tooManyAttemptsMessage(wait) };
+
+  try {
+    await auth.api.verifyTOTP({ body: { code }, headers });
+  } catch (error) {
+    if (isAPIError(error) && error.body?.code === "INVALID_CODE") {
+      await settleFailure([key]);
+      return {
+        ok: false,
+        error:
+          "El código no coincide. Revisa que la hora de tu teléfono sea automática y usa el código más reciente.",
+      };
+    }
+    await refundAttempt([key]);
+    console.error("confirmTotpEnrollment failed", error);
+    return {
+      ok: false,
+      error: "No pudimos confirmar el código. Inténtalo de nuevo.",
+    };
+  }
+
+  await clearAttempts([key]);
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+  await recordSecurityEvent({
+    userId,
+    action: "mfa.enabled",
+    ipAddress: clientIp(headers),
+  });
+  await sendEmail(mfaEnabledEmail({ to: user.email, name: user.name }));
+  return { ok: true, backupCodes: await readBackupCodes(userId) };
+}
+
+export type SignInCodeResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid"; error: string }
+  /** The challenge expired, was used up or the code was replayed. */
+  | { ok: false; reason: "restart"; error: string };
+
+/**
+ * Second step of signing in with MFA on (PLT-08B). `headers` must carry the
+ * challenge cookie set by signIn; the session starts only here. Each code
+ * works once, wrong codes are limited per challenge, per account (Better
+ * Auth) and per IP.
+ */
+export async function verifySignInCode(
+  input: { code: string; method?: "totp" | "backup" },
+  headers: Headers,
+): Promise<SignInCodeResult> {
+  const backup = input.method === "backup";
+  const raw = String(input.code ?? "");
+  const code = backup ? normalizeBackupCode(raw) : normalizeTotpCode(raw);
+  if (!code) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: backup
+        ? "Escribe uno de tus códigos de recuperación, por ejemplo k7m2p-9xq4t."
+        : `Escribe los ${TOTP_DIGITS} números que muestra tu app.`,
+    };
+  }
+  const ipKey = throttleKeys.mfaChallengeIp(clientIp(headers));
+  const wait = await reserveAttempt([ipKey]);
+  if (wait > 0) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: tooManyAttemptsMessage(wait),
+    };
+  }
+
+  let session: { token: string; userId: string };
+  try {
+    // Backup codes go through the same challenge, attempt limits and
+    // account lock as app codes: recovery never skips the controls.
+    const result = backup
+      ? await auth.api.verifyBackupCode({ body: { code }, headers })
+      : await auth.api.verifyTOTP({ body: { code }, headers });
+    if (!result.token) throw new Error("No session after the MFA code");
+    session = { token: result.token, userId: result.user.id };
+  } catch (error) {
+    const errorCode = isAPIError(error) ? String(error.body?.code ?? "") : "";
+    if (errorCode === "INVALID_CODE" || errorCode === "INVALID_BACKUP_CODE") {
+      await settleFailure([ipKey]);
+      return {
+        ok: false,
+        reason: "invalid",
+        error: backup
+          ? "Ese código de recuperación no es válido o ya se usó."
+          : "El código no coincide. Usa el código más reciente de tu app.",
+      };
+    }
+    // Not a wrong code: the attempt is given back.
+    await refundAttempt([ipKey]);
+    if (errorCode === "ACCOUNT_TEMPORARILY_LOCKED") {
+      return {
+        ok: false,
+        reason: "restart",
+        error:
+          "Demasiados códigos incorrectos. Espera 15 minutos e inicia sesión de nuevo.",
+      };
+    }
+    if (
+      errorCode === "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE" ||
+      errorCode === "INVALID_TWO_FACTOR_COOKIE" ||
+      errorCode === "TOTP_NOT_ENABLED" ||
+      errorCode === "BACKUP_CODES_NOT_ENABLED"
+    ) {
+      return {
+        ok: false,
+        reason: "restart",
+        error: "Tu verificación venció. Inicia sesión de nuevo.",
+      };
+    }
+    console.error("verifySignInCode failed", error);
+    return {
+      ok: false,
+      reason: "invalid",
+      error: "No pudimos verificar el código. Inténtalo de nuevo.",
+    };
+  }
+
+  await refundAttempt([ipKey]);
+  if (backup) {
+    // Backup codes are removed when used; tell the owner how many are left.
+    const left = (await readBackupCodes(session.userId)).length;
+    await recordSecurityEvent({
+      userId: session.userId,
+      action: "mfa.backup_code_used",
+      metadata: { left },
+      ipAddress: clientIp(headers),
+    });
+    const user = await db.user.findUniqueOrThrow({
+      where: { id: session.userId },
+      select: { email: true, name: true },
+    });
+    await sendEmail(
+      backupCodeUsedEmail({ to: user.email, name: user.name, left }),
+    );
+    return { ok: true };
+  }
+
+  // One-time use: a code seen before (e.g. read over someone's shoulder)
+  // does not open a second session.
+  // Claimed in one step: two requests with the same code cannot both see
+  // it unused.
+  const usedKey = throttleKeys.totpUsed(session.userId, code);
+  if ((await reserveAttempt([usedKey])) > 0) {
+    await db.session.deleteMany({ where: { token: session.token } });
+    return {
+      ok: false,
+      reason: "restart",
+      error:
+        "Ese código ya se usó. Espera a que tu app muestre uno nuevo e inicia sesión de nuevo.",
+    };
+  }
+  await recordSecurityEvent({
+    userId: session.userId,
+    action: "sign_in.succeeded",
+    metadata: { mfa: true },
+    ipAddress: clientIp(headers),
+  });
+  return { ok: true };
+}

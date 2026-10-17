@@ -1,0 +1,11 @@
+[Unit]
+Description=Almacén (respaldo diario)
+
+[Timer]
+# 03:30 hora del servidor (UTC) = 21:30 en la Ciudad de México.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

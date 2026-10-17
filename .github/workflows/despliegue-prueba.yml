@@ -1,0 +1,139 @@
+# BAS-09..11: proves deploy/ on a clean Ubuntu machine, the same way the
+# founder runs it: install, configure mail, deploy the package built here
+# (like the «Desplegar» workflow), HTTPS + CSP + health, encrypted backup
+# that can be opened, a second deploy and the rollback, reinstalling
+# without touching secrets, and the build-on-the-server alternative.
+name: Despliegue de prueba
+
+on:
+  push:
+    branches: [pruebas]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/despliegue-prueba.yml"
+      - ".github/workflows/desplegar.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: despliegue-prueba-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  servidor:
+    name: Servidor limpio
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Construir el paquete (como «Desplegar»)
+        run: bash deploy/empaquetar.sh "$RUNNER_TEMP/paquete.tgz"
+
+      - name: Llave de respaldos (en el servidor real vive fuera de él)
+        run: |
+          sudo apt-get install -yq age
+          age-keygen -o "$RUNNER_TEMP/llave.txt" 2>/dev/null
+          echo "RECIPIENT=$(age-keygen -y "$RUNNER_TEMP/llave.txt")" >> "$GITHUB_ENV"
+
+      - name: Instalar el servidor (sin repositorio)
+        run: |
+          sudo bash deploy/instalar.sh --prueba \
+            --dominio localhost \
+            --clave-respaldos "$RECIPIENT"
+
+      - name: Configurar correo (servidor SMTP local de prueba)
+        run: |
+          sudo apt-get install -yq python3-aiosmtpd
+          nohup python3 -u -m aiosmtpd -n -l 127.0.0.1:2525 > /tmp/smtp.log 2>&1 &
+          sudo sed -i \
+            -e 's|^SMTP_HOST=.*|SMTP_HOST=127.0.0.1|' \
+            -e 's|^SMTP_PORT=.*|SMTP_PORT=2525|' \
+            -e 's|^SMTP_SECURITY=.*|SMTP_SECURITY=none|' \
+            -e 's|^MAIL_FROM=.*|MAIL_FROM=Almacén <avisos@almacen.test>|' \
+            /srv/almacen/shared/.env.local
+
+      - name: Primer despliegue (paquete por la entrada, como por SSH)
+        run: |
+          SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
+          sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $SUMA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"
+
+      - name: Un paquete alterado se rechaza
+        run: |
+          OTRA="$(printf '0%.0s' $(seq 1 64))"
+          if sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $OTRA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"; then
+            echo "Se aceptó un paquete con otra suma" >&2; exit 1
+          fi
+
+      - name: HTTPS, CSP y salud
+        run: |
+          curl -fsSk https://localhost/ -o /dev/null -D /tmp/cabeceras
+          grep -i "content-security-policy: .*'nonce-" /tmp/cabeceras
+          grep -i "strict-transport-security" /tmp/cabeceras
+          for i in $(seq 1 30); do
+            curl -sk https://localhost/api/salud | tee /tmp/salud.json
+            jq -e '.ok == true' /tmp/salud.json && break
+            sleep 2
+          done
+          jq -e '.ok == true' /tmp/salud.json
+
+      - name: Correo de prueba
+        run: |
+          almacen correo:prueba prueba@example.test
+          sleep 2; grep -q "prueba@example.test" /tmp/smtp.log
+
+      - name: Respaldo cifrado que se puede abrir
+        run: |
+          sudo systemctl start almacen-respaldo.service
+          ULTIMO="$(sudo ls -t /srv/almacen/backups | grep '^almacen-' | head -1)"
+          sudo age -d -i "$RUNNER_TEMP/llave.txt" "/srv/almacen/backups/$ULTIMO" | gunzip | grep -q "CREATE TABLE \`organization\`"
+          sudo journalctl -u almacen-respaldo -n 8 --no-pager
+
+      - name: Segundo despliegue y vuelta a la versión anterior
+        run: |
+          PRIMERA="$(sudo readlink -f /srv/almacen/current)"
+          SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
+          sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $SUMA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"
+          [ "$(sudo readlink -f /srv/almacen/current)" != "$PRIMERA" ]
+          sudo -u almacen /usr/local/lib/almacen/volver
+          [ "$(sudo readlink -f /srv/almacen/current)" = "$PRIMERA" ]
+          curl -fsSk https://localhost/precios -o /dev/null
+
+      - name: Reinstalar (con repositorio) no cambia secretos ni datos
+        run: |
+          git clone --quiet --bare "$GITHUB_WORKSPACE" /tmp/almacen.git
+          git -C /tmp/almacen.git branch -f pruebas "$GITHUB_SHA"
+          sudo chmod -R a+rX /tmp/almacen.git
+          ANTES="$(sudo sha256sum /srv/almacen/shared/.env.local)"
+          sudo bash deploy/instalar.sh --prueba \
+            --dominio localhost \
+            --clave-respaldos "$RECIPIENT" \
+            --repo /tmp/almacen.git --rama pruebas
+          [ "$(sudo sha256sum /srv/almacen/shared/.env.local)" = "$ANTES" ]
+
+      - name: Alternativa - compilar en el servidor
+        run: |
+          sudo -u almacen /usr/local/lib/almacen/desplegar
+          jq -e '.checks.database == "ok"' <(curl -sk https://localhost/api/salud)
+
+      - name: Registros si algo falló
+        if: failure()
+        run: |
+          sudo journalctl -u almacen-web -n 80 --no-pager || true
+          sudo journalctl -u almacen-worker -n 40 --no-pager || true
+          sudo journalctl -u almacen-respaldo -n 40 --no-pager || true
+          sudo journalctl -u caddy -n 40 --no-pager || true
+          cat /tmp/smtp.log || true

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Restaura un respaldo de Almacén sobre la base de producción (PIL-03). Se
+# corre como root, a mano, solo ante una pérdida de datos:
+#
+#   sudo /usr/local/lib/almacen/restaurar \
+#     /srv/almacen/backups/almacen-20261020-033012.sql.gz.age \
+#     /root/llave-respaldos.txt \
+#     [/srv/almacen/backups/archivos-20261020-033012.tar.gz.age]
+#
+# La llave privada se sube solo para esto y se borra al terminar
+# (shred -u /root/llave-respaldos.txt). Detiene la app y el worker,
+# reemplaza la base (y los archivos, si se indican) y los vuelve a arrancar.
+set -euo pipefail
+umask 077
+
+BASE=/srv/almacen
+RESPALDO="${1:-}"
+LLAVE="${2:-}"
+ARCHIVOS="${3:-}"
+falla() { printf '\n\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || falla "córrelo como root."
+[[ -f "$RESPALDO" && -f "$LLAVE" ]] || falla "uso: restaurar <respaldo.sql.gz.age> <llave> [archivos.tar.gz.age]"
+[[ -z "$ARCHIVOS" || -f "$ARCHIVOS" ]] || falla "no existe $ARCHIVOS"
+
+RAIZ="$(cat /root/.almacen-mysql-root)"
+TRABAJO="$(mktemp -d)"
+trap 'rm -rf "$TRABAJO"' EXIT
+
+echo "Descifrando y revisando el respaldo…"
+# El mismo arreglo de disparadores que hace respaldo (por si el archivo es
+# de antes de que lo hiciera).
+age -d -i "$LLAVE" "$RESPALDO" | gunzip |
+  sed -E '/^\/\*!50003 CREATE\*\//s/;[[:space:]]*\*\/;;$/ *\/;;/' > "$TRABAJO/almacen.sql"
+grep -q "CREATE TABLE" "$TRABAJO/almacen.sql" || falla "el respaldo no tiene tablas."
+
+cat <<EOF
+
+Esto REEMPLAZA la base de producción por el respaldo
+  $(basename "$RESPALDO")
+Todo lo registrado después de ese momento se pierde.
+EOF
+read -r -p "Escribe RESTAURAR para continuar: " RESPUESTA
+[[ "$RESPUESTA" == "RESTAURAR" ]] || falla "cancelado."
+
+systemctl stop almacen-web.service almacen-worker.service
+sql() { docker exec -i -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 "$@"; }
+# Los permisos de los usuarios son sobre `almacen`.* y sobreviven al DROP.
+sql -e "DROP DATABASE IF EXISTS almacen; CREATE DATABASE almacen CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+sql almacen < "$TRABAJO/almacen.sql"
+
+if [[ -n "$ARCHIVOS" ]]; then
+  echo "Restaurando archivos…"
+  mv "$BASE/shared/storage" "$BASE/shared/storage.antes-$(date -u +%Y%m%d%H%M%S)"
+  age -d -i "$LLAVE" "$ARCHIVOS" | tar -xzf - -C "$BASE/shared"
+  chown -R almacen:almacen "$BASE/shared/storage"
+fi
+
+systemctl start almacen-web.service almacen-worker.service
+printf '\n\033[1;32mRestaurado.\033[0m Borra la llave: shred -u %s\n' "$LLAVE"

@@ -1,0 +1,9 @@
+node_modules
+.next
+package-lock.json
+.agents
+.claude
+docs
+*.md
+src/server/generated
+design-system
