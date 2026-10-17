@@ -1,7 +1,8 @@
-# BAS-09..11: proves deploy/ on a clean Ubuntu 24.04 machine, the same way
-# the founder will run it on the server: install, configure mail, deploy,
-# HTTPS + health, encrypted backup with a verified restore, a second
-# deploy and the rollback to the first.
+# BAS-09..11: proves deploy/ on a clean Ubuntu machine, the same way the
+# founder runs it: install, configure mail, deploy the package built here
+# (like the «Desplegar» workflow), HTTPS + CSP + health, encrypted backup
+# that can be opened, a second deploy and the rollback, reinstalling
+# without touching secrets, and the build-on-the-server alternative.
 name: Despliegue de prueba
 
 on:
@@ -10,6 +11,7 @@ on:
     paths:
       - "deploy/**"
       - ".github/workflows/despliegue-prueba.yml"
+      - ".github/workflows/desplegar.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,12 +25,20 @@ jobs:
   servidor:
     name: Servidor limpio
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Construir el paquete (como «Desplegar»)
+        run: bash deploy/empaquetar.sh "$RUNNER_TEMP/paquete.tgz"
 
       - name: Llave de respaldos (en el servidor real vive fuera de él)
         run: |
@@ -36,18 +46,11 @@ jobs:
           age-keygen -o "$RUNNER_TEMP/llave.txt" 2>/dev/null
           echo "RECIPIENT=$(age-keygen -y "$RUNNER_TEMP/llave.txt")" >> "$GITHUB_ENV"
 
-      - name: Repositorio local como origen
-        run: |
-          git clone --quiet --bare "$GITHUB_WORKSPACE" /tmp/almacen.git
-          git -C /tmp/almacen.git branch -f pruebas "$GITHUB_SHA"
-          sudo chmod -R a+rX /tmp/almacen.git
-
-      - name: Instalar el servidor
+      - name: Instalar el servidor (sin repositorio)
         run: |
           sudo bash deploy/instalar.sh --prueba \
             --dominio localhost \
-            --clave-respaldos "$RECIPIENT" \
-            --repo /tmp/almacen.git --rama pruebas
+            --clave-respaldos "$RECIPIENT"
 
       - name: Configurar correo (servidor SMTP local de prueba)
         run: |
@@ -60,8 +63,19 @@ jobs:
             -e 's|^MAIL_FROM=.*|MAIL_FROM=Almacén <avisos@almacen.test>|' \
             /srv/almacen/shared/.env.local
 
-      - name: Primer despliegue
-        run: sudo -u almacen /usr/local/lib/almacen/desplegar
+      - name: Primer despliegue (paquete por la entrada, como por SSH)
+        run: |
+          SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
+          sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $SUMA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"
+
+      - name: Un paquete alterado se rechaza
+        run: |
+          OTRA="$(printf '0%.0s' $(seq 1 64))"
+          if sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $OTRA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"; then
+            echo "Se aceptó un paquete con otra suma" >&2; exit 1
+          fi
 
       - name: HTTPS, CSP y salud
         run: |
@@ -70,7 +84,7 @@ jobs:
           grep -i "strict-transport-security" /tmp/cabeceras
           for i in $(seq 1 30); do
             curl -sk https://localhost/api/salud | tee /tmp/salud.json
-            jq -e '.checks.database == "ok" and .checks.worker == "ok" and .checks.queue == "ok" and .checks.backup == "ok"' /tmp/salud.json && break
+            jq -e '.ok == true' /tmp/salud.json && break
             sleep 2
           done
           jq -e '.ok == true' /tmp/salud.json
@@ -85,25 +99,35 @@ jobs:
           sudo systemctl start almacen-respaldo.service
           ULTIMO="$(sudo ls -t /srv/almacen/backups | grep '^almacen-' | head -1)"
           sudo age -d -i "$RUNNER_TEMP/llave.txt" "/srv/almacen/backups/$ULTIMO" | gunzip | grep -q "CREATE TABLE \`organization\`"
-          sudo journalctl -u almacen-respaldo -n 20 --no-pager
+          sudo journalctl -u almacen-respaldo -n 8 --no-pager
 
       - name: Segundo despliegue y vuelta a la versión anterior
         run: |
           PRIMERA="$(readlink -f /srv/almacen/current)"
-          sudo -u almacen /usr/local/lib/almacen/desplegar "$GITHUB_SHA"
+          SUMA="$(cat "$RUNNER_TEMP/paquete.tgz.sha256")"
+          sudo -u almacen env SSH_ORIGINAL_COMMAND="paquete $GITHUB_SHA $SUMA" \
+            /usr/local/lib/almacen/desplegar --desde-ssh < "$RUNNER_TEMP/paquete.tgz"
           [ "$(readlink -f /srv/almacen/current)" != "$PRIMERA" ]
           sudo -u almacen /usr/local/lib/almacen/volver
           [ "$(readlink -f /srv/almacen/current)" = "$PRIMERA" ]
           curl -fsSk https://localhost/precios -o /dev/null
 
-      - name: Reinstalar no cambia secretos ni datos
+      - name: Reinstalar (con repositorio) no cambia secretos ni datos
         run: |
+          git clone --quiet --bare "$GITHUB_WORKSPACE" /tmp/almacen.git
+          git -C /tmp/almacen.git branch -f pruebas "$GITHUB_SHA"
+          sudo chmod -R a+rX /tmp/almacen.git
           ANTES="$(sudo sha256sum /srv/almacen/shared/.env.local)"
           sudo bash deploy/instalar.sh --prueba \
             --dominio localhost \
             --clave-respaldos "$RECIPIENT" \
             --repo /tmp/almacen.git --rama pruebas
           [ "$(sudo sha256sum /srv/almacen/shared/.env.local)" = "$ANTES" ]
+
+      - name: Alternativa - compilar en el servidor
+        run: |
+          sudo -u almacen /usr/local/lib/almacen/desplegar
+          jq -e '.checks.database == "ok"' <(curl -sk https://localhost/api/salud)
 
       - name: Registros si algo falló
         if: failure()

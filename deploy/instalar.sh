@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Prepara un servidor Ubuntu 24.04 limpio para Almacén (BAS-09..11).
+# Prepara un servidor Ubuntu (24.04 o más nuevo) limpio para Almacén
+# (BAS-09..11).
 # Se corre como root, una vez; volver a correrlo es seguro (actualiza los
 # scripts y plantillas sin tocar datos ni secretos).
 #
-#   bash deploy/instalar.sh \
+#   sudo bash deploy/instalar.sh \
 #     --dominio almacen.mx \
-#     --correo-ssl tu@correo.mx \
 #     --clave-respaldos age1... \
-#     [--repo git@github.com:Blackopuss/SaaS-Almacen.git] [--rama pruebas] \
-#     [--admin usuario --llave-admin "ssh-ed25519 AAAA..."] \
-#     [--llave-ci "ssh-ed25519 AAAA..."]
+#     --llave-ci "ssh-ed25519 AAAA..."      (la que usa GitHub para desplegar)
+#     [--correo-ssl tu@correo.mx]           (avisos de Let's Encrypt)
+#     [--repo git@github.com:…/SaaS-Almacen.git --rama pruebas]
+#                                           (solo si se compila en el servidor)
+#     [--admin usuario --llave-admin "ssh-ed25519 AAAA..."]
 #
 # Guía completa: docs/DESPLIEGUE.md
 set -euo pipefail
@@ -17,7 +19,8 @@ set -euo pipefail
 DOMINIO=""
 CORREO_SSL=""
 CLAVE_RESPALDOS=""
-REPO="git@github.com:Blackopuss/SaaS-Almacen.git"
+# Sin repositorio: el build lo hace GitHub Actions y llega como paquete.
+REPO=""
 RAMA="pruebas"
 ADMIN=""
 LLAVE_ADMIN=""
@@ -45,7 +48,7 @@ falla() { printf '\n\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || falla "córrelo como root (sudo bash deploy/instalar.sh …)."
 [[ -n "$DOMINIO" ]] || falla "falta --dominio."
 [[ "$DOMINIO" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || falla "dominio inválido: $DOMINIO"
-[[ -n "$CORREO_SSL" || $PRUEBA -eq 1 ]] || falla "falta --correo-ssl (avisos de Let's Encrypt)."
+[[ -z "$CORREO_SSL" || "$CORREO_SSL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || falla "--correo-ssl inválido."
 [[ "$CLAVE_RESPALDOS" =~ ^age1[0-9a-z]{58}$ ]] || falla "falta --clave-respaldos (llave pública de age, empieza con age1)."
 [[ "$RAMA" =~ ^[A-Za-z0-9._/-]+$ ]] || falla "rama inválida: $RAMA"
 if [[ -n "$ADMIN" ]]; then
@@ -56,7 +59,7 @@ if [[ -n "$LLAVE_CI" ]]; then
   [[ "$LLAVE_CI" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+ ]] || falla "--llave-ci debe ser una llave ssh-ed25519."
 fi
 . /etc/os-release
-[[ "$ID" == "ubuntu" ]] || falla "este script es para Ubuntu 24.04 (encontré $PRETTY_NAME)."
+[[ "$ID" == "ubuntu" && "${VERSION_ID%%.*}" -ge 24 ]] || falla "este script es para Ubuntu 24.04 o más nuevo (encontré $PRETTY_NAME)."
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd /
@@ -203,6 +206,8 @@ if [[ ! -f "$ENV" ]]; then
   chown almacen:almacen "$ENV"
   chmod 600 "$ENV"
 fi
+# Si cambió el dominio, la dirección pública lo sigue (los secretos no).
+sed -i "s|^BETTER_AUTH_URL=.*|BETTER_AUTH_URL=https://$DOMINIO|" "$ENV"
 valor() { grep -E "^$1=" "$ENV" | head -1 | cut -d= -f2-; }
 
 paso "Base «almacen» y usuarios de mínimo privilegio"
@@ -249,7 +254,9 @@ systemctl start almacen-respaldo.timer
 paso "Caddy para https://$DOMINIO"
 TLS=""
 [[ $PRUEBA -eq 1 ]] && TLS="tls internal"
-sed -e "s|@@DOMINIO@@|$DOMINIO|g" -e "s|@@CORREO_SSL@@|${CORREO_SSL:-admin@$DOMINIO}|" \
+CORREO_LINEA=""
+[[ -n "$CORREO_SSL" ]] && CORREO_LINEA="email $CORREO_SSL"
+sed -e "s|@@DOMINIO@@|$DOMINIO|g" -e "s|@@CORREO_LINEA@@|$CORREO_LINEA|" \
   -e "s|@@TLS@@|$TLS|" "$AQUI/plantillas/Caddyfile" > /etc/caddy/Caddyfile
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
@@ -258,9 +265,9 @@ chown -R caddy:caddy /var/log/caddy
 systemctl enable caddy
 systemctl reload-or-restart caddy
 
-paso "Acceso al repositorio"
+paso "Acceso por SSH para desplegar"
 install -d -o almacen -g almacen -m 700 "$BASE/.ssh"
-if [[ ! -f "$BASE/.ssh/id_ed25519" ]]; then
+if [[ -n "$REPO" && ! -f "$BASE/.ssh/id_ed25519" ]]; then
   sudo -u almacen ssh-keygen -q -t ed25519 -N "" -C "almacen@$DOMINIO" -f "$BASE/.ssh/id_ed25519"
 fi
 if [[ "$REPO" == git@github.com:* ]]; then
@@ -279,8 +286,8 @@ if [[ -n "$LLAVE_CI" ]]; then
   chown almacen:almacen "$BASE/.ssh/authorized_keys"
   chmod 600 "$BASE/.ssh/authorized_keys"
 fi
-[[ $PRUEBA -eq 1 ]] && git config --system --add safe.directory '*'
-if [[ ! -d "$BASE/repo/.git" ]]; then
+[[ $PRUEBA -eq 1 && -n "$REPO" ]] && git config --system --add safe.directory '*'
+if [[ -n "$REPO" && ! -d "$BASE/repo/.git" ]]; then
   if ! sudo -u almacen git clone --quiet --branch "$RAMA" "$REPO" "$BASE/repo"; then
     rm -rf "$BASE/repo"
     cat <<EOF
@@ -299,13 +306,16 @@ echo "RAMA=$RAMA" > "$BASE/shared/despliegue.env"
 chown almacen:almacen "$BASE/shared/despliegue.env"
 
 if [[ -z "$(valor SMTP_HOST)" ]]; then
-  printf '\n\033[1;32mServidor listo.\033[0m Falta el correo:\n'
-  echo "  1. sudo nano $ENV   (sección «Correo»: datos SMTP de tu proveedor)"
-  echo "  2. sudo -u almacen $LIB/desplegar"
-  echo "  3. almacen correo:prueba tu@correo.mx"
-  exit 0
+  # La app arranca sin correo, pero nadie podrá confirmar su cuenta.
+  printf '\n\033[1;33mFalta el correo:\033[0m sudo nano %s (sección «Correo»),\n' "$ENV"
+  echo "luego: sudo systemctl restart almacen-web almacen-worker && almacen correo:prueba tu@correo.mx"
 fi
 
+if [[ -z "$REPO" && ! -L "$BASE/current" ]]; then
+  printf '\n\033[1;32mServidor listo.\033[0m Despliega desde GitHub: Actions → Desplegar → Run workflow.\n'
+  [[ -n "$LLAVE_CI" ]] || echo "  (Falta --llave-ci: vuelve a correr con la llave pública que usa GitHub.)"
+  exit 0
+fi
 if [[ -L "$BASE/current" ]]; then
   # Reinstalación: la versión activa sigue; desplegar es aparte.
   printf '\n\033[1;32mServidor actualizado.\033[0m Para una versión nueva: sudo -u almacen %s/desplegar\n' "$LIB"

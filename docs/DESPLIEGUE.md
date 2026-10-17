@@ -1,8 +1,11 @@
 # Despliegue en el servidor
 
-Guía para poner Almacén en internet en un VPS con Ubuntu 24.04, por ejemplo la KVM 2 de Hostinger. La decisión y sus razones están en el ADR 0024.
+Guía para poner Almacén en internet en un servidor con Ubuntu 24.04 o más nuevo: una EC2 de AWS, como la actual (Ubuntu 26.04, 2 vCPU, 4 GB), o un VPS como la KVM 2 de Hostinger.
+
+**El build se hace en GitHub, no en el servidor.** El workflow «Desplegar» compila y le manda al servidor el paquete terminado, y el servidor solo lo instala. Así no gasta memoria compilando, que con 4 GB competiría con MySQL y la app. La decisión y sus razones están en el ADR 0024.
 
 Todo lo de esta guía ya está probado: el workflow «Despliegue de prueba» corre en GitHub, sobre un Ubuntu limpio, todo lo que sigue.
+- Arma el paquete.
 - Instala el servidor.
 - Configura el correo.
 - Despliega.
@@ -39,8 +42,11 @@ Internet ──HTTPS──► Caddy (certificado de Let's Encrypt, renovación s
 
 ### 1. Servidor y dominio
 
-1. Contrata el VPS con **Ubuntu 24.04**. Anota su IP y la contraseña de root.
-2. En el DNS de tu dominio crea un registro **A**: `almacen.mx → IP del servidor` (o el subdominio que quieras, como `app.almacen.mx`). Puede tardar de minutos a horas en propagarse. Revísalo con `nslookup almacen.mx`.
+1. Servidor con **Ubuntu 24.04 o más nuevo**.
+   - En AWS: asígnale una **IP elástica**. Si no, la IP cambia al detener la instancia y el dominio deja de apuntar.
+   - En su **grupo de seguridad**, abre la entrada a **80 y 443 desde 0.0.0.0/0** (HTTPS y la renovación del certificado) y a **22** desde donde despliegas. GitHub Actions entra desde IPs variables, así que 22 queda abierto a 0.0.0.0/0; la llave de despliegue solo puede desplegar.
+2. En el DNS de tu dominio crea un registro **A**: `almacen.mx → IP del servidor` (o un subdominio, como `app.almacen.mx`). Puede tardar de minutos a horas en propagarse; revísalo con `nslookup almacen.mx`.
+   - **Mientras no tengas dominio**, usa `18-216-231-155.sslip.io` (la IP con guiones). Ese nombre apunta solo a tu IP y Let's Encrypt le da certificado. Cuando tengas el dominio, vuelve a correr el instalador con `--dominio almacen.mx`.
 
 ### 2. Proveedor de correo
 
@@ -71,52 +77,52 @@ age-keygen -o almacen-respaldos.txt
 - Muestra una línea `Public key: age1…`: esa es la que usa el servidor.
 - Guarda `almacen-respaldos.txt` en tu gestor de contraseñas y en una USB. **Si la pierdes, ningún respaldo se puede abrir.**
 
-### 4. Tu llave SSH
+### 4. Llave para que GitHub despliegue
 
-Si no tienes una: `ssh-keygen -t ed25519`. Tu llave pública está en `~/.ssh/id_ed25519.pub`.
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/almacen-despliegue -C "github-actions"
+```
+
+En el servidor, esta llave solo puede desplegar: no abre una terminal.
 
 ## Instalación
 
 1. Copia la carpeta `deploy` al servidor, desde la carpeta del proyecto en tu computadora:
 
    ```bash
-   scp -r deploy root@IP_DEL_SERVIDOR:/root/
+   scp -i ~/.ssh/MIvps.pem -r deploy ubuntu@SERVIDOR:/tmp/
    ```
 
-2. Entra al servidor y corre el instalador:
+2. Entra y corre el instalador. Repetirlo es seguro: nunca cambia secretos ni datos.
 
    ```bash
-   ssh root@IP_DEL_SERVIDOR
-   bash /root/deploy/instalar.sh \
+   ssh -i ~/.ssh/MIvps.pem ubuntu@SERVIDOR
+   sudo bash /tmp/deploy/instalar.sh \
      --dominio almacen.mx \
-     --correo-ssl tu@correo.mx \
      --clave-respaldos age1TU_LLAVE_PUBLICA \
-     --admin tuusuario \
-     --llave-admin "$(cat ~/.ssh/authorized_keys | head -1)"
+     --llave-ci "ssh-ed25519 AAAA… github-actions"
    ```
 
-   - `--admin` crea tu cuenta con permisos de administración.
-   - Al terminar, **ya no se puede entrar como root ni con contraseña, solo con tu llave**. Por eso `--llave-admin` debe ser tu llave pública.
-   - Si entraste a root con contraseña, pega el contenido de tu `id_ed25519.pub` en lugar de `$(cat …)`.
-   - Prueba `ssh tuusuario@almacen.mx` en otra terminal **antes de cerrar** la sesión de root.
+   - `--llave-ci` es el contenido de `~/.ssh/almacen-despliegue.pub`.
+   - `--correo-ssl tu@correo.mx` (opcional): Let's Encrypt avisa ahí si un certificado no se pudo renovar.
+   - En AWS la cuenta `ubuntu` ya entra solo con llave. En un VPS al que entras como root con contraseña, agrega `--admin tuusuario --llave-admin "ssh-ed25519 …"`. Así se crea tu cuenta y se cierra el acceso con contraseña; prueba la nueva cuenta en otra terminal antes de cerrar la de root.
 
-3. **Permiso para leer el repositorio.**
-   - La primera vez, el instalador se detiene y muestra una llave.
-   - En GitHub: _Settings → Deploy keys → Add deploy key_. Pégala, deja _Allow write access_ **sin marcar** y guarda.
-   - Vuelve a correr el mismo comando. Repetirlo es seguro: nunca cambia secretos ni datos.
-
-4. **Correo:** llena la sección «Correo» con los datos de tu proveedor.
+3. **Correo:** llena la sección «Correo» con los datos de tu proveedor.
 
    ```bash
    sudo nano /srv/almacen/shared/.env.local
    ```
 
-   `MAIL_FROM` debe ser una dirección de tu dominio verificado, por ejemplo `Almacén <avisos@almacen.mx>`.
+   `MAIL_FROM` debe ser una dirección de tu dominio verificado, por ejemplo `Almacén <avisos@almacen.mx>`. Si ya hay una versión activa: `sudo systemctl restart almacen-web almacen-worker`.
 
-5. **Primer despliegue:**
+4. **Secretos en GitHub** (_Settings → Secrets and variables → Actions_):
+   - `DEPLOY_HOST`: el dominio, o la IP.
+   - `DEPLOY_SSH_KEY`: el contenido de `~/.ssh/almacen-despliegue`, la privada.
+   - `DEPLOY_KNOWN_HOSTS`: la salida de `ssh-keyscan -t ed25519 almacen.mx`.
+
+5. **Desplegar:** en GitHub, _Actions → Desplegar → Run workflow_, con la rama `pruebas`. Al terminar:
 
    ```bash
-   sudo -u almacen /usr/local/lib/almacen/desplegar
    almacen correo:prueba tu@correo.mx
    ```
 
@@ -125,6 +131,8 @@ Si no tienes una: `ssh-keygen -t ed25519`. Tu llave pública está en `~/.ssh/id
    ```bash
    almacen staff add tu@correo.mx
    ```
+
+**Alternativa sin GitHub Actions:** instala con `--repo git@github.com:Blackopuss/SaaS-Almacen.git` y agrega en GitHub la _deploy key_ de solo lectura que muestra el instalador. Después despliega en el servidor con `sudo -u almacen /usr/local/lib/almacen/desplegar`, que compila ahí mismo. Con 4 GB funciona, pero tarda más y aprieta la memoria.
 
 ### 5. Respaldo del secreto de autenticación
 
@@ -159,22 +167,11 @@ sudo nano /srv/almacen/shared/respaldo.env   # RCLONE_DESTINO=b2:almacen-respald
 sudo systemctl start almacen-respaldo.service  # prueba
 ```
 
-### 8. Desplegar desde GitHub (opcional)
-
-1. En tu computadora: `ssh-keygen -t ed25519 -f despliegue-almacen -N ""`.
-2. Vuelve a correr `instalar.sh` con `--llave-ci "$(cat despliegue-almacen.pub)"`. Esa llave solo puede desplegar: no abre una terminal.
-3. En GitHub, en _Settings → Secrets and variables → Actions_, crea:
-   - `DEPLOY_HOST`: `almacen.mx`.
-   - `DEPLOY_SSH_KEY`: el contenido de `despliegue-almacen`, la privada.
-   - `DEPLOY_KNOWN_HOSTS`: la salida de `ssh-keyscan -t ed25519 almacen.mx`.
-4. Desde ese momento: _Actions → Desplegar → Run workflow_.
-
 ## Operación diaria
 
 | Para | Comando |
 | --- | --- |
-| Desplegar lo último de `pruebas` | `sudo -u almacen /usr/local/lib/almacen/desplegar` |
-| Desplegar un commit | `sudo -u almacen /usr/local/lib/almacen/desplegar abc1234` |
+| Desplegar | GitHub: _Actions → Desplegar → Run workflow_ (rama o commit) |
 | Regresar a la versión anterior | `sudo -u almacen /usr/local/lib/almacen/volver` |
 | Ver versiones | `ls /srv/almacen/releases` |
 | Estado | `curl -s localhost:3000/api/salud` y `systemctl status almacen-web almacen-worker` |
@@ -185,7 +182,7 @@ sudo systemctl start almacen-respaldo.service  # prueba
 | Estado de migraciones | `almacen db:status` |
 
 **Cada despliegue:**
-1. Construye la versión nueva aparte.
+1. Construye la versión nueva en GitHub y verifica la suma del paquete al recibirlo.
 2. Hace un **respaldo verificado**.
 3. Aplica las migraciones.
 4. Cambia de versión y revisa la salud.

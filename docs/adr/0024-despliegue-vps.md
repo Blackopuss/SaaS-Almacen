@@ -5,14 +5,14 @@
 
 ## Contexto
 
-- El fundador eligió un VPS (KVM 2 de Hostinger: 2 vCPU, 8 GB, NVMe) en lugar de un servicio administrado.
+- El fundador eligió un servidor propio en lugar de un servicio administrado: primero se pensó en la KVM 2 de Hostinger y al final contrató una EC2 de AWS (c7i-flex.large: 2 vCPU, 4 GB, Ubuntu 26.04).
 - Antes de contratarlo, quiere todo listo para que solo falte subirlo.
 - BAS-09..11 piden HTTPS, red privada para la base, secretos fuera del repositorio, logs, captura de errores y un respaldo restaurado.
 - PIL-01 pide poder regresar a la versión anterior sin una migración destructiva.
 
 ## Decisión
 
-- **Un solo servidor, con Ubuntu 24.04:**
+- **Un solo servidor, con Ubuntu 24.04 o más nuevo:**
   - **Caddy** delante, con HTTPS automático (Let's Encrypt).
   - **App y worker** como servicios de systemd, con la cuenta `almacen` y escritura solo en sus carpetas.
   - **MySQL 9.4** en un contenedor Docker con la versión exacta de desarrollo y CI. Usa `--network host` y escucha solo en 127.0.0.1, así que los usuarios quedan en `127.0.0.1` y no en `%`.
@@ -44,7 +44,11 @@
   - Logs en JSON por línea en journald.
   - `src/instrumentation.ts` para los errores.
   - `/api/salud` para un monitor externo (UptimeRobot): base, latido del worker, cola detenida, último respaldo y errores recientes.
-- **Despliegue desde GitHub (manual):** el workflow `Desplegar` entra por SSH con una llave que en el servidor solo puede correr `desplegar` (comando forzado).
+- **Build en GitHub, no en el servidor (decisión del fundador al contratar una EC2 de 4 GB):**
+  - El workflow `Desplegar` arma el paquete (`deploy/empaquetar.sh`: dependencias y build, sin secretos).
+  - Lo manda por SSH, por la entrada estándar, con una llave que en el servidor solo puede correr `desplegar` (comando forzado).
+  - El servidor comprueba la suma SHA-256 y sigue con respaldo, migraciones y cambio de versión.
+  - El servidor no necesita acceso al repositorio. Compilar en el servidor (`--repo`) queda como alternativa.
 - **Prueba de punta a punta:** el workflow `Despliegue de prueba` corre en Ubuntu 24.04 limpio cuando cambia `deploy/`, con certificado interno y un SMTP local.
 
 - **Conexión a MySQL por loopback:** la app acepta la llave pública de MySQL (`allowPublicKeyRetrieval`) solo si la base está en 127.0.0.1. MySQL 9 la manda en el primer inicio de sesión de un usuario sin TLS, y por loopback nadie puede suplantarla (`isLoopbackHost`). Una base en otra máquina tendría que usar TLS.

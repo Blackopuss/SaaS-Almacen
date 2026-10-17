@@ -27,7 +27,10 @@ TRABAJO="$(mktemp -d)"
 trap 'rm -rf "$TRABAJO"' EXIT
 
 echo "Descifrando y revisando el respaldo…"
-age -d -i "$LLAVE" "$RESPALDO" | gunzip > "$TRABAJO/almacen.sql"
+# El mismo arreglo de disparadores que hace respaldo (por si el archivo es
+# de antes de que lo hiciera).
+age -d -i "$LLAVE" "$RESPALDO" | gunzip |
+  sed -E '/^\/\*!50003 CREATE\*\//s/;[[:space:]]*\*\/;;$/ *\/;;/' > "$TRABAJO/almacen.sql"
 grep -q "CREATE TABLE" "$TRABAJO/almacen.sql" || falla "el respaldo no tiene tablas."
 
 cat <<EOF

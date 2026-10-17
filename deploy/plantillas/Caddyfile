@@ -1,7 +1,7 @@
 # Caddy delante de Almacén (lo escribe deploy/instalar.sh). Pide y renueva
 # solo el certificado HTTPS y pasa todo a la app, que escucha en 127.0.0.1.
 {
-	email @@CORREO_SSL@@
+	@@CORREO_LINEA@@
 }
 
 @@DOMINIO@@ {

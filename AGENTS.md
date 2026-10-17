@@ -110,8 +110,8 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 
 ## Despliegue (BAS-09..11, ADR 0024)
 
-- Servidor: Ubuntu 24.04 con Caddy (HTTPS) → `next start` en 127.0.0.1:3000 y el worker como servicios de systemd (cuenta `almacen`), MySQL 9.4 en Docker solo en 127.0.0.1. Guía del fundador: `docs/DESPLIEGUE.md`.
-- `deploy/instalar.sh` (idempotente: nunca cambia secretos ni datos), `deploy/bin/desplegar` (versiones en `releases/`, respaldo verificado antes de migrar, vuelta automática si la salud falla), `volver`, `respaldo` (restauración de prueba + cifrado con `age`), `restaurar` y `almacen <comando>`.
+- Servidor (hoy una EC2 con Ubuntu 26.04): Caddy (HTTPS) → `next start` en 127.0.0.1:3000 y el worker como servicios de systemd (cuenta `almacen`), MySQL 9.4 en Docker solo en 127.0.0.1. Guía del fundador: `docs/DESPLIEGUE.md`.
+- `deploy/instalar.sh` (idempotente: nunca cambia secretos ni datos), `deploy/empaquetar.sh` (build en GitHub Actions; el workflow «Desplegar» lo manda por SSH), `deploy/bin/desplegar` (paquete con suma verificada o build en el servidor; versiones en `releases/`, respaldo verificado antes de migrar, vuelta automática si la salud falla), `volver`, `respaldo` (restauración de prueba + cifrado con `age`), `restaurar` y `almacen <comando>`.
 - **Migraciones solo de expansión**: nada que borre o renombre algo que la versión anterior use; eso va en un despliegue posterior (así `volver` funciona sin tocar la base).
 - Una variable de entorno nueva de producción se agrega a `deploy/plantillas/env.production` (y a `.env.example`). Un cambio en `deploy/` lo prueba el workflow «Despliegue de prueba» en un Ubuntu limpio; no subirlo sin revisar que pase.
 

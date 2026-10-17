@@ -28,9 +28,14 @@ trap 'rm -rf "$TRABAJO"; docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -u
 sql() { docker exec -i -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 -N -B "$@"; }
 
 echo "Volcado de la base…"
+# Los disparadores de una sola sentencia quedaron guardados con un «;» al
+# final, y mysqldump lo deja dentro de su comentario de versión
+# («…'; */;;»), que MySQL no acepta al restaurar: se quita aquí, en el
+# volcado, para que el respaldo se pueda restaurar tal cual.
 docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysqldump -uroot -h127.0.0.1 \
   --single-transaction --routines --triggers --events --hex-blob \
-  --set-gtid-purged=OFF --no-tablespaces almacen > "$TRABAJO/almacen.sql"
+  --set-gtid-purged=OFF --no-tablespaces almacen |
+  sed -E '/^\/\*!50003 CREATE\*\//s/;[[:space:]]*\*\/;;$/ *\/;;/' > "$TRABAJO/almacen.sql"
 
 echo "Restauración de prueba…"
 sql -e "DROP DATABASE IF EXISTS almacen_verificacion; CREATE DATABASE almacen_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
