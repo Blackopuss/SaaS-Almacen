@@ -253,6 +253,8 @@ sed -e "s|@@DOMINIO@@|$DOMINIO|g" -e "s|@@CORREO_SSL@@|${CORREO_SSL:-admin@$DOMI
   -e "s|@@TLS@@|$TLS|" "$AQUI/plantillas/Caddyfile" > /etc/caddy/Caddyfile
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+# Validar como root crea el archivo de registro; el servicio corre como caddy.
+chown -R caddy:caddy /var/log/caddy
 systemctl enable caddy
 systemctl reload-or-restart caddy
 
@@ -304,6 +306,11 @@ if [[ -z "$(valor SMTP_HOST)" ]]; then
   exit 0
 fi
 
+if [[ -L "$BASE/current" ]]; then
+  # Reinstalación: la versión activa sigue; desplegar es aparte.
+  printf '\n\033[1;32mServidor actualizado.\033[0m Para una versión nueva: sudo -u almacen %s/desplegar\n' "$LIB"
+  exit 0
+fi
 paso "Primer despliegue"
 sudo -u almacen "$LIB/desplegar"
 printf '\n\033[1;32mListo:\033[0m https://%s\n' "$DOMINIO"
