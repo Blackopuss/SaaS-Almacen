@@ -4,8 +4,9 @@ import type { NextConfig } from "next";
  * Security headers for every response (PLT-16). The page cannot be shown
  * inside another site's frame (clickjacking), the browser does not guess
  * content types, links do not leak full URLs to other sites, and unused
- * device features are off. A full script Content-Security-Policy with
- * nonces is pending (see docs/seguridad/REVISION_PLT.md).
+ * device features are off. Pages also get a script policy with a nonce
+ * per request from src/proxy.ts (PLT16-04); this one covers every
+ * response, static files included.
  */
 const securityHeaders = [
   {

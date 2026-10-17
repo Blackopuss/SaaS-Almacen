@@ -1,6 +1,8 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { contentSecurityPolicy, newNonce } from "@/lib";
+
 /**
  * Optimistic auth check (PLT-04): sends people without a session cookie to
  * /ingresar before rendering a protected screen. It only reads the cookie;
@@ -34,25 +36,28 @@ export default function proxy(request: NextRequest) {
     url.searchParams.set("siguiente", `${pathname}${search}`);
     return NextResponse.redirect(url);
   }
-  return NextResponse.next();
+
+  // Script policy with a fresh nonce per request (PLT16-04). Next reads it
+  // from the request's CSP header and puts it on its own scripts; the root
+  // layout passes it to the theme script.
+  const nonce = newNonce();
+  const policy = contentSecurityPolicy(nonce, {
+    development: process.env.NODE_ENV === "development",
+    https:
+      request.nextUrl.protocol === "https:" ||
+      process.env.BETTER_AUTH_URL?.startsWith("https://") === true,
+  });
+  const headers = new Headers(request.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", policy);
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set("Content-Security-Policy", policy);
+  return response;
 }
 
 export const config = {
-  // The same paths as PROTECTED (security audit: some were missing).
-  matcher: [
-    "/inicio/:path*",
-    "/inventario/:path*",
-    "/movimientos/:path*",
-    "/ubicaciones/:path*",
-    "/conteos/:path*",
-    "/compras/:path*",
-    "/configuracion/:path*",
-    "/activa-dos-pasos",
-    "/crear-empresa",
-    "/interno/:path*",
-    "/api/archivos/:path*",
-    "/api/importaciones/:path*",
-    "/api/exportaciones/:path*",
-    "/api/compras/:path*",
-  ],
+  // Every page and route (the CSP needs a nonce per page); protected
+  // paths are decided by PROTECTED above. Static build files do not run
+  // through it.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

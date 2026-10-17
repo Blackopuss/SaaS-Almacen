@@ -14,7 +14,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V2 | Operaciones que no se duplican al reintentar | Cumple | Clave de confirmación única por empresa en cada movimiento, recepción y devolución, comparada con lo pedido; conteos aplicados una sola vez; sugerencias que cuentan lo ya pedido (`idempotency.int.test.ts`, `count-apply.int.test.ts`, `receipts.int.test.ts`, `returns.int.test.ts`, `suggestions.int.test.ts`). |
 | V2 | Integridad de datos de negocio | Cumple | Saldos derivados de movimientos inmutables; cantidades con decimal exacto y regla por producto; reconciliación `npm run stock:reconcile` (sin programar todavía: INV-S03). |
 | V3 Seguridad del frontend web | Cabeceras (framing, nosniff, referrer, HSTS) | Cumple | `next.config.ts`; `verify:ui`. |
-| V3 | CSP de scripts con nonce | Pendiente | PLT16-04, antes del piloto. |
+| V3 | CSP de scripts con nonce | Cumple | PLT16-04: `src/proxy.ts` (nonce por petición, `strict-dynamic`, sin `unsafe-inline`/`unsafe-eval` en producción); `src/lib/csp.test.ts`. |
 | V3 | Cookies seguras | Cumple | ADR 0003 «Sesiones, cookies y CSRF». |
 | V3 | CSRF / origen | Cumple | Revisión de origen de Better Auth forzada en todos los entornos; Server Actions con revisión de origen de Next. |
 | V4 API y servicios web | Superficie HTTP mínima | Cumple | Lista de permitidos `/api/auth` (`http.ts`, `http-surface.int.test.ts`). |
