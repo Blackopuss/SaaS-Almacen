@@ -45,6 +45,7 @@
   - `src/instrumentation.ts` para los errores.
   - `/api/salud` para un monitor externo (UptimeRobot): base, latido del worker, cola detenida, último respaldo y errores recientes.
 - **Build en GitHub, no en el servidor (decisión del fundador al contratar una EC2 de 4 GB):**
+  - Desplegar es mover la rama `produccion` a un commit que ya pasó CI en `pruebas` (`git push origin pruebas:produccion`). Lo que está en producción queda a la vista y no hace falta tocar `main`.
   - El workflow `Desplegar` arma el paquete (`deploy/empaquetar.sh`: dependencias y build, sin secretos).
   - Lo manda por SSH, por la entrada estándar, con una llave que en el servidor solo puede correr `desplegar` (comando forzado).
   - El servidor comprueba la suma SHA-256 y sigue con respaldo, migraciones y cambio de versión.

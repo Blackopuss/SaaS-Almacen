@@ -1,5 +1,8 @@
-# BAS-09 (ADR 0024): build in GitHub and deploy to the server, by hand
-# (Actions → Desplegar → Run workflow). The server never compiles: it gets
+# BAS-09 (ADR 0024): build in GitHub and deploy to the server. Deploying
+# means moving the «produccion» branch to a commit that already passed CI
+# on «pruebas»:  git push origin pruebas:produccion
+# (or Actions → Desplegar → Run workflow, once this file is on the default
+# branch). The server never compiles: it gets
 # the finished package over SSH, checks its sha256, backs up, migrates and
 # switches versions (deploy/bin/desplegar). Needs these repository secrets
 # (docs/DESPLIEGUE.md):
@@ -10,6 +13,8 @@
 name: Desplegar
 
 on:
+  push:
+    branches: [produccion]
   workflow_dispatch:
     inputs:
       ref:
@@ -33,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0

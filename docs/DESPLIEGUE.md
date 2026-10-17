@@ -120,7 +120,13 @@ En el servidor, esta llave solo puede desplegar: no abre una terminal.
    - `DEPLOY_SSH_KEY`: el contenido de `~/.ssh/almacen-despliegue`, la privada.
    - `DEPLOY_KNOWN_HOSTS`: la salida de `ssh-keyscan -t ed25519 almacen.mx`.
 
-5. **Desplegar:** en GitHub, _Actions → Desplegar → Run workflow_, con la rama `pruebas`. Al terminar:
+5. **Desplegar:** lleva a la rama `produccion` un commit que ya pasó CI en `pruebas`.
+
+   ```bash
+   git push origin pruebas:produccion
+   ```
+
+   El workflow «Desplegar» arranca solo; míralo en _Actions_. Cuando el archivo del workflow esté también en la rama principal, aparece además el botón _Actions → Desplegar → Run workflow_, para elegir rama o commit. Al terminar:
 
    ```bash
    almacen correo:prueba tu@correo.mx
@@ -171,7 +177,7 @@ sudo systemctl start almacen-respaldo.service  # prueba
 
 | Para | Comando |
 | --- | --- |
-| Desplegar | GitHub: _Actions → Desplegar → Run workflow_ (rama o commit) |
+| Desplegar | `git push origin pruebas:produccion` (o _Actions → Desplegar → Run workflow_) |
 | Regresar a la versión anterior | `sudo -u almacen /usr/local/lib/almacen/volver` |
 | Ver versiones | `ls /srv/almacen/releases` |
 | Estado | `curl -s localhost:3000/api/salud` y `systemctl status almacen-web almacen-worker` |
