@@ -29,29 +29,44 @@ registerHooks({
 const { db } = await import("@/server/db");
 const { runWorker } = await import("@/platform/jobs/queue");
 const { jobHandlers } = await import("@/modules/registry/jobs");
+const { HEARTBEAT_EVERY_MS, writeWorkerHeartbeat } =
+  await import("@/platform/ops");
+const { log } = await import("@/lib");
 
 const stop = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    console.log("[jobs] deteniendo al terminar el trabajo en curso…");
+    log.info("worker_stopping", { signal });
     stop.abort();
   });
 }
 
 const workerId = `worker-${process.pid}`;
-console.log(
-  `[jobs] ${workerId} en marcha. Tipos: ${Object.keys(jobHandlers).join(", ") || "(ninguno todavía)"}`,
-);
+log.info("worker_started", { workerId, types: Object.keys(jobHandlers) });
+
+// Heartbeat for /api/salud (BAS-11): written on a timer, so a long job does
+// not make a live worker look down.
+const beat = () =>
+  writeWorkerHeartbeat(workerId).catch((error: unknown) =>
+    log.error("worker_heartbeat_failed", error),
+  );
+await beat();
+const heartbeat = setInterval(beat, HEARTBEAT_EVERY_MS);
+
 await runWorker(jobHandlers, {
   workerId,
   signal: stop.signal,
   onOutcome: (outcome) => {
     if (outcome.kind === "idle") return;
-    console.log(
-      `[jobs] ${outcome.kind} ${outcome.jobId} (empresa ${outcome.organizationId})` +
-        ("error" in outcome ? `: ${outcome.error}` : ""),
-    );
+    const fields = {
+      jobId: outcome.jobId,
+      organizationId: outcome.organizationId,
+      ...("error" in outcome ? { reason: outcome.error } : {}),
+    };
+    if (outcome.kind === "failed") log.warn(`job_${outcome.kind}`, fields);
+    else log.info(`job_${outcome.kind}`, fields);
   },
 });
+clearInterval(heartbeat);
 await db.$disconnect();
-console.log("[jobs] detenido.");
+log.info("worker_stopped", { workerId });

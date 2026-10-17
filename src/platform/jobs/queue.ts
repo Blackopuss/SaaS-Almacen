@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isAppError, newId } from "@/lib";
+import { isAppError, log, newId } from "@/lib";
 import { db, forOrganization, type TenantDb } from "@/server";
 
 /**
@@ -439,7 +439,7 @@ export async function runWorker(
       outcome = await runNextJob(handlers, options);
     } catch (error) {
       // The database blinked: wait and go on, the queue is still there.
-      console.error("[jobs] no se pudo tomar el siguiente trabajo:", error);
+      log.error("job_claim_failed", error);
       outcome = { kind: "idle" };
     }
     if (outcome.kind === "failed" || Date.now() - settledAt >= settleEveryMs) {
@@ -447,7 +447,7 @@ export async function runWorker(
       try {
         await settleFailedJobs(handlers);
       } catch (error) {
-        console.error("[jobs] no se pudieron revisar los fallidos:", error);
+        log.error("job_settle_failed", error);
       }
     }
     options.onOutcome?.(outcome);
