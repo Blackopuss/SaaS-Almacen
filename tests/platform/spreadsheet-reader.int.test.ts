@@ -488,6 +488,22 @@ describe("readXlsx", () => {
       sheet: "Datos",
       rows: [["visible"]],
     });
+    // openpyxl writes state="visible" on every sheet (a founder's file was
+    // refused as «not Excel»); veryHidden still hides.
+    const visible = readXlsx(
+      workbook(
+        '<row><c t="inlineStr"><is><t>muy oculta</t></is></c></row>',
+        {
+          "xl/worksheets/sheet2.xml": `<worksheet ${NS}><sheetData><row><c t="inlineStr"><is><t>a la vista</t></is></c></row></sheetData></worksheet>`,
+        },
+        '<sheet name="Listas" sheetId="1" state="veryHidden" r:id="rId1"/><sheet name="Productos" sheetId="2" state="visible" r:id="rId2"/>',
+      ),
+    );
+    expect(visible).toMatchObject({
+      ok: true,
+      sheet: "Productos",
+      rows: [["a la vista"]],
+    });
     expect(
       readXlsx(
         workbook(`<row r="${READ_LIMITS.rows + 1}"><c><v>1</v></c></row>`),
