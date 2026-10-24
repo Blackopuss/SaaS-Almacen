@@ -9,7 +9,7 @@ El fundador eligió MySQL, en la versión que ya usa (9.4). El inventario exige 
 ## Decisión
 
 - **MySQL 9.4** local y como objetivo; InnoDB, `utf8mb4`.
-- **Prisma 7.10.0** con `@prisma/adapter-mariadb` 7.10.0. Migraciones versionadas en `prisma/migrations`.
+- **Prisma 7.10.1** con `@prisma/adapter-mariadb` 7.10.1. Migraciones versionadas en `prisma/migrations`.
 - **Mínimo privilegio**: la aplicación usa `almacen_app` (solo SELECT/INSERT/UPDATE/DELETE); la CLI de Prisma usa `almacen_migrator` (DDL). `root` solo crea bases y usuarios locales (`npm run db:setup`).
 - **IDs UUIDv7** en `CHAR(36)` generados por la app (`src/lib/ids.ts`): ordenados por tiempo para inserciones secuenciales en el índice primario.
 - **Decimales exactos** con `decimal.js` (`src/lib/decimal.ts`); nunca `number` para cantidades o dinero.
@@ -18,7 +18,7 @@ El fundador eligió MySQL, en la versión que ya usa (9.4). El inventario exige 
 
 ## Seguridad de dependencias
 
-Prisma 7.10 fija versiones vulnerables de `mariadb` (3.4.5), `mysql2` (3.15.3) y `deepmerge-ts` (7.1.5). Se fuerzan versiones corregidas con `overrides` (`mariadb` 3.4.7, `mysql2` 3.24.5, `deepmerge-ts` 8.0.2); `npm audit` en 0. Revisar al actualizar Prisma y quitar los `overrides` cuando ya no hagan falta.
+Prisma 7.10 fija versiones vulnerables de `mariadb` (3.4.5), `mysql2` (3.15.3) y `deepmerge-ts` (7.1.5). Se fuerzan versiones corregidas con `overrides` (`mariadb` 3.4.7, `mysql2` 3.24.5, `deepmerge-ts` 8.0.2); `npm audit` en 0. Actualización 2026-10-23 (avisos nuevos de Next, zod, nodemailer y mariadb): Prisma 7.10.1 ya trae `mariadb` 3.5.4 y el `override` queda en esa versión; `handlebars` 4.7.10 se fuerza también (lo trae `eslint-plugin-boundaries`, solo desarrollo). Revisar al actualizar Prisma y quitar los `overrides` cuando ya no hagan falta.
 
 ## Alternativas consideradas
 

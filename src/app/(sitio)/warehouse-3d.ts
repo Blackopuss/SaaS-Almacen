@@ -5,8 +5,8 @@ import * as THREE from "three";
 /**
  * 3D warehouse of the landing hero (three.js + anime.js). Racks with boxes
  * that settle onto the shelves, and a forklift that brings one box to an
- * empty place, over and over; every delivery calls `onDeliver`, so the
- * page can show the stock going up. Decorative.
+ * empty place, over and over, lowering it until it rests on the shelf.
+ * Decorative.
  *
  * Colors come from the scene tokens of globals.css and follow the theme.
  * With reduced motion (read live) the scene is drawn once, complete and
@@ -26,7 +26,6 @@ type Slot = {
 };
 
 type Options = {
-  onDeliver?: () => void;
   onReady?: () => void;
 };
 
@@ -37,6 +36,14 @@ const RACK_LENGTH = 6.6;
 const RACK_HEIGHT = 4.2;
 /** The empty place the forklift fills: rack at x = 2, middle level. */
 const TARGET = { rack: 2, level: 1.6, z: 0.8 };
+/**
+ * Facing the rack (turned 90°) the carried box's center is 1.2 ahead of the
+ * truck and its base 0.14 above the lift, so these put it exactly on the
+ * target place; CLEARANCE lifts it over the beam on the way in.
+ */
+const REACH = TARGET.rack - 1.2;
+const SET_DOWN = TARGET.level - 0.14;
+const CLEARANCE = 0.15;
 
 /** Deterministic pseudo-random numbers: the same warehouse on every visit. */
 function seeded(seed: number) {
@@ -67,7 +74,7 @@ function readPalette() {
 
 export function mountWarehouse(
   container: HTMLElement,
-  { onDeliver, onReady }: Options = {},
+  { onReady }: Options = {},
 ): () => void {
   let renderer: THREE.WebGLRenderer;
   try {
@@ -207,7 +214,8 @@ export function mountWarehouse(
   const tint = new THREE.Color();
   const delivery = { highlight: 0 };
 
-  // Forklift: body, mast, forks and the box it carries.
+  // Forklift: body, mast, forks and the box it carries (sized like the
+  // target once turned: 0.9 across the rack, 1.1 along it).
   const forklift = new THREE.Group();
   const add = (
     geometry: THREE.BufferGeometry,
@@ -253,19 +261,19 @@ export function mountWarehouse(
   }
   add(new THREE.BoxGeometry(0.8, 0.5, 0.06), darkMaterial, 0, 0.25, 0, forks);
   const carried = add(
-    new THREE.BoxGeometry(0.9, 0.8, 1.1),
+    new THREE.BoxGeometry(1.1, 0.8, 0.9),
     boxMaterial,
     0,
     0.42,
-    0.55,
+    0.5,
     forks,
   );
   const carriedTape = add(
-    new THREE.BoxGeometry(0.16, 0.02, 1.11),
+    new THREE.BoxGeometry(1.11, 0.02, 0.16),
     tapeMaterial,
     0,
     0.83,
-    0.55,
+    0.5,
     forks,
   );
   scene.add(forklift);
@@ -366,7 +374,8 @@ export function mountWarehouse(
 
   function startMotion() {
     for (const slot of slots) Object.assign(slot, { drop: 3.5, scale: 0 });
-    if (target) target.scale = 0;
+    // The target skips the settle animation, so it must start on its shelf.
+    if (target) Object.assign(target, { drop: 0, scale: 0 });
     const settling = slots.filter((slot) => slot !== target);
     settle = animate(settling, {
       drop: 0,
@@ -384,16 +393,16 @@ export function mountWarehouse(
       .add(truck, { z: TARGET.z, duration: 2800, ease: "inOutSine" }, 300)
       .add(truck, { turn: Math.PI / 2, duration: 700, ease: "inOutQuad" })
       .add(truck, {
-        lift: TARGET.level + 0.02,
+        lift: SET_DOWN + CLEARANCE,
         duration: 900,
         ease: "inOutQuad",
       })
-      .add(truck, { x: 0.58, duration: 500, ease: "outQuad" })
+      .add(truck, { x: REACH, duration: 500, ease: "outQuad" })
+      .add(truck, { lift: SET_DOWN, duration: 350, ease: "inOutQuad" })
       .call(() => {
         truck.carrying = 0;
         if (target) target.scale = 1;
         delivery.highlight = 1;
-        onDeliver?.();
       })
       .label("delivered")
       .add(truck, { x: 0, duration: 500, ease: "inOutQuad" })

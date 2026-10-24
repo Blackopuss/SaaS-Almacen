@@ -13,7 +13,7 @@ Producción se niega a arrancar sin un proveedor real (ADR 0003, «Requisitos de
 
 ## Decisión
 
-- **Nuevo modo de envío `MAIL_DRIVER=smtp`, con `nodemailer` 10.0.13.**
+- **Nuevo modo de envío `MAIL_DRIVER=smtp`, con `nodemailer` 10.2.1.** (Antes 10.0.13; 10.2.1 corrige tres fallos del lector de direcciones, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w y GHSA-85x2-q946-cp5h.)
   - Versión exacta, publicada hace más de dos semanas.
   - SMTP lo ofrecen todos los proveedores: Resend, Amazon SES, Brevo, Postmark y el correo del propio hosting. Cambiar de proveedor es cambiar variables, no código.
 - **Variables:**
