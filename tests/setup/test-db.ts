@@ -1,4 +1,4 @@
-import mariadb from "mariadb";
+import mariadb, { type Connection } from "mariadb";
 
 /** Name of the database integration tests run against. */
 export function testDatabaseName(): string {
@@ -13,7 +13,7 @@ export function testDatabaseName(): string {
 }
 
 /** Connection with schema privileges, for setup and test fixtures only. */
-export function migratorConnection(): Promise<mariadb.Connection> {
+export function migratorConnection(): Promise<Connection> {
   return mariadb.createConnection({
     host: process.env.DATABASE_HOST,
     port: Number(process.env.DATABASE_PORT ?? 3306),

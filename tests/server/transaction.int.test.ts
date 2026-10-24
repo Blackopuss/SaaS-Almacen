@@ -1,4 +1,4 @@
-import type mariadb from "mariadb";
+import type { Connection } from "mariadb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server";
@@ -8,7 +8,7 @@ import { migratorConnection } from "../setup/test-db";
 // A throwaway table: the schema has no business models yet (PLT-01).
 const PROBE = "__tx_probe";
 
-let admin: mariadb.Connection;
+let admin: Connection;
 
 async function count(): Promise<number> {
   const rows = await db.$queryRawUnsafe<{ n: bigint }[]>(
