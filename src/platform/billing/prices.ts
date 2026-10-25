@@ -90,7 +90,7 @@ export function quote(
   }
   const chosen = new Set<SoldModule>(["inventory", ...modules]);
   let monthly = dec(0);
-  for (const module of chosen) monthly = monthly.plus(tier.prices[module]);
+  for (const moduleId of chosen) monthly = monthly.plus(tier.prices[moduleId]);
   const subtotal = monthly.times(months);
   const discount = dec(money(subtotal.times(percentOff).dividedBy(100)));
   const taxable = subtotal.minus(discount);
