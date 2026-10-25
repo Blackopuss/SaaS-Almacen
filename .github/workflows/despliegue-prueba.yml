@@ -119,9 +119,9 @@ jobs:
         run: |
           # La config que root «sourcea»/ejecuta es solo de root y vive fuera
           # del árbol que la app puede escribir: «almacen» no puede plantarla.
-          [ "$(stat -c '%U %a' /etc/almacen)" = "root 750" ]
-          [ "$(stat -c '%U %a' /etc/almacen/respaldo.env)" = "root 640" ]
-          [ ! -e /srv/almacen/shared/respaldo.env ]
+          [ "$(sudo stat -c '%U %a' /etc/almacen)" = "root 750" ]
+          [ "$(sudo stat -c '%U %a' /etc/almacen/respaldo.env)" = "root 640" ]
+          sudo test ! -e /srv/almacen/shared/respaldo.env
           if sudo -u almacen bash -c 'echo pwned >> /etc/almacen/respaldo.env' 2>/dev/null; then
             echo "almacen pudo escribir la config que root ejecuta" >&2; exit 1
           fi
