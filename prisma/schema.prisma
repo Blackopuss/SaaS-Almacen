@@ -393,6 +393,25 @@ model SecurityEvent {
   @@map("security_event")
 }
 
+/// One person accepted one version of a legal document (PIL-09): terms of
+/// service or privacy notice. Per person, not per company (the documents
+/// are accepted once for the account), so it is not a tenant model. No
+/// foreign key and append-only (triggers), like security_event: the proof
+/// outlives accounts and is never edited.
+model LegalAcceptance {
+  id         String   @id @db.Char(36)
+  userId     String   @db.Char(36)
+  /// "terms" or "privacy" (LEGAL_DOCUMENTS in src/platform/legal).
+  document   String   @db.VarChar(20)
+  version    String   @db.VarChar(20)
+  acceptedAt DateTime @default(now()) @db.DateTime(3)
+  ipAddress  String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(500)
+
+  @@unique([userId, document, version])
+  @@map("legal_acceptance")
+}
+
 // ── Commercial model (MOD-03) ────────────────────────────────────────────
 
 /// One published set of conditions for a capacity tier: product quota,

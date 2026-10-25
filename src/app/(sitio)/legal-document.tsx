@@ -1,6 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 
-import { SITE } from "./content";
+import { legalVersionDate } from "@/platform/legal";
+
 import { PageHero } from "./sections";
 
 export type LegalSection = { id: string; title: string; body: React.ReactNode };
@@ -13,18 +14,21 @@ export type LegalSection = { id: string; title: string; body: React.ReactNode };
 export function LegalDocument({
   eyebrow,
   title,
+  version,
   intro,
   sections,
 }: {
   eyebrow: string;
   title: string;
+  /** LEGAL_DOCUMENTS[…].version: people accept this exact version (PIL-09). */
+  version: string;
   intro: React.ReactNode;
   sections: LegalSection[];
 }) {
   return (
     <>
       <PageHero eyebrow={eyebrow} title={title}>
-        Última actualización: {SITE.legalUpdatedAt}
+        Versión {version} · vigente desde el {legalVersionDate(version)}
       </PageHero>
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[240px_1fr]">
         <nav

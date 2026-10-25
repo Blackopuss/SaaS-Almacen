@@ -58,7 +58,7 @@ describe("Better Auth on MySQL", () => {
   it("registers with a UUIDv7 id and a hashed password, without a session", async () => {
     expect(
       await registerUser(
-        { name: "Prueba Técnica", email, password },
+        { name: "Prueba Técnica", email, password, acceptLegal: true },
         browser(),
       ),
     ).toEqual({ ok: true });
@@ -108,7 +108,10 @@ describe("Better Auth on MySQL", () => {
 
   it("a link for another email does nothing", async () => {
     const other = `otro.${stamp}@example.test`;
-    await registerUser({ name: "Otro", email: other, password }, browser());
+    await registerUser(
+      { name: "Otro", email: other, password, acceptLegal: true },
+      browser(),
+    );
     // Signing in to `other` with `email`'s link: not confirmed.
     expect(
       await signIn({ email: other, password }, browser(linkToken(email))),
@@ -120,7 +123,7 @@ describe("Better Auth on MySQL", () => {
     const owner = `dueno.${stamp}@example.test`;
     const stranger = "la-contrasena-del-extrano-42";
     await registerUser(
-      { name: "Extraño", email: owner, password: stranger },
+      { name: "Extraño", email: owner, password: stranger, acceptLegal: true },
       browser(),
     );
     // The owner opens the link but does not know the stranger's password.

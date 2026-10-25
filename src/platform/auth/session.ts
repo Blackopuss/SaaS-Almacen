@@ -7,6 +7,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { recordSecurityEvent } from "@/platform/audit";
+import { pendingLegalDocuments } from "@/platform/legal";
 
 import { VERIFY_EMAIL_COOKIE, auth } from "./auth";
 import { isMfaRequired } from "./mfa-policy";
@@ -40,13 +41,19 @@ export type CurrentUser = { id: string; name: string; email: string };
 /** Where accounts that must use MFA set it up before using the app. */
 export const MFA_SETUP_PATH = "/activa-dos-pasos";
 
+/** Where people accept new versions of the legal documents (PIL-09). */
+export const LEGAL_ACCEPTANCE_PATH = "/acepta-terminos";
+
 /**
  * Server-side guard for protected screens and actions. Accounts that must
  * use MFA (PLT-08B) and have not set it up are sent to MFA_SETUP_PATH;
- * only that screen passes `allowMissingMfa`.
+ * only that screen passes `allowMissingMfa`. Accounts that have not
+ * accepted the current legal documents (PIL-09) are sent first to
+ * LEGAL_ACCEPTANCE_PATH, whose screen passes `allowPendingLegal` (and
+ * `allowMissingMfa`, so the two gates never send to each other).
  */
 export async function requireSession(
-  options: { allowMissingMfa?: boolean } = {},
+  options: { allowMissingMfa?: boolean; allowPendingLegal?: boolean } = {},
 ): Promise<{
   user: CurrentUser;
   sessionId: string;
@@ -56,6 +63,12 @@ export async function requireSession(
   if (!session) redirect("/ingresar");
   const { id, name, email } = session.user;
   const mfaEnabled = Boolean(session.user.twoFactorEnabled);
+  if (
+    !options.allowPendingLegal &&
+    (await pendingLegalDocuments(id)).length > 0
+  ) {
+    redirect(LEGAL_ACCEPTANCE_PATH);
+  }
   if (!mfaEnabled && !options.allowMissingMfa && (await isMfaRequired(id))) {
     redirect(MFA_SETUP_PATH);
   }

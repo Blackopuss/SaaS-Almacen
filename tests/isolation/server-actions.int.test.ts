@@ -407,7 +407,8 @@ const REVIEWED: Record<string, Review> = {
     coveredBy: "tests/platform/invitation-accept.int.test.ts",
   },
   joinAsNewUserAction: {
-    input: "token de la invitación, nombre y contraseña",
+    input:
+      "token de la invitación, nombre, contraseña y aceptación de documentos",
     identity: "el token (un solo uso, vence); el correo sale de la invitación",
     coveredBy: "tests/platform/invitation-accept.int.test.ts",
   },
@@ -421,8 +422,13 @@ const REVIEWED: Record<string, Review> = {
     identity: "ninguna sesión previa",
     coveredBy: "tests/platform/throttle.int.test.ts, session.int.test.ts",
   },
+  acceptLegalAction: {
+    input: "casilla de aceptación (las versiones salen del código)",
+    identity: "sesión (requireSession); la persona sale de la sesión",
+    coveredBy: "tests/platform/legal-acceptance.int.test.ts",
+  },
   registerAction: {
-    input: "nombre, correo y contraseña",
+    input: "nombre, correo, contraseña y aceptación de documentos",
     identity: "ninguna",
     coveredBy: "tests/platform/register.int.test.ts",
   },

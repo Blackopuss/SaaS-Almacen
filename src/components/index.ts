@@ -25,6 +25,7 @@ export { BackupCodesList } from "./backup-codes-list";
 export { QrCode } from "./qr-code";
 export { ThemeToggle } from "./theme-toggle";
 export { FormField } from "./form-field";
+export { LegalConsent } from "./legal-consent";
 export { PasswordInput } from "./password-input";
 export { WarehouseScene } from "./warehouse-scene";
 export { WarehouseCard } from "./warehouse-card";

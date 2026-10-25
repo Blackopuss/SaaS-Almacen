@@ -11,6 +11,7 @@ import {
   tooManyAttemptsMessage,
   type InvitedAccountField,
 } from "@/platform/auth";
+import { recordLegalAcceptance } from "@/platform/legal";
 import { db } from "@/server";
 
 import { isRole, type Role } from "./catalog";
@@ -220,7 +221,7 @@ const HAS_ACCOUNT =
 /** Someone without an account creates it and joins, in one transaction. */
 export async function acceptInvitationAsNewUser(
   token: string,
-  input: { name: string; password: string },
+  input: { name: string; password: string; acceptLegal: boolean },
   headers: Headers,
 ): Promise<AcceptAsNewUserResult> {
   const key = [throttleKeys.inviteTokenIp(clientIp(headers))];
@@ -268,6 +269,10 @@ export async function acceptInvitationAsNewUser(
         name: account.name,
         email: invitation.email,
         passwordHash: account.passwordHash,
+      });
+      await recordLegalAcceptance(tx, userId, {
+        ipAddress: clientIp(headers),
+        userAgent: headers.get("user-agent"),
       });
       await join(tx, invitation, userId);
       return {

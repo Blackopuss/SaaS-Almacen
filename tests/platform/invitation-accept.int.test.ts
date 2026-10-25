@@ -222,7 +222,7 @@ describe("acceptInvitationAsNewUser", () => {
       const { token } = await invite(email, ["viewer"]);
       const result = await acceptInvitationAsNewUser(
         token,
-        { name: "  Lupita Ramos ", password: PASSWORD },
+        { name: "  Lupita Ramos ", password: PASSWORD, acceptLegal: true },
         from(),
       );
       expect(result).toEqual({ ok: true, organizationId: org, email });
@@ -251,13 +251,13 @@ describe("acceptInvitationAsNewUser", () => {
       const { token } = await invite(email);
       await acceptInvitationAsNewUser(
         token,
-        { name: "Primera", password: PASSWORD },
+        { name: "Primera", password: PASSWORD, acceptLegal: true },
         from(),
       );
       expect(
         await acceptInvitationAsNewUser(
           token,
-          { name: "Segunda", password: PASSWORD },
+          { name: "Segunda", password: PASSWORD, acceptLegal: true },
           from(),
         ),
       ).toMatchObject({ ok: false, reason: "invalid" });
@@ -276,7 +276,7 @@ describe("acceptInvitationAsNewUser", () => {
     expect(
       await acceptInvitationAsNewUser(
         token,
-        { name: "Tarde", password: PASSWORD },
+        { name: "Tarde", password: PASSWORD, acceptLegal: true },
         from(),
       ),
     ).toMatchObject({ ok: false, reason: "invalid" });
@@ -291,7 +291,7 @@ describe("acceptInvitationAsNewUser", () => {
       expect(
         await acceptInvitationAsNewUser(
           token,
-          { name: "Impostor", password: PASSWORD },
+          { name: "Impostor", password: PASSWORD, acceptLegal: true },
           from(),
         ),
       ).toMatchObject({ ok: false, reason: "has_account" });
@@ -315,7 +315,7 @@ describe("acceptInvitationAsNewUser", () => {
     expect(
       await acceptInvitationAsNewUser(
         token,
-        { name: "", password: "corta" },
+        { name: "", password: "corta", acceptLegal: true },
         from(),
       ),
     ).toMatchObject({
@@ -339,7 +339,7 @@ describe("acceptInvitationAsNewUser", () => {
         Array.from({ length: 4 }, (_, i) =>
           acceptInvitationAsNewUser(
             token,
-            { name: `Carrera ${i}`, password: PASSWORD },
+            { name: `Carrera ${i}`, password: PASSWORD, acceptLegal: true },
             from(),
           ),
         ),
@@ -361,7 +361,7 @@ describe("acceptInvitationAsNewUser", () => {
       for (let i = 0; i < 32; i++) {
         const result = await acceptInvitationAsNewUser(
           "token-inventado-con-forma-valida-0000000000",
-          { name: "Bot", password: PASSWORD },
+          { name: "Bot", password: PASSWORD, acceptLegal: true },
           from(ip),
         );
         if (!result.ok && result.reason === "throttled") throttled++;

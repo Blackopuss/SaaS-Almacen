@@ -44,6 +44,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V13 | Páginas de desarrollo cerradas en producción | Cumple | `/correos`, `/sistema-visual` (PLT16-06). |
 | V5 | Correo saliente sin inyección de cabeceras | Cumple | `sendEmail` rechaza destinatario, «responder a» y asunto con saltos de línea o más de un destinatario, y adjuntos con nombre o tipo fuera de lo permitido; el destinatario de una orden sale de la ficha del proveedor, con límites diarios (CMP-06B, ADR 0020). Pendiente al elegir proveedor de correo: SPF, DKIM y DMARC. |
 | V14 Protección de datos | Sin secretos en registros, correos ni bitácora | Cumple | `sanitizeMetadata`; tokens nunca enviados al navegador. |
+| V14 | Consentimiento del aviso de privacidad y de los términos | Cumple | PIL-09 (ADR 0026): casilla obligatoria al crear cuenta (registro e invitación); versión, fecha, persona, IP y navegador en `legal_acceptance` (solo agregar, disparadores); una versión nueva detiene a cada persona en `/acepta-terminos` desde `requireSession` (`legal-acceptance.int.test.ts`). Los textos siguen en revisión profesional (PIL-08). |
 | V14 | Respaldos cifrados | Pendiente | BAS-11. |
 | V15 Codificación segura y arquitectura | Dependencias con versión exacta y auditoría | Cumple | `.npmrc save-exact`; `npm audit --omit=dev` en CI. |
 | V16 Registro de seguridad y errores | Bitácora inmutable de cambios sensibles | Cumple | ADR 0006; `audit.int.test.ts`. |

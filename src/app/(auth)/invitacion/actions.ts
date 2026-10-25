@@ -45,7 +45,7 @@ export type JoinAsNewUserState = {
   formError?: string;
   invalid?: boolean;
   hasAccount?: boolean;
-  values: { name: string };
+  values: { name: string; acceptLegal: boolean };
 };
 
 /** Someone without an account creates it from the invitation and enters. */
@@ -56,21 +56,25 @@ export async function joinAsNewUserAction(
   const requestHeaders = await headers();
   const name = String(formData.get("name") ?? "");
   const password = String(formData.get("password") ?? "");
+  const acceptLegal = formData.get("acceptLegal") === "1";
   const result = await acceptInvitationAsNewUser(
     String(formData.get("token") ?? ""),
-    { name, password },
+    { name, password, acceptLegal },
     requestHeaders,
   );
   if (!result.ok) {
     if (result.reason === "fields") {
-      return { fieldErrors: result.fieldErrors, values: { name } };
+      return {
+        fieldErrors: result.fieldErrors,
+        values: { name, acceptLegal },
+      };
     }
     return {
       fieldErrors: {},
       formError: result.error,
       invalid: result.reason === "invalid",
       hasAccount: result.reason === "has_account",
-      values: { name },
+      values: { name, acceptLegal },
     };
   }
   const signedIn = await signIn(

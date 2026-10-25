@@ -169,12 +169,22 @@ describe("registration and verification emails", () => {
     await expireLimits();
     for (let i = 0; i < 10; i++) {
       await registerUser(
-        { name: "Masivo", email: `masivo${i}.${stamp}@example.test`, password },
+        {
+          name: "Masivo",
+          email: `masivo${i}.${stamp}@example.test`,
+          password,
+          acceptLegal: true,
+        },
         from("198.51.100.4"),
       );
     }
     const blocked = await registerUser(
-      { name: "Masivo", email: `masivo-extra.${stamp}@example.test`, password },
+      {
+        name: "Masivo",
+        email: `masivo-extra.${stamp}@example.test`,
+        password,
+        acceptLegal: true,
+      },
       from("198.51.100.4"),
     );
     expect(blocked.ok).toBe(false);
@@ -187,13 +197,13 @@ describe("registration and verification emails", () => {
     for (let i = 0; i < 3; i++) {
       expect(
         await registerUser(
-          { name: "Repetido", email, password },
+          { name: "Repetido", email, password, acceptLegal: true },
           from(`192.0.3.${i}`),
         ),
       ).toEqual({ ok: true });
     }
     const blocked = await registerUser(
-      { name: "Repetido", email, password },
+      { name: "Repetido", email, password, acceptLegal: true },
       from("192.0.3.200"),
     );
     expect(!blocked.ok && blocked.formError).toMatch(/Demasiados intentos/);

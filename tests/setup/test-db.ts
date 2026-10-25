@@ -4,7 +4,8 @@ import mariadb, { type Connection } from "mariadb";
 export function testDatabaseName(): string {
   const name = process.env.DATABASE_NAME ?? "";
   // Safety net: never migrate or wipe a database that is not a test database.
-  if (!/^[A-Za-z0-9_]+_test$/.test(name)) {
+  // `_test_<name>` too: a parallel worktree gets its own copy.
+  if (!/^[A-Za-z0-9_]+_test(_[A-Za-z0-9]+)?$/.test(name)) {
     throw new Error(
       `Integration tests require a *_test database, got "${name}".`,
     );
