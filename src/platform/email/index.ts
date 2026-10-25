@@ -20,6 +20,7 @@ export {
   existingAccountEmail,
   invitationEmail,
   mfaDisabledEmail,
+  operationsAlertEmail,
   mfaEnabledEmail,
   passwordChangedEmail,
   passwordResetEmail,

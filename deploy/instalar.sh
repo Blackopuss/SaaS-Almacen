@@ -216,6 +216,10 @@ if [[ ! -f "$ENV" ]]; then
 fi
 # Si cambió el dominio, la dirección pública lo sigue (los secretos no).
 sed -i "s|^BETTER_AUTH_URL=.*|BETTER_AUTH_URL=https://$DOMINIO|" "$ENV"
+# Claves nuevas para instalaciones anteriores a ellas (vacías: no cambia nada).
+if ! grep -q '^ALERT_EMAIL=' "$ENV"; then
+  printf '%s\n' "" "# Avisos de operación (PIL-04, ADR 0025). Vacío = solo en el registro." "ALERT_EMAIL=" >> "$ENV"
+fi
 valor() { grep -E "^$1=" "$ENV" | head -1 | cut -d= -f2-; }
 
 paso "Base «almacen» y usuarios de mínimo privilegio"

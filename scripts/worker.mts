@@ -29,8 +29,12 @@ registerHooks({
 const { db } = await import("@/server/db");
 const { runWorker } = await import("@/platform/jobs/queue");
 const { jobHandlers } = await import("@/modules/registry/jobs");
-const { HEARTBEAT_EVERY_MS, writeWorkerHeartbeat } =
-  await import("@/platform/ops");
+const {
+  ALERT_EVERY_MS,
+  HEARTBEAT_EVERY_MS,
+  runAlertRound,
+  writeWorkerHeartbeat,
+} = await import("@/platform/ops");
 const { log } = await import("@/lib");
 
 const stop = new AbortController();
@@ -53,6 +57,18 @@ const beat = () =>
 await beat();
 const heartbeat = setInterval(beat, HEARTBEAT_EVERY_MS);
 
+// Operations alerts (PIL-04): one round a minute, never two at once.
+let seen: string[] = [];
+let checking = false;
+const alerts = setInterval(() => {
+  if (checking) return;
+  checking = true;
+  runAlertRound(seen)
+    .then((now) => (seen = now))
+    .catch((error: unknown) => log.error("ops_alert_round_failed", error))
+    .finally(() => (checking = false));
+}, ALERT_EVERY_MS);
+
 await runWorker(jobHandlers, {
   workerId,
   signal: stop.signal,
@@ -68,5 +84,6 @@ await runWorker(jobHandlers, {
   },
 });
 clearInterval(heartbeat);
+clearInterval(alerts);
 await db.$disconnect();
 log.info("worker_stopped", { workerId });
