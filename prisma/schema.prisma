@@ -157,6 +157,7 @@ model Organization {
   purchaseReturns         PurchaseReturn[]
   purchaseReturnLines     PurchaseReturnLine[]
   manualPayments          ManualPayment[]
+  checkoutOrders          CheckoutOrder[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -580,6 +581,107 @@ model PlatformStaff {
   disabledAt DateTime? @db.DateTime(3)
 
   @@map("platform_staff")
+}
+
+// ── Online purchase (ADR 0028) ───────────────────────────────────────────
+
+enum CheckoutProvider {
+  STRIPE
+  PAYPAL
+  MERCADOPAGO
+  /// Paid entirely with a code (100% off): no provider involved.
+  CODE
+}
+
+enum CheckoutStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
+/// A plan bought online by the owner of a company. Every amount is fixed
+/// by the server when the order is created (src/platform/billing/prices);
+/// the provider only confirms that exactly that was paid. The plan is
+/// applied once, when the order becomes PAID.
+model CheckoutOrder {
+  id               String           @id @db.Char(36)
+  organizationId   String           @db.Char(36)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Shown to the customer and in the email: "AL-7F3K9Q2M".
+  transactionId    String           @unique @db.VarChar(20)
+  /// Owner who bought it.
+  userId           String           @db.Char(36)
+  tier             String           @db.VarChar(20)
+  productLimit     Int
+  includedUsers    Int
+  /// Modules bought, comma separated in registry order: "inventory,purchasing".
+  modules          String           @db.VarChar(200)
+  months           Int
+  subtotal         Decimal          @db.Decimal(12, 2)
+  discount         Decimal          @db.Decimal(12, 2)
+  tax              Decimal          @db.Decimal(12, 2)
+  total            Decimal          @db.Decimal(12, 2)
+  currency         String           @default("MXN") @db.Char(3)
+  provider         CheckoutProvider
+  /// The provider's checkout id (session / order / preference).
+  providerRef      String?          @db.VarChar(255)
+  /// The provider's id of the captured payment.
+  paymentRef       String?          @db.VarChar(255)
+  status           CheckoutStatus   @default(PENDING)
+  promoCodeId      String?          @db.Char(36)
+  promoCode        PromoCode?       @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  /// End of the plan before and after applying this purchase.
+  validUntilBefore DateTime?        @db.DateTime(3)
+  validUntilAfter  DateTime?        @db.DateTime(3)
+  createdAt        DateTime         @default(now()) @db.DateTime(3)
+  /// After this a PENDING order is no longer payable.
+  expiresAt        DateTime         @db.DateTime(3)
+  paidAt           DateTime?        @db.DateTime(3)
+  updatedAt        DateTime         @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([provider, providerRef])
+  @@index([organizationId, createdAt])
+  @@index([status, expiresAt])
+  @@map("checkout_order")
+}
+
+/// A discount code created by platform staff (/interno/codigos). Not a
+/// company table: one code can be used by different companies.
+model PromoCode {
+  id              String          @id @db.Char(36)
+  /// Upper case, letters, digits and hyphens: "PEPITOGRATIS".
+  code            String          @unique @db.VarChar(40)
+  /// Whole percentage taken from the subtotal; 100 = free.
+  percentOff      Int
+  maxRedemptions  Int
+  /// Orders PAID with it; moved with a conditional UPDATE (never > max).
+  redemptions     Int             @default(0)
+  validUntil      DateTime?       @db.DateTime(3)
+  disabledAt      DateTime?       @db.DateTime(3)
+  note            String?         @db.VarChar(200)
+  createdByUserId String          @db.Char(36)
+  createdAt       DateTime        @default(now()) @db.DateTime(3)
+  orders          CheckoutOrder[]
+
+  @@map("promo_code")
+}
+
+/// A webhook received from a provider, stored before answering so a
+/// repeated delivery is recognised (unique per provider + event id). The
+/// body is not stored: the state is always asked to the provider.
+model PaymentEvent {
+  id          String    @id @db.Char(36)
+  provider    String    @db.VarChar(20)
+  eventId     String    @db.VarChar(255)
+  type        String    @db.VarChar(100)
+  orderId     String?   @db.Char(36)
+  receivedAt  DateTime  @default(now()) @db.DateTime(3)
+  processedAt DateTime? @db.DateTime(3)
+
+  @@unique([provider, eventId])
+  @@map("payment_event")
 }
 
 enum ManualPaymentKind {
