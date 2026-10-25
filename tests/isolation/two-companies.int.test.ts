@@ -483,6 +483,19 @@ beforeAll(async () => {
         subscriptionId: subscription.id,
       },
     });
+    await db.manualPayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        amount: "1499.00",
+        paidOn: new Date("2026-10-01T00:00:00Z"),
+        reference: "SPEI-ISO",
+        months: 1,
+        validUntilBefore: new Date("2026-10-31T00:00:00Z"),
+        validUntilAfter: new Date("2026-11-30T00:00:00Z"),
+        recordedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
   }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
