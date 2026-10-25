@@ -180,13 +180,17 @@ if [[ ! -f "$SECRETO_ROOT" ]]; then
 fi
 # La contraseña de root de MySQL va por un archivo (creado 600 por mktemp), no
 # en la línea de comando de docker, donde la vería cualquiera en «ps» mientras
-# corre (auditoría 3). Se borra al terminar.
+# corre (auditoría 3). Se borran al terminar. Son dos: con MYSQL_PWD dentro
+# del contenedor, su arranque inicial no entra como root sin contraseña y
+# nunca crea root@'%' (así falló el despliegue de prueba).
 MYSQL_ENV="$(mktemp)"
-trap 'rm -f "$MYSQL_ENV"' EXIT
-printf 'MYSQL_PWD=%s\nMYSQL_ROOT_PASSWORD=%s\n' "$(cat "$SECRETO_ROOT")" "$(cat "$SECRETO_ROOT")" > "$MYSQL_ENV"
+MYSQL_INIT_ENV="$(mktemp)"
+trap 'rm -f "$MYSQL_ENV" "$MYSQL_INIT_ENV"' EXIT
+printf 'MYSQL_PWD=%s\n' "$(cat "$SECRETO_ROOT")" > "$MYSQL_ENV"
+printf 'MYSQL_ROOT_PASSWORD=%s\n' "$(cat "$SECRETO_ROOT")" > "$MYSQL_INIT_ENV"
 if ! docker inspect almacen-mysql >/dev/null 2>&1; then
   docker run -d --name almacen-mysql --restart unless-stopped --network host \
-    --env-file "$MYSQL_ENV" \
+    --env-file "$MYSQL_INIT_ENV" \
     -v almacen-mysql:/var/lib/mysql \
     mysql:9.4 \
     --bind-address=127.0.0.1 --mysqlx=OFF \
