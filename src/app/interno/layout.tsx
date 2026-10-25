@@ -23,8 +23,22 @@ export default async function InternoLayout({
           className="flex min-h-11 items-center gap-2 rounded-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <ShieldCheck aria-hidden="true" className="size-5 text-primary" />
-          Consola interna
+          <span className="sr-only sm:not-sr-only">Consola interna</span>
         </Link>
+        <nav aria-label="Consola" className="flex items-center gap-1 text-sm">
+          {[
+            { href: "/interno", label: "Empresas" },
+            { href: "/interno/codigos", label: "Códigos" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="inline-flex min-h-11 items-center rounded-lg px-2 font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
         <span className="ml-auto hidden text-sm text-muted-foreground sm:inline">
           {staff.name}
         </span>

@@ -393,8 +393,15 @@ describe("codes", () => {
     }
   });
 
-  it("only platform staff create codes", async () => {
+  it("only platform staff create or disable codes", async () => {
     const someone = await newUser();
+    const code = await newCode(100);
+    expect(await disablePromoCode(someone.id, code.id)).toMatchObject({
+      ok: false,
+    });
+    expect(
+      await db.promoCode.findUnique({ where: { id: code.id } }),
+    ).toMatchObject({ disabledAt: null });
     expect(
       await createPromoCode(someone.id, {
         code: "GRATIS-TOTAL",

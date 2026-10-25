@@ -4,7 +4,7 @@ import { animate, onScroll, stagger, utils } from "animejs";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-import { formatCount } from "./content";
+import { formatCount } from "./site-shared";
 
 /**
  * Scroll motion of the public pages (anime.js), declared in the markup:

@@ -496,6 +496,25 @@ beforeAll(async () => {
         recordedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.checkoutOrder.create({
+      data: {
+        id: newId(),
+        organizationId,
+        transactionId: `AL-ISO${organizationId === orgA ? "A" : "B"}`,
+        userId: organizationId === orgA ? ids.ana : ids.beto,
+        tier: "t100",
+        productLimit: 100,
+        includedUsers: 2,
+        modules: "inventory",
+        months: 1,
+        subtotal: "349.00",
+        discount: "0.00",
+        tax: "55.84",
+        total: "404.84",
+        provider: "STRIPE",
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
   }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);
