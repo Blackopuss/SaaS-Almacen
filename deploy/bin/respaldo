@@ -17,22 +17,48 @@ umask 077
 
 BASE=/srv/almacen
 DESTINO="$BASE/backups"
-# shellcheck disable=SC1091
-. "$BASE/shared/respaldo.env"
-[[ -n "${AGE_RECIPIENT:-}" ]] || { echo "Falta AGE_RECIPIENT en respaldo.env" >&2; exit 1; }
+
+# La configuración que root lee vive en /etc/almacen, fuera del árbol que la
+# app puede escribir, y se lee como CLAVE=VALOR, nunca con «source»: así una
+# escritura de la cuenta «almacen» no puede plantar comandos que root ejecute
+# (auditoría 3). Solo se aceptan las tres claves conocidas.
+CONFIG=/etc/almacen/respaldo.env
+[[ -r "$CONFIG" ]] || { echo "Falta $CONFIG" >&2; exit 1; }
+AGE_RECIPIENT=""
+RETENER_DIAS=14
+RCLONE_DESTINO=""
+while IFS= read -r LINEA || [[ -n "$LINEA" ]]; do
+  LINEA="${LINEA%$'\r'}"
+  [[ "$LINEA" =~ ^[[:space:]]*(#|$) ]] && continue
+  [[ "$LINEA" == *=* ]] || continue
+  CLAVE="${LINEA%%=*}"; CLAVE="${CLAVE//[[:space:]]/}"
+  VALOR="${LINEA#*=}"
+  case "$CLAVE" in
+    AGE_RECIPIENT) AGE_RECIPIENT="$VALOR" ;;
+    RETENER_DIAS) RETENER_DIAS="$VALOR" ;;
+    RCLONE_DESTINO) RCLONE_DESTINO="$VALOR" ;;
+  esac
+done < "$CONFIG"
+[[ "$AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]] || { echo "AGE_RECIPIENT inválido en $CONFIG" >&2; exit 1; }
+[[ "$RETENER_DIAS" =~ ^[0-9]+$ ]] || RETENER_DIAS=14
+
 RAIZ="$(cat /root/.almacen-mysql-root)"
 FECHA="$(date -u +%Y%m%d-%H%M%S)"
 TRABAJO="$(mktemp -d)"
-trap 'rm -rf "$TRABAJO"; docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 -e "DROP DATABASE IF EXISTS almacen_verificacion" >/dev/null 2>&1 || true' EXIT
+# La contraseña de MySQL va por un archivo (umask 077 lo deja solo para root),
+# no en la línea de comando, donde la vería cualquiera en la lista de procesos.
+MYSQL_ENV="$TRABAJO/mysql.env"
+printf 'MYSQL_PWD=%s\n' "$RAIZ" > "$MYSQL_ENV"
+trap 'docker exec --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 -e "DROP DATABASE IF EXISTS almacen_verificacion" >/dev/null 2>&1 || true; rm -rf "$TRABAJO"' EXIT
 
-sql() { docker exec -i -e MYSQL_PWD="$RAIZ" almacen-mysql mysql -uroot -h127.0.0.1 -N -B "$@"; }
+sql() { docker exec -i --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 -N -B "$@"; }
 
 echo "Volcado de la base…"
 # Los disparadores de una sola sentencia quedaron guardados con un «;» al
 # final, y mysqldump lo deja dentro de su comentario de versión
 # («…'; */;;»), que MySQL no acepta al restaurar: se quita aquí, en el
 # volcado, para que el respaldo se pueda restaurar tal cual.
-docker exec -e MYSQL_PWD="$RAIZ" almacen-mysql mysqldump -uroot -h127.0.0.1 \
+docker exec --env-file "$MYSQL_ENV" almacen-mysql mysqldump -uroot -h127.0.0.1 \
   --single-transaction --routines --triggers --events --hex-blob \
   --set-gtid-purged=OFF --no-tablespaces almacen |
   sed -E '/^\/\*!50003 CREATE\*\//s/;[[:space:]]*\*\/;;$/ *\/;;/' > "$TRABAJO/almacen.sql"

@@ -20,6 +20,17 @@
 			roll_size 50MiB
 			roll_keep 5
 		}
-		format json
+		# No guardar en claro los tokens de recuperación/confirmación que
+		# viajan en la URL (y en el Referer): se redactan antes de escribir
+		# el registro (auditoría 3). El filtro reemplaza el token por
+		# «[redactado]» tanto en la ruta (/api/auth/reset-password/<token>)
+		# como en el query (?token=…).
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "reset-password/[^&?/]+|[?&]token=[^&?/]+" "[redactado]"
+				request>headers>Referer regexp "reset-password/[^&?/]+|[?&]token=[^&?/]+" "[redactado]"
+			}
+		}
 	}
 }

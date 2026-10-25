@@ -169,7 +169,7 @@ Un respaldo que solo vive en el servidor se pierde con el servidor. Hay dos opci
 
 ```bash
 sudo rclone config               # crea el remoto, p. ej. «b2»
-sudo nano /srv/almacen/shared/respaldo.env   # RCLONE_DESTINO=b2:almacen-respaldos
+sudo nano /etc/almacen/respaldo.env          # RCLONE_DESTINO=b2:almacen-respaldos
 sudo systemctl start almacen-respaldo.service  # prueba
 ```
 
