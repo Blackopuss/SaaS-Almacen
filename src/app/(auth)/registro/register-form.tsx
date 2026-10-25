@@ -4,7 +4,12 @@ import { CircleAlert, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useEffect, useRef } from "react";
 
-import { WarehouseCard, FormField, PasswordInput } from "@/components";
+import {
+  FormField,
+  LegalConsent,
+  PasswordInput,
+  WarehouseCard,
+} from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -12,10 +17,10 @@ import { registerAction, type RegisterFormState } from "./actions";
 
 const initialState: RegisterFormState = {
   fieldErrors: {},
-  values: { name: "", email: "" },
+  values: { name: "", email: "", acceptLegal: false },
 };
 
-const FIELD_ORDER = ["name", "email", "password"] as const;
+const FIELD_ORDER = ["name", "email", "password", "acceptLegal"] as const;
 
 export function RegisterForm({ minLength }: { minLength: number }) {
   const [state, formAction, pending] = useActionState(
@@ -113,6 +118,12 @@ export function RegisterForm({ minLength }: { minLength: number }) {
             />
           )}
         </FormField>
+
+        <LegalConsent
+          error={state.fieldErrors.acceptLegal}
+          defaultChecked={state.values.acceptLegal}
+          key={`legal-${state.values.acceptLegal}`}
+        />
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { LEGAL_DOCUMENTS } from "@/platform/legal";
+
 import { SITE } from "../content";
 import { LegalDocument } from "../legal-document";
 
@@ -21,7 +23,8 @@ export default function PrivacyPage() {
   return (
     <LegalDocument
       eyebrow="Legal"
-      title="Aviso de privacidad"
+      title={LEGAL_DOCUMENTS.privacy.title}
+      version={LEGAL_DOCUMENTS.privacy.version}
       intro={
         <p>
           Este aviso explica qué datos personales trata {SITE.name}, para qué y

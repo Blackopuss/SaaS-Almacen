@@ -6,7 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 import { after } from "next/server";
 import { twoFactor } from "better-auth/plugins";
 
-import { newId } from "@/lib";
+import { log, newId } from "@/lib";
 import { recordSecurityEvent } from "@/platform/audit";
 import {
   existingAccountEmail,
@@ -15,6 +15,7 @@ import {
   sendEmail,
   verificationEmail,
 } from "@/platform/email";
+import { recordLegalAcceptance } from "@/platform/legal";
 import { db } from "@/server";
 
 import {
@@ -178,6 +179,28 @@ export const auth = betterAuth({
           hours: VERIFICATION_HOURS,
         }),
       );
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // PIL-09: only self sign-up creates users through Better Auth, and
+        // it is reachable only from registerUser, which requires the
+        // checkbox. Better Auth runs this after its transaction commits; if
+        // it fails, the gate in requireSession asks for the acceptance at
+        // the first sign-in, so no one uses the app without it.
+        after: async (user, context) => {
+          if (context?.path !== "/sign-up/email") return;
+          try {
+            await recordLegalAcceptance(db, user.id, {
+              ipAddress: context.headers ? clientIp(context.headers) : null,
+              userAgent: context.headers?.get("user-agent") ?? null,
+            });
+          } catch (error) {
+            log.error("legal.acceptance_failed", error);
+          }
+        },
+      },
     },
   },
   session: {

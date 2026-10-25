@@ -3,6 +3,8 @@ import "server-only";
 import { isAPIError } from "better-auth/api";
 import { z } from "zod";
 
+import { legalConsentSchema } from "@/platform/legal";
+
 import { auth } from "./auth";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
 import {
@@ -42,6 +44,8 @@ export const registerSchema = z.object({
     .max(254, "El correo es demasiado largo.")
     .pipe(z.email("Escribe un correo válido, por ejemplo nombre@negocio.mx.")),
   password: newPasswordSchema,
+  /** Terms and privacy notice (PIL-09): stored when the account is created. */
+  acceptLegal: legalConsentSchema,
 });
 
 export type RegisterInput = z.input<typeof registerSchema>;
@@ -88,8 +92,10 @@ export async function registerUser(
 
   try {
     // Email link lands on /correo-verificado, which explains the result.
+    // The acceptance is stored by the user.create hook in ./auth.ts.
+    const { name, email, password } = parsed.data;
     await auth.api.signUpEmail({
-      body: { ...parsed.data, callbackURL: "/correo-verificado" },
+      body: { name, email, password, callbackURL: "/correo-verificado" },
       headers,
     });
     // Same answer for new and existing emails (no account enumeration).

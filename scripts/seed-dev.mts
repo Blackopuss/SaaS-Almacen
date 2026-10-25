@@ -37,6 +37,8 @@ const { ensureDefaultLocation } =
 const { symmetricEncrypt } = await import("better-auth/crypto");
 const { generateBackupCodes } = await import("@/platform/auth/backup-codes");
 const { base32 } = await import("./totp.mjs");
+const { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_IDS } =
+  await import("@/platform/legal/documents");
 
 const hash = await hashPassword(password);
 const now = new Date();
@@ -45,6 +47,18 @@ const user = await db.user.upsert({
   where: { email },
   update: { emailVerified: true, name: "Demo Almacén" },
   create: { id: newId(), email, name: "Demo Almacén", emailVerified: true },
+});
+
+// The demo account has accepted the current legal documents (PIL-09), so
+// it goes straight to the app; re-seed after bumping a version.
+await db.legalAcceptance.createMany({
+  data: LEGAL_DOCUMENT_IDS.map((document) => ({
+    id: newId(),
+    userId: user.id,
+    document,
+    version: LEGAL_DOCUMENTS[document].version,
+  })),
+  skipDuplicates: true,
 });
 
 const credential = await db.account.findFirst({

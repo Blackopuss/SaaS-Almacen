@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { LEGAL_DOCUMENTS } from "@/platform/legal";
+
 import { SITE } from "../content";
 import { LegalDocument } from "../legal-document";
 
@@ -15,7 +17,8 @@ export default function TermsPage() {
   return (
     <LegalDocument
       eyebrow="Legal"
-      title="Términos y condiciones"
+      title={LEGAL_DOCUMENTS.terms.title}
+      version={LEGAL_DOCUMENTS.terms.version}
       intro={
         <p>
           Estos términos regulan el uso de {SITE.name}, un servicio en línea

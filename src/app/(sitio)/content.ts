@@ -11,8 +11,6 @@ export const SITE = {
   contactEmail: "contacto@almacen.mx",
   /** Pending (founder): legal name of the company that runs the service. */
   legalName: "Almacén (razón social por confirmar)",
-  /** Date shown on the legal documents. */
-  legalUpdatedAt: "16 de octubre de 2026",
 } as const;
 
 export const SITE_NAV = [

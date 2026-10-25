@@ -18,6 +18,7 @@ const PROTECTED = [
   "/compras",
   "/configuracion",
   "/activa-dos-pasos",
+  "/acepta-terminos",
   "/crear-empresa",
   "/interno",
   "/api/archivos",

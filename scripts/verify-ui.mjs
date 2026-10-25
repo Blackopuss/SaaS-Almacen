@@ -878,12 +878,23 @@ try {
     const kept = await page.inputValue("#email");
     const cleared = (await page.inputValue("#password")) === "";
     check(
-      errors === 3 &&
+      errors === 4 &&
         focused === "name" &&
         described?.includes("password-error") === true &&
         kept === "no-es-correo" &&
         cleared,
       `${viewport.name}: registration shows inline errors and focuses the first`,
+    );
+    // PIL-09: the terms checkbox is required and links to both documents.
+    check(
+      (await page.getAttribute("#acceptLegal", "aria-describedby")) ===
+        "acceptLegal-error" &&
+        (await page.locator("a[href='/terminos'][target='_blank']").count()) ===
+          1 &&
+        (await page
+          .locator("a[href='/privacidad'][target='_blank']")
+          .count()) === 1,
+      `${viewport.name}: registration asks to accept terms and privacy`,
     );
     await page.getByRole("button", { name: "Mostrar contraseña" }).click();
     check(

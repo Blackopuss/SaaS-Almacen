@@ -4,7 +4,7 @@ import { CircleAlert, Loader2, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useEffect, useRef } from "react";
 
-import { FormField, PasswordInput } from "@/components";
+import { FormField, LegalConsent, PasswordInput } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -105,12 +105,15 @@ export function JoinForm({
   const [state, formAction, pending] = useActionState<
     JoinAsNewUserState,
     FormData
-  >(joinAsNewUserAction, { fieldErrors: {}, values: { name: "" } });
+  >(joinAsNewUserAction, {
+    fieldErrors: {},
+    values: { name: "", acceptLegal: false },
+  });
   const formRef = useRef<HTMLFormElement>(null);
 
   // After a failed submit, move focus to the first field with an error.
   useEffect(() => {
-    const first = (["name", "password"] as const).find(
+    const first = (["name", "password", "acceptLegal"] as const).find(
       (field) => state.fieldErrors[field],
     );
     if (first)
@@ -175,6 +178,11 @@ export function JoinForm({
             />
           )}
         </FormField>
+        <LegalConsent
+          error={state.fieldErrors.acceptLegal}
+          defaultChecked={state.values.acceptLegal}
+          key={`legal-${state.values.acceptLegal}`}
+        />
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
           {pending ? "Creando cuenta…" : "Crear cuenta y entrar"}
