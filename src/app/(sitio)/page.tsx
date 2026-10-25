@@ -72,7 +72,7 @@ const STEPS = [
 ];
 
 export default function LandingPage() {
-  const from = TIER_PRICES[0].inventory;
+  const from = TIER_PRICES[0]!.inventory;
   return (
     <>
       {/* Hero */}

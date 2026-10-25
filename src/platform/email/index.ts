@@ -24,6 +24,7 @@ export {
   mfaEnabledEmail,
   passwordChangedEmail,
   passwordResetEmail,
+  planPurchaseEmail,
   purchaseOrderEmail,
   verificationEmail,
 } from "./templates";

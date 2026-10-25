@@ -46,6 +46,23 @@ export type PlanTierId = PlanTier["id"];
 /** Modules sold online. Inventory is the base and always included. */
 export type SoldModule = keyof PlanTier["prices"];
 
+/** Names of the modules sold online, in the order they are listed. */
+export const SOLD_MODULE_NAMES: Record<SoldModule, string> = {
+  inventory: "Inventario",
+  purchasing: "Compras",
+};
+
+/** "1,000 productos · Inventario + Compras". */
+export function planText(
+  productLimit: number,
+  modules: readonly SoldModule[],
+): string {
+  const names = (["inventory", "purchasing"] as const)
+    .filter((module) => module === "inventory" || modules.includes(module))
+    .map((module) => SOLD_MODULE_NAMES[module]);
+  return `${productLimit.toLocaleString("es-MX")} productos · ${names.join(" + ")}`;
+}
+
 /** How many months can be bought at once. */
 export const PURCHASE_MONTHS = [1, 3, 6, 12] as const;
 export type PurchaseMonths = (typeof PURCHASE_MONTHS)[number];
@@ -90,7 +107,7 @@ export function quote(
   }
   const chosen = new Set<SoldModule>(["inventory", ...modules]);
   let monthly = dec(0);
-  for (const module of chosen) monthly = monthly.plus(tier.prices[module]);
+  for (const sold of chosen) monthly = monthly.plus(tier.prices[sold]);
   const subtotal = monthly.times(months);
   const discount = dec(money(subtotal.times(percentOff).dividedBy(100)));
   const taxable = subtotal.minus(discount);

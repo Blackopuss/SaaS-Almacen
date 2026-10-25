@@ -61,6 +61,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "location.restored": "Reactivó una ubicación",
   "plan.provisioned": "Se asignó el plan de la empresa",
   "payment.recorded": "Se registró un pago",
+  "plan.purchased": "Compró el plan en línea",
   "payment.reversed": "Se anuló un pago",
   "module.activated": "Se activó un módulo",
   "module.deactivated": "Se desactivó un módulo",

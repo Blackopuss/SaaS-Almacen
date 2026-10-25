@@ -5,10 +5,12 @@
  * (PROPOSED_TIERS); the prices below are a proposal, not an approved list.
  */
 
+import { CONTACT_EMAIL, PLAN_TIERS } from "@/platform/billing";
+
 export const SITE = {
   name: "Almacén",
-  /** Pending (founder): the real contact mailbox. */
-  contactEmail: "contacto@almacen.mx",
+  /** Pending (founder): the real contact mailbox (also in the receipts). */
+  contactEmail: CONTACT_EMAIL,
   /** Pending (founder): legal name of the company that runs the service. */
   legalName: "Almacén (razón social por confirmar)",
 } as const;
@@ -50,13 +52,11 @@ export const FOOTER_LINKS = [
  * PROPOSED_TIERS). Proposal for the launch: the founder confirms them in
  * FUN-06 before anyone is charged.
  */
-export const TIER_PRICES = [
-  { inventory: 349, purchasing: 179 },
-  { inventory: 649, purchasing: 299 },
-  { inventory: 949, purchasing: 449 },
-  { inventory: 1690, purchasing: 790 },
-  { inventory: 3490, purchasing: 1490 },
-] as const;
+export const TIER_PRICES = PLAN_TIERS.map(({ prices }) => ({
+  // Whole pesos, for display only; the checkout charges the exact list.
+  inventory: Number(prices.inventory),
+  purchasing: Number(prices.purchasing),
+}));
 
 export function formatMoney(amount: number): string {
   return new Intl.NumberFormat("es-MX", {

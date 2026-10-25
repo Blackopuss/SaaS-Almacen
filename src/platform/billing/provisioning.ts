@@ -111,7 +111,8 @@ export type ProvisionResult =
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
-async function setEntitlement(
+/** Writes one entitlement; shared with the online purchase (ADR 0028). */
+export async function setEntitlement(
   tx: Tx,
   organizationId: string,
   kind: "MODULE" | "LIMIT",
