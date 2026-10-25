@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { moduleOpenWork, moduleRegistry } from "@/modules/registry";
 import {
   provisionCompany,
+  recordManualPayment,
   requirePlatformStaff,
+  reverseManualPayment,
+  type PaymentField,
+  type PaymentInput,
   type ProvisionField,
 } from "@/platform/billing";
 
@@ -76,4 +80,78 @@ export async function provisionAction(
   }
   revalidatePath(`/interno/empresas/${organizationId}`);
   return { fieldErrors: {}, saved: true };
+}
+
+export type PaymentState = {
+  fieldErrors: Partial<Record<PaymentField, string>>;
+  formError?: string;
+  /** End of the plan after the payment, ISO. */
+  savedUntil?: string;
+  /** What was typed, so a rejected form keeps it. */
+  values?: PaymentInput;
+};
+
+/**
+ * Registers a SPEI payment (PIL-11). Staff from the session; the company
+ * id is the one bound by the page and the service checks staff again.
+ */
+export async function recordPaymentAction(
+  organizationId: string,
+  _prev: PaymentState,
+  formData: FormData,
+): Promise<PaymentState> {
+  const staff = await requirePlatformStaff();
+  const values: PaymentInput = {
+    amount: String(formData.get("amount") ?? ""),
+    paidOn: String(formData.get("paidOn") ?? ""),
+    reference: String(formData.get("reference") ?? ""),
+    months: String(formData.get("months") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+  };
+  const result = await recordManualPayment(
+    staff.userId,
+    String(organizationId),
+    values,
+  );
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      formError: result.formError,
+      values,
+    };
+  }
+  revalidatePath(`/interno/empresas/${organizationId}`);
+  return { fieldErrors: {}, savedUntil: result.validUntil.toISOString() };
+}
+
+export type ReversalState = {
+  error?: string;
+  /** What was typed, so a rejected form keeps it. */
+  reason?: string;
+  done?: boolean;
+};
+
+/** Reverses a payment registered by mistake (PIL-11). */
+export async function reversePaymentAction(
+  organizationId: string,
+  paymentId: string,
+  _prev: ReversalState,
+  formData: FormData,
+): Promise<ReversalState> {
+  const staff = await requirePlatformStaff();
+  const reason = String(formData.get("reason") ?? "");
+  const result = await reverseManualPayment(
+    staff.userId,
+    String(organizationId),
+    String(paymentId),
+    reason,
+  );
+  if (!result.ok) {
+    return {
+      error: result.fieldErrors.notes ?? result.formError,
+      reason,
+    };
+  }
+  revalidatePath(`/interno/empresas/${organizationId}`);
+  return { done: true };
 }

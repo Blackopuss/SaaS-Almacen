@@ -35,6 +35,7 @@ export const TENANT_MODELS = [
   "Invitation",
   "Job",
   "Location",
+  "ManualPayment",
   "Membership",
   "MembershipRole",
   "OwnershipTransfer",

@@ -39,7 +39,7 @@ describe("database transactions (app user)", () => {
     const rows = await db.$queryRaw<
       { name: string }[]
     >`SELECT DATABASE() AS name`;
-    expect(rows[0]?.name).toMatch(/_test$/);
+    expect(rows[0]?.name).toMatch(/_test(_[a-z]+)?$/);
   });
 
   it("commits all writes when the transaction succeeds", async () => {

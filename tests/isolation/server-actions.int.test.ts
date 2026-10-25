@@ -370,6 +370,20 @@ const REVIEWED: Record<string, Review> = {
       "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
     coveredBy: "tests/platform/provisioning.int.test.ts",
   },
+  recordPaymentAction: {
+    input:
+      "id de empresa (cualquiera: es personal de plataforma), importe, día, clave de rastreo, meses y notas",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/payments.int.test.ts",
+  },
+  reversePaymentAction: {
+    input:
+      "id de empresa e id de pago (el pago se busca dentro de esa empresa) y motivo",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/payments.int.test.ts",
+  },
   inviteAction: {
     input: "correo y roles",
     identity: "sesión y empresa activa (requireOrganizationContext)",

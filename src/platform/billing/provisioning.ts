@@ -353,6 +353,8 @@ export type CompanyPlan = CompanySummary & {
   activeMembers: number;
   /** Earliest end date among what is in force; null = no end date. */
   validUntil: Date | null;
+  /** When the plan already ended (read-only), its end; null otherwise. */
+  endedAt: Date | null;
 };
 
 /** Current plan of one company, for the console. Null if it does not exist. */
@@ -371,22 +373,33 @@ export async function getCompanyPlan(
   if (!row) return null;
   invalidateEntitlements(row.id);
   const now = new Date();
-  const [entitlements, products, activeMembers, ends] = await Promise.all([
-    getEntitlements(row.id),
-    getQuotaUsage(row.id, "active_products"),
-    db.membership.count({
-      where: { organizationId: row.id, status: "ACTIVE" },
-    }),
-    db.entitlement.findFirst({
-      where: {
-        organizationId: row.id,
-        validFrom: { lte: now },
-        validUntil: { gt: now },
-      },
-      orderBy: { validUntil: "asc" },
-      select: { validUntil: true },
-    }),
-  ]);
+  const [entitlements, products, activeMembers, ends, plan] = await Promise.all(
+    [
+      getEntitlements(row.id),
+      getQuotaUsage(row.id, "active_products"),
+      db.membership.count({
+        where: { organizationId: row.id, status: "ACTIVE" },
+      }),
+      db.entitlement.findFirst({
+        where: {
+          organizationId: row.id,
+          validFrom: { lte: now },
+          validUntil: { gt: now },
+        },
+        orderBy: { validUntil: "asc" },
+        select: { validUntil: true },
+      }),
+      db.entitlement.findFirst({
+        where: {
+          organizationId: row.id,
+          kind: "LIMIT",
+          key: "active_products",
+        },
+        select: { validUntil: true },
+      }),
+    ],
+  );
+  const planEnd = plan?.validUntil ?? null;
   return {
     id: row.id,
     name: row.name,
@@ -399,5 +412,6 @@ export async function getCompanyPlan(
     users: entitlements.limit("users"),
     activeMembers,
     validUntil: ends?.validUntil ?? null,
+    endedAt: planEnd !== null && planEnd <= now ? planEnd : null,
   };
 }

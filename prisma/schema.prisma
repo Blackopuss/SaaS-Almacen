@@ -156,6 +156,7 @@ model Organization {
   purchaseReceiptLines    PurchaseReceiptLine[]
   purchaseReturns         PurchaseReturn[]
   purchaseReturnLines     PurchaseReturnLine[]
+  manualPayments          ManualPayment[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -560,6 +561,48 @@ model PlatformStaff {
   disabledAt DateTime? @db.DateTime(3)
 
   @@map("platform_staff")
+}
+
+enum ManualPaymentKind {
+  PAYMENT
+  REVERSAL
+}
+
+/// A bank transfer (SPEI) registered by platform staff while billing is
+/// assisted (PIL-11, ADR 0027). Registering it moves the end of the plan
+/// (`validUntilBefore` → `validUntilAfter`). Immutable (triggers): a
+/// mistake is undone by a REVERSAL row pointing to the payment, which
+/// takes the same months back.
+model ManualPayment {
+  id                String            @id @db.Char(36)
+  organizationId    String            @db.Char(36)
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  kind              ManualPaymentKind @default(PAYMENT)
+  /// Amount received, MXN; a reversal repeats the amount of its payment.
+  amount            Decimal           @db.Decimal(12, 2)
+  currency          String            @default("MXN") @db.Char(3)
+  /// Day of the transfer, as written on the bank receipt.
+  paidOn            DateTime          @db.Date
+  /// SPEI tracking key (clave de rastreo), upper case; null in reversals.
+  reference         String?           @db.VarChar(40)
+  /// Months of plan it pays (or takes back).
+  months            Int
+  /// Free notes; reason of a reversal. Fiscal data (CFDI) comes later (PIL-10).
+  notes             String?           @db.VarChar(500)
+  reversesPaymentId String?           @db.Char(36)
+  reverses          ManualPayment?    @relation("ManualPaymentReversal", fields: [organizationId, reversesPaymentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  reversal          ManualPayment?    @relation("ManualPaymentReversal")
+  validUntilBefore  DateTime          @db.DateTime(3)
+  validUntilAfter   DateTime          @db.DateTime(3)
+  recordedByUserId  String            @db.Char(36)
+  createdAt         DateTime          @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  /// One reversal per payment.
+  @@unique([organizationId, reversesPaymentId])
+  @@index([organizationId, reference])
+  @@index([organizationId, createdAt])
+  @@map("manual_payment")
 }
 
 // ── Product catalog (INV-01) ─────────────────────────────────────────────
