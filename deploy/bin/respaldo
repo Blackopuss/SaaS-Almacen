@@ -18,6 +18,13 @@ umask 077
 BASE=/srv/almacen
 DESTINO="$BASE/backups"
 
+# Un respaldo que falla deja esta marca y /api/salud (y el aviso del worker,
+# PIL-04) lo dice de inmediato, sin esperar a que el último correcto envejezca.
+# El siguiente respaldo correcto la quita.
+FALLIDO="$BASE/shared/run/ultimo-respaldo.fallido"
+marcar_fallo() { install -o almacen -g almacen -m 640 /dev/null "$FALLIDO" 2>/dev/null || true; }
+trap '[[ $? -eq 0 ]] || marcar_fallo' EXIT
+
 # La configuración que root lee vive en /etc/almacen, fuera del árbol que la
 # app puede escribir, y se lee como CLAVE=VALOR, nunca con «source»: así una
 # escritura de la cuenta «almacen» no puede plantar comandos que root ejecute
@@ -49,7 +56,7 @@ TRABAJO="$(mktemp -d)"
 # no en la línea de comando, donde la vería cualquiera en la lista de procesos.
 MYSQL_ENV="$TRABAJO/mysql.env"
 printf 'MYSQL_PWD=%s\n' "$RAIZ" > "$MYSQL_ENV"
-trap 'docker exec --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 -e "DROP DATABASE IF EXISTS almacen_verificacion" >/dev/null 2>&1 || true; rm -rf "$TRABAJO"' EXIT
+trap 'ESTADO=$?; docker exec --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 -e "DROP DATABASE IF EXISTS almacen_verificacion" >/dev/null 2>&1 || true; rm -rf "$TRABAJO"; [[ $ESTADO -eq 0 ]] || marcar_fallo' EXIT
 
 sql() { docker exec -i --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 -N -B "$@"; }
 
@@ -94,4 +101,5 @@ fi
 find "$DESTINO" -maxdepth 1 -type f -name '*.age' -mtime +"${RETENER_DIAS:-14}" -delete
 
 install -o almacen -g almacen -m 640 /dev/null "$BASE/shared/run/ultimo-respaldo"
+rm -f "$FALLIDO"
 echo "Respaldo listo: $DESTINO/almacen-$FECHA.sql.gz.age"

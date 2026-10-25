@@ -231,3 +231,36 @@ export function purchaseOrderEmail(input: {
     ].join("\n"),
   };
 }
+
+/** Operations alert for whoever runs the server (PIL-04). */
+export function operationsAlertEmail(input: {
+  to: string;
+  server: string;
+  failed: string[];
+  recovered: string[];
+  stillFailing: string[];
+}): EmailMessage {
+  const list = (items: string[]) => items.map((item) => `- ${item}`);
+  return {
+    to: input.to,
+    subject:
+      input.failed.length > 0
+        ? `Almacén: falla en el servidor (${input.server})`
+        : `Almacén: el servidor se recuperó (${input.server})`,
+    text: [
+      ...(input.failed.length > 0
+        ? ["Empezó a fallar:", ...list(input.failed), ""]
+        : []),
+      ...(input.recovered.length > 0
+        ? ["Ya funciona otra vez:", ...list(input.recovered), ""]
+        : []),
+      ...(input.stillFailing.length > 0
+        ? ["Sigue fallando:", ...list(input.stillFailing), ""]
+        : []),
+      "Estado en el servidor: curl -s localhost:3000/api/salud",
+      "Registros: journalctl -u almacen-web -u almacen-worker -u almacen-respaldo -n 100",
+      "",
+      "Avisamos cuando algo empieza a fallar y cuando se recupera, no mientras siga igual.",
+    ].join("\n"),
+  };
+}

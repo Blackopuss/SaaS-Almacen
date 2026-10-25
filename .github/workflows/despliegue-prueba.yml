@@ -101,6 +101,20 @@ jobs:
           sudo age -d -i "$RUNNER_TEMP/llave.txt" "/srv/almacen/backups/$ULTIMO" | gunzip | grep -q "CREATE TABLE \`organization\`"
           sudo journalctl -u almacen-respaldo -n 8 --no-pager
 
+      - name: Un respaldo fallido se avisa de inmediato (PIL-04)
+        run: |
+          sudo grep -q '^ALERT_EMAIL=' /srv/almacen/shared/.env.local
+          sudo mv /etc/almacen/respaldo.env /etc/almacen/respaldo.env.aparte
+          if sudo systemctl start almacen-respaldo.service; then
+            echo "el respaldo sin configuración no falló" >&2; exit 1
+          fi
+          sudo mv /etc/almacen/respaldo.env.aparte /etc/almacen/respaldo.env
+          sudo test -e /srv/almacen/shared/run/ultimo-respaldo.fallido
+          jq -e '.checks.backup == "falla"' <(curl -sk https://localhost/api/salud)
+          sudo systemctl start almacen-respaldo.service
+          sudo test ! -e /srv/almacen/shared/run/ultimo-respaldo.fallido
+          jq -e '.checks.backup == "ok"' <(curl -sk https://localhost/api/salud)
+
       - name: Endurecimiento (auditoría 3)
         run: |
           # La config que root «sourcea»/ejecuta es solo de root y vive fuera

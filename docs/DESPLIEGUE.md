@@ -158,8 +158,17 @@ Avisa cuando falla cualquiera de estas cosas:
 | `database` | la app no llega a MySQL |
 | `worker` | el worker lleva más de 2 minutos sin latido |
 | `queue` | un trabajo lleva 10 minutos esperando |
-| `backup` | el último respaldo correcto tiene más de 26 horas |
+| `backup` | el último respaldo falló o el último correcto tiene más de 26 horas |
 | `errors` | hubo 20 errores o más en 15 minutos |
+
+Además, el **worker avisa por correo** (PIL-04, ADR 0025) cuando algo de esa tabla empieza a fallar, cuando la app web deja de responder y cuando se recupera. Revisa cada minuto, avisa si la falla dura dos revisiones seguidas y no repite el aviso mientras siga igual. Para recibirlo, pon tu correo en `/srv/almacen/shared/.env.local` y reinicia el worker:
+
+```bash
+sudo nano /srv/almacen/shared/.env.local     # ALERT_EMAIL=tu@correo.mx
+sudo systemctl restart almacen-worker
+```
+
+Necesita el correo SMTP configurado. Mientras no lo esté (o con `ALERT_EMAIL` vacío), el aviso queda solo en el registro: `journalctl -u almacen-worker | grep ops_alert`. Si el worker o el servidor entero se caen, nadie adentro puede avisar: para eso es el monitor de UptimeRobot.
 
 ### 7. Copia fuera del servidor (recomendado)
 

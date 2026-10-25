@@ -1,5 +1,6 @@
 import "server-only";
 
+import { existsSync } from "node:fs";
 import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -64,10 +65,18 @@ async function lastHeartbeat(): Promise<number | null> {
   }
 }
 
+/** Mark left by a backup that failed, next to the status file. */
+function backupFailedFile(statusFile: string): string {
+  return `${statusFile}.fallido`;
+}
+
 async function lastBackup(): Promise<number | null | undefined> {
   const file = process.env.BACKUP_STATUS_FILE;
   if (!file) return undefined;
   try {
+    // `respaldo` leaves this mark when it fails (PIL-04): alert now, not
+    // when the last good one gets old. The next good backup removes it.
+    if (existsSync(backupFailedFile(file))) return null;
     return (await stat(file)).mtimeMs;
   } catch {
     return null;
