@@ -316,6 +316,12 @@ async function SupplierView({
             </h2>
             {download("proveedores", { desde: report.from, hasta: report.to })}
           </div>
+          {report.truncated && (
+            <p className="border-b px-4 py-3 text-sm text-muted-foreground sm:px-5">
+              Son muchas recepciones: los totales solo cuentan las primeras.
+              Elige un periodo más corto.
+            </p>
+          )}
           <ul className="divide-y">
             {report.rows.map((row) => (
               <li

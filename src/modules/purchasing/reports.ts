@@ -56,6 +56,8 @@ function dayOf(moment: Date, timeZone: string): string {
 
 const nextDay = (day: string) => {
   const date = new Date(`${day}T12:00:00.000Z`);
+  // Not a day («2026-13-01», «x»): no next day, so the range is refused.
+  if (Number.isNaN(date.getTime())) return "";
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
 };
@@ -232,6 +234,8 @@ export type SupplierReport =
       costsVisible: boolean;
       /** Absent without costs. */
       totalText?: string;
+      /** More receipts or returns than a report holds: the totals miss some. */
+      truncated: boolean;
     }
   | { ok: false; error: string };
 
@@ -270,9 +274,10 @@ export async function getPurchasesBySupplier(
   }
   const client = forOrganization(actor.organizationId);
   const when = { gte: start, lt: end };
-  const receipts = await client.purchaseReceipt.findMany({
+  const receiptRows = await client.purchaseReceipt.findMany({
     where: { createdAt: when },
-    take: REPORT_MAX_ROWS,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: REPORT_MAX_ROWS + 1,
     select: {
       orderId: true,
       order: {
@@ -287,9 +292,10 @@ export async function getPurchasesBySupplier(
       },
     },
   });
-  const returns = await client.purchaseReturn.findMany({
+  const returnRows = await client.purchaseReturn.findMany({
     where: { createdAt: when },
-    take: REPORT_MAX_ROWS,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: REPORT_MAX_ROWS + 1,
     select: {
       receipt: {
         select: {
@@ -308,6 +314,11 @@ export async function getPurchasesBySupplier(
       },
     },
   });
+
+  const truncated =
+    receiptRows.length > REPORT_MAX_ROWS || returnRows.length > REPORT_MAX_ROWS;
+  const receipts = receiptRows.slice(0, REPORT_MAX_ROWS);
+  const returns = returnRows.slice(0, REPORT_MAX_ROWS);
 
   type Acc = {
     name: string;
@@ -400,6 +411,7 @@ export async function getPurchasesBySupplier(
     rows,
     costsVisible,
     ...(costsVisible ? { totalText: money(total) } : {}),
+    truncated,
   };
 }
 

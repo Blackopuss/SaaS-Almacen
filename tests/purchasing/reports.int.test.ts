@@ -9,6 +9,7 @@ import {
   createPurchaseOrder,
   getPendingReport,
   getPurchasesBySupplier,
+  REPORT_MAX_ROWS,
   receivePurchaseOrder,
   returnToSupplier,
   submitPurchaseOrder,
@@ -316,7 +317,42 @@ describe("getPurchasesBySupplier", () => {
         to: "2020-01-31",
       }),
     ).toMatchObject({ ok: false, error: /anterior o igual/ });
+    // CMP-S10: an impossible final day was a server error, not a refusal.
+    for (const to of ["x", "2026-13-01", "2026-00-10"]) {
+      expect(
+        await getPurchasesBySupplier(actor, { from: "2020-01-01", to }),
+      ).toMatchObject({ ok: false, error: /día de calendario/ });
+    }
   });
+
+  it("says so when the period has more receipts than a report holds", async () => {
+    // CMP-S11: past the limit the totals were cut without a word.
+    const { actor, plain } = await scene();
+    const { organizationId, userId } = actor;
+    const movements = Array.from({ length: REPORT_MAX_ROWS + 1 }, () => ({
+      id: newId(),
+      organizationId,
+      type: "RECEIPT" as const,
+      createdByUserId: userId,
+    }));
+    await db.stockMovement.createMany({ data: movements });
+    await db.purchaseReceipt.createMany({
+      data: movements.map((movement) => ({
+        id: newId(),
+        organizationId,
+        orderId: plain,
+        movementId: movement.id,
+        idempotencyKey: newId(),
+        receivedByUserId: userId,
+      })),
+    });
+    const report = await getPurchasesBySupplier(actor);
+    if (!report.ok) throw new Error(report.error);
+    expect(report.truncated).toBe(true);
+    expect(report.rows.reduce((sum, row) => sum + row.receipts, 0)).toBe(
+      REPORT_MAX_ROWS,
+    );
+  }, 120_000);
 });
 
 describe("buildPurchaseReport", () => {
