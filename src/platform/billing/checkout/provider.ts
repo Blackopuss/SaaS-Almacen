@@ -72,6 +72,9 @@ export type VerifiedWebhook = {
   orderId: string | null;
 };
 
+/** A webhook as it arrived: the raw body untouched, the full URL (query included). */
+export type WebhookRequest = { headers: Headers; rawBody: string; url: URL };
+
 /** Identifies a checkout when asking for its state. */
 export type CheckoutRef = { providerRef: string; orderId: string };
 
@@ -92,9 +95,6 @@ export interface PaymentProvider {
    * arrived. Returns null when it does not come from the provider; throws
    * only on unexpected failures (network, provider down).
    */
-  verifyWebhook(
-    headers: Headers,
-    rawBody: string,
-  ): Promise<VerifiedWebhook | null>;
+  verifyWebhook(request: WebhookRequest): Promise<VerifiedWebhook | null>;
   fetchStatus(ref: CheckoutRef): Promise<PaymentStatus>;
 }
