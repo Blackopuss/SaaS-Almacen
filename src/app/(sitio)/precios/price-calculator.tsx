@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { formatCount, formatMoney } from "../content";
+import { formatCount, formatMoney } from "../site-shared";
 
 export type PriceTier = {
   productLimit: number;

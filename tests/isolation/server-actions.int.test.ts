@@ -384,6 +384,25 @@ const REVIEWED: Record<string, Review> = {
       "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
     coveredBy: "tests/platform/payments.int.test.ts",
   },
+  checkoutAction: {
+    input:
+      "nivel, meses, si agrega Compras, código, proveedor e intención (aplicar código o pagar); nunca importes",
+    identity:
+      "sesión y empresa activa (getAccess); el servicio exige al titular (assertOwnerAction), precia en el servidor y el correo del recibo sale de la sesión",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
+  createPromoCodeAction: {
+    input: "texto del código, % de descuento, usos máximos, último día y nota",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
+  disablePromoCodeAction: {
+    input: "id de código",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
   inviteAction: {
     input: "correo y roles",
     identity: "sesión y empresa activa (requireOrganizationContext)",
