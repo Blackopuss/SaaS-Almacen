@@ -15,15 +15,12 @@ import { Input } from "@/components/ui/input";
 import { EXPORT_KINDS, type ExportKind } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
-export const metadata: Metadata = { title: "Exportar a Excel" };
+export const metadata: Metadata = { title: "Descargar en Excel" };
 
 const DESCRIPTIONS: Record<ExportKind, string> = {
-  catalogo:
-    "Todos tus productos, activos y archivados: clave, nombre, categoría, marca, código de barras, unidad y mínimo.",
-  existencias:
-    "Cuánto hay de cada producto en cada ubicación, en la unidad del producto.",
-  movimientos:
-    "Cada entrada, salida, reubicación, ajuste y reversa: cuándo, qué, dónde, cuánto, por qué y quién.",
+  catalogo: "Todos tus productos, también los archivados.",
+  existencias: "Cuánto hay de cada producto en cada ubicación.",
+  movimientos: "Entradas, salidas y ajustes, con fecha y quién.",
 };
 
 /**
@@ -67,85 +64,80 @@ export default async function ExportarPage() {
     <PageContainer>
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
-      <PageHeader
-        title="Exportar a Excel"
-        description="Descarga tu información para revisarla, respaldarla o compartirla con tu contador. El archivo trae lo que hay en este momento."
-      />
+      <PageHeader title="Descargar en Excel" />
       {kinds.length === 0 && <NoAccessState />}
-      {kinds.map((kind) => (
-        <section
-          key={kind}
-          aria-labelledby={`exportar-${kind}`}
-          className="max-w-3xl space-y-4 rounded-xl border bg-card p-4 sm:p-5"
-        >
-          <div className="space-y-1">
-            <h2 id={`exportar-${kind}`} className="font-medium">
-              {EXPORT_KINDS[kind].label}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {DESCRIPTIONS[kind]}
-            </p>
-          </div>
-          {kind === "movimientos" ? (
-            // A plain GET form, not next/form: the answer is a file to
-            // download, not a screen to navigate to. The dates travel in
-            // the address; nothing is sent to a Server Action.
-            <form
-              method="get"
-              action="/api/exportaciones/movimientos"
-              className="space-y-4"
-            >
-              <div className="grid max-w-md grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField
-                  id="desde"
-                  label="Desde"
-                  hint="Vacío = desde el principio."
-                >
-                  {(control) => <Input {...control} name="desde" type="date" />}
-                </FormField>
-                <FormField id="hasta" label="Hasta" hint="Vacío = hasta hoy.">
-                  {(control) => <Input {...control} name="hasta" type="date" />}
-                </FormField>
+      {kinds.length > 0 && (
+        <ul className="max-w-3xl divide-y rounded-xl border bg-card">
+          {kinds.map((kind) => (
+            <li key={kind} className="space-y-3 p-4 sm:px-5">
+              <div className="space-y-1">
+                <h2 id={`exportar-${kind}`} className="font-medium">
+                  {EXPORT_KINDS[kind].label}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {DESCRIPTIONS[kind]}
+                </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" name="formato" value="xlsx">
-                  <Download aria-hidden="true" data-icon="inline-start" />
-                  Excel (.xlsx)
-                </Button>
-                <Button
-                  type="submit"
-                  name="formato"
-                  value="csv"
-                  variant="outline"
+              {kind === "movimientos" ? (
+                // A plain GET form, not next/form: the answer is a file to
+                // download, not a screen to navigate to. The dates travel in
+                // the address; nothing is sent to a Server Action.
+                <form
+                  method="get"
+                  action="/api/exportaciones/movimientos"
+                  aria-labelledby={`exportar-${kind}`}
+                  className="flex flex-wrap items-end gap-2"
                 >
-                  <Download aria-hidden="true" data-icon="inline-start" />
-                  CSV
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild>
-                <a href={`/api/exportaciones/${kind}?formato=xlsx`} download>
-                  <Download aria-hidden="true" data-icon="inline-start" />
-                  Excel (.xlsx)
-                </a>
-              </Button>
-              <Button asChild variant="outline">
-                <a href={`/api/exportaciones/${kind}?formato=csv`} download>
-                  <Download aria-hidden="true" data-icon="inline-start" />
-                  CSV
-                </a>
-              </Button>
-            </div>
-          )}
-        </section>
-      ))}
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        Las celdas se guardan como texto: un nombre o una nota que empiece con
-        «=», «+», «-» o «@» llega con un apóstrofo delante para que Excel no lo
-        ejecute como fórmula. Cada exportación queda anotada en la bitácora.
-      </p>
+                  <FormField id="desde" label="Desde (opcional)">
+                    {(control) => (
+                      <Input {...control} name="desde" type="date" />
+                    )}
+                  </FormField>
+                  <FormField id="hasta" label="Hasta (opcional)">
+                    {(control) => (
+                      <Input {...control} name="hasta" type="date" />
+                    )}
+                  </FormField>
+                  <Button
+                    type="submit"
+                    name="formato"
+                    value="xlsx"
+                    variant="outline"
+                  >
+                    <Download aria-hidden="true" data-icon="inline-start" />
+                    Excel
+                  </Button>
+                  <Button
+                    type="submit"
+                    name="formato"
+                    value="csv"
+                    variant="ghost"
+                  >
+                    CSV
+                  </Button>
+                </form>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="outline">
+                    <a
+                      href={`/api/exportaciones/${kind}?formato=xlsx`}
+                      download
+                    >
+                      <Download aria-hidden="true" data-icon="inline-start" />
+                      Excel
+                    </a>
+                  </Button>
+                  <Button asChild variant="ghost">
+                    <a href={`/api/exportaciones/${kind}?formato=csv`} download>
+                      CSV
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </PageContainer>
   );
 }

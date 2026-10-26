@@ -27,6 +27,7 @@ import {
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
+import { ImportSteps } from "../../import-steps";
 import { CancelImport } from "./cancel-import";
 import { ConfirmImport } from "./confirm-import";
 
@@ -44,8 +45,9 @@ const KIND = {
 
 /**
  * Third step of an import (IMP-05): every row checked, with its problems
- * by row and column, and how the rows that are right will be understood.
- * The check runs each time the screen opens and writes nothing.
+ * by row and column, and one list of the products with what happens to
+ * each and how its row was understood (KISS: one list, not two). The
+ * check runs each time the screen opens and writes nothing.
  */
 export default async function RevisionPage({
   params,
@@ -157,11 +159,15 @@ export default async function RevisionPage({
   // Rows well written that still cannot go in (clashes, plan places): the
   // header must not read as «all good».
   const blocked = clean && editable && plan !== null && !plan.ready;
+  // How each right row was read, shown under its product in the one list.
+  const readAs = new Map(result.preview.map((line) => [line.row, line]));
+  const showPlan = plan !== null && plan.validRows > 0 && editable;
 
   return (
     <PageContainer>
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
+      {editable && <ImportSteps current={3} />}
       <PageHeader
         title="Revisión de tu archivo"
         description={result.fileName}
@@ -197,24 +203,18 @@ export default async function RevisionPage({
           {blocked ? (
             <>
               <span className="font-medium">
-                {result.totalRows === 1
-                  ? "La fila está bien escrita"
-                  : `Las ${count(result.totalRows)} filas están bien escritas`}
-                , pero todavía no se puede importar
-              </span>
-              : abajo dice qué resolver. Todavía no se importó nada.
+                Tus filas están bien, pero falta resolver algo
+              </span>{" "}
+              (abajo). No se importó nada.
             </>
           ) : clean ? (
             <>
               <span className="font-medium">
-                {result.totalRows === 1
-                  ? "La fila está correcta"
-                  : `Las ${count(result.totalRows)} filas están correctas`}
+                Todo bien:{" "}
+                {result.products === 1
+                  ? "1 producto listo"
+                  : `${count(result.products)} productos listos`}
               </span>
-              :{" "}
-              {result.products === 1
-                ? "1 producto"
-                : `${count(result.products)} productos`}
               . Todavía no se importó nada.
             </>
           ) : (
@@ -222,10 +222,8 @@ export default async function RevisionPage({
               <span className="font-medium">
                 {rows(result.invalidRows)} con problemas
               </span>{" "}
-              de {count(result.totalRows)}; {rows(result.validRows)}{" "}
-              {result.validRows === 1 ? "correcta" : "correctas"}. Corrige tu
-              archivo, súbelo de nuevo y vuelve a revisar. No se importó ni se
-              cambió nada.
+              de {count(result.totalRows)}. Corrígelas en tu archivo y súbelo de
+              nuevo. No se importó nada.
             </>
           )}
         </p>
@@ -245,9 +243,8 @@ export default async function RevisionPage({
               {plan.exampleRows.length === 1
                 ? `La fila ${plan.exampleRows[0]} es un ejemplo de la plantilla`
                 : `Las filas ${plan.exampleRows.join(", ")} son ejemplos de la plantilla`}
-            </span>{" "}
-            (misma clave y nombre). Si no son productos tuyos, bórralas de tu
-            archivo y súbelo de nuevo antes de importar.
+            </span>
+            . Si no son productos tuyos, bórralas y sube el archivo de nuevo.
           </p>
         </div>
       )}
@@ -462,7 +459,7 @@ export default async function RevisionPage({
         </section>
       )}
 
-      {plan && plan.validRows > 0 && editable && (
+      {plan && showPlan && (
         <section
           aria-labelledby="clasificacion"
           className="max-w-3xl rounded-xl border bg-card"
@@ -478,14 +475,16 @@ export default async function RevisionPage({
                   ["Se actualizan", plan.counts.update],
                   ["Se reactivan", plan.counts.reactivate],
                 ] as const
-              ).map(([term, value]) => (
-                <div key={term}>
-                  <dt className="text-muted-foreground">{term}</dt>
-                  <dd className="text-2xl font-semibold tracking-tight tabular-nums">
-                    {count(value)}
-                  </dd>
-                </div>
-              ))}
+              )
+                .filter(([, value]) => value > 0)
+                .map(([term, value]) => (
+                  <div key={term}>
+                    <dt className="text-muted-foreground">{term}</dt>
+                    <dd className="text-2xl font-semibold tracking-tight tabular-nums">
+                      {count(value)}
+                    </dd>
+                  </div>
+                ))}
             </dl>
             <p
               className="flex items-start gap-2 text-sm"
@@ -509,24 +508,24 @@ export default async function RevisionPage({
                   "No necesita lugares de tu plan: solo actualiza productos que ya tienes."
                 ) : (
                   <>
-                    Necesita{" "}
+                    Usa{" "}
                     <span className="font-medium tabular-nums">
                       {plan.quota.required === 1
                         ? "1 lugar"
                         : `${count(plan.quota.required)} lugares`}
                     </span>{" "}
-                    de tu plan (productos nuevos y reactivados). Tienes{" "}
+                    de tu plan; te quedan{" "}
                     <span className="font-medium tabular-nums">
                       {count(plan.quota.available)}
-                    </span>{" "}
-                    disponibles de {count(plan.quota.limit)}.
+                    </span>
+                    .
                     {!plan.quota.fits &&
-                      ` ${plan.quota.required - plan.quota.available === 1 ? "Falta 1" : `Faltan ${count(plan.quota.required - plan.quota.available)}`}: quita productos del archivo, archiva los que ya no uses o pide un nivel mayor. Mientras no quepa todo, no se puede importar (nunca se importa solo una parte).`}
+                      ` ${plan.quota.required - plan.quota.available === 1 ? "Falta 1" : `Faltan ${count(plan.quota.required - plan.quota.available)}`}: quita productos del archivo o archiva los que ya no uses. No se importa solo una parte.`}
                   </>
                 )}{" "}
                 {plan.quota.fits && plan.quota.required > 0 && (
                   <span className="text-muted-foreground">
-                    Los lugares se apartan al confirmar.
+                    Se apartan al confirmar.
                   </span>
                 )}
               </span>
@@ -570,6 +569,20 @@ export default async function RevisionPage({
                     {product.sku}
                   </span>
                 </p>
+                {readAs.has(product.row) && (
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    {[
+                      `Por ${readAs.get(product.row)!.unit}`,
+                      readAs.get(product.row)!.presentation,
+                      readAs.get(product.row)!.stock &&
+                        `existencia inicial ${readAs.get(product.row)!.stock}`,
+                      readAs.get(product.row)!.minimum &&
+                        `mínimo ${readAs.get(product.row)!.minimum}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 {product.changes.length > 0 && (
                   <ul className="text-sm text-muted-foreground">
                     {product.changes.map((change) => (
@@ -595,8 +608,7 @@ export default async function RevisionPage({
                   aria-hidden="true"
                   className="mt-0.5 size-4 shrink-0 text-success"
                 />
-                Todo listo para importar. Al confirmar se apartan los lugares de
-                tu plan; hasta entonces nada cambia en tu inventario.
+                Listo para importar.
               </>
             ) : (
               <>
@@ -604,8 +616,16 @@ export default async function RevisionPage({
                   aria-hidden="true"
                   className="mt-0.5 size-4 shrink-0 text-warning"
                 />
-                Todavía no se puede importar: corrige lo marcado y vuelve a
-                subir el archivo.
+                <span>
+                  Corrige lo marcado y{" "}
+                  <Link
+                    href="/inventario/importar"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    sube el archivo de nuevo
+                  </Link>
+                  .
+                </span>
               </>
             )}
           </p>
@@ -630,7 +650,8 @@ export default async function RevisionPage({
         </section>
       )}
 
-      {result.preview.length > 0 && (
+      {/* While the plan list is shown, it already carries this per product. */}
+      {result.preview.length > 0 && !showPlan && (
         <section
           aria-labelledby="entendido"
           className="rounded-xl border bg-card"

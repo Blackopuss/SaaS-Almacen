@@ -62,16 +62,11 @@ export function PresentationsPanel({
           Presentaciones
         </h2>
         <p className="text-sm text-muted-foreground">
-          Cómo lo compras o lo manejas además de por {unitPlural}: cajas,
-          rollos, sacos. Las existencias se guardan siempre en {unitPlural}.
+          Cajas, rollos o sacos, y cuántas {unitPlural} trae cada uno.
         </p>
       </div>
 
-      {presentations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Este producto todavía no tiene presentaciones.
-        </p>
-      ) : (
+      {presentations.length > 0 && (
         <ul className="divide-y rounded-lg border">
           {presentations.map((presentation) => (
             <li key={presentation.id} className="space-y-2 p-3">

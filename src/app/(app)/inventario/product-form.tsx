@@ -217,13 +217,8 @@ export function ProductForm({
             )}
           </FormField>
         ) : (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Precisión de las cantidades</p>
-            <p className="text-sm text-muted-foreground">
-              Se maneja en enteros: no admite fracciones.
-            </p>
-            <input type="hidden" name="step" value="1" />
-          </div>
+          // Counted things go in whole units: nothing to choose (KISS).
+          <input type="hidden" name="step" value="1" />
         )}
       </div>
 
