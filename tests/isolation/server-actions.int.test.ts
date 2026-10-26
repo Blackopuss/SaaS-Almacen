@@ -370,6 +370,39 @@ const REVIEWED: Record<string, Review> = {
       "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
     coveredBy: "tests/platform/provisioning.int.test.ts",
   },
+  recordPaymentAction: {
+    input:
+      "id de empresa (cualquiera: es personal de plataforma), importe, día, clave de rastreo, meses y notas",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/payments.int.test.ts",
+  },
+  reversePaymentAction: {
+    input:
+      "id de empresa e id de pago (el pago se busca dentro de esa empresa) y motivo",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/payments.int.test.ts",
+  },
+  checkoutAction: {
+    input:
+      "nivel, meses, si agrega Compras, código, proveedor e intención (aplicar código o pagar); nunca importes",
+    identity:
+      "sesión y empresa activa (getAccess); el servicio exige al titular (assertOwnerAction), precia en el servidor y el correo del recibo sale de la sesión",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
+  createPromoCodeAction: {
+    input: "texto del código, % de descuento, usos máximos, último día y nota",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
+  disablePromoCodeAction: {
+    input: "id de código",
+    identity:
+      "sesión con MFA + fila activa en platform_staff (requirePlatformStaff); el servicio lo vuelve a comprobar",
+    coveredBy: "tests/platform/checkout.int.test.ts",
+  },
   inviteAction: {
     input: "correo y roles",
     identity: "sesión y empresa activa (requireOrganizationContext)",
@@ -407,7 +440,8 @@ const REVIEWED: Record<string, Review> = {
     coveredBy: "tests/platform/invitation-accept.int.test.ts",
   },
   joinAsNewUserAction: {
-    input: "token de la invitación, nombre y contraseña",
+    input:
+      "token de la invitación, nombre, contraseña y aceptación de documentos",
     identity: "el token (un solo uso, vence); el correo sale de la invitación",
     coveredBy: "tests/platform/invitation-accept.int.test.ts",
   },
@@ -421,8 +455,13 @@ const REVIEWED: Record<string, Review> = {
     identity: "ninguna sesión previa",
     coveredBy: "tests/platform/throttle.int.test.ts, session.int.test.ts",
   },
+  acceptLegalAction: {
+    input: "casilla de aceptación (las versiones salen del código)",
+    identity: "sesión (requireSession); la persona sale de la sesión",
+    coveredBy: "tests/platform/legal-acceptance.int.test.ts",
+  },
   registerAction: {
-    input: "nombre, correo y contraseña",
+    input: "nombre, correo, contraseña y aceptación de documentos",
     identity: "ninguna",
     coveredBy: "tests/platform/register.int.test.ts",
   },

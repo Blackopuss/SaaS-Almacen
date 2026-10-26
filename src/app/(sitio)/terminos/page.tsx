@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { REFUND_TERMS } from "@/platform/billing";
+import { LEGAL_DOCUMENTS } from "@/platform/legal";
+
 import { SITE } from "../content";
 import { LegalDocument } from "../legal-document";
 
@@ -15,7 +18,8 @@ export default function TermsPage() {
   return (
     <LegalDocument
       eyebrow="Legal"
-      title="Términos y condiciones"
+      title={LEGAL_DOCUMENTS.terms.title}
+      version={LEGAL_DOCUMENTS.terms.version}
       intro={
         <p>
           Estos términos regulan el uso de {SITE.name}, un servicio en línea
@@ -96,7 +100,22 @@ export default function TermsPage() {
           title: "Precios y pagos",
           body: (
             <ul>
-              <li>Los precios están en pesos mexicanos y no incluyen IVA.</li>
+              <li>
+                Los precios están en pesos mexicanos y no incluyen IVA; al pagar
+                se suma el IVA (16%).
+              </li>
+              <li>
+                Solo el titular de la empresa compra el plan, por 1, 3, 6 o 12
+                meses pagados por adelantado, con tarjeta, OXXO, PayPal o
+                Mercado Pago. El pago lo procesa el proveedor elegido: nunca
+                recibimos los datos de tu tarjeta. Las personas que el titular
+                invita usan el mismo plan.
+              </li>
+              <li>
+                Cada compra tiene un ID de transacción y te enviamos su
+                comprobante por correo. El plan se activa cuando el proveedor
+                confirma el pago.
+              </li>
               <li>
                 El precio que contratas se mantiene mientras conserves tu plan;
                 un cambio de precio aplica a contrataciones nuevas o te lo
@@ -106,6 +125,17 @@ export default function TermsPage() {
                 Si un pago no se realiza, la cuenta pasa a modo consulta: ves y
                 exportas todo, pero no registras cambios.
               </li>
+            </ul>
+          ),
+        },
+        {
+          id: "reembolsos",
+          title: "Reembolsos",
+          body: (
+            <ul>
+              {REFUND_TERMS.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
             </ul>
           ),
         },

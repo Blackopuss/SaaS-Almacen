@@ -483,6 +483,38 @@ beforeAll(async () => {
         subscriptionId: subscription.id,
       },
     });
+    await db.manualPayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        amount: "1499.00",
+        paidOn: new Date("2026-10-01T00:00:00Z"),
+        reference: "SPEI-ISO",
+        months: 1,
+        validUntilBefore: new Date("2026-10-31T00:00:00Z"),
+        validUntilAfter: new Date("2026-11-30T00:00:00Z"),
+        recordedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.checkoutOrder.create({
+      data: {
+        id: newId(),
+        organizationId,
+        transactionId: `AL-ISO${organizationId === orgA ? "A" : "B"}${stamp % 1000}`,
+        userId: organizationId === orgA ? ids.ana : ids.beto,
+        tier: "t100",
+        productLimit: 100,
+        includedUsers: 2,
+        modules: "inventory",
+        months: 1,
+        subtotal: "349.00",
+        discount: "0.00",
+        tax: "55.84",
+        total: "404.84",
+        provider: "STRIPE",
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
   }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);

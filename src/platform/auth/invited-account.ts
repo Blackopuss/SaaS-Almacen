@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { newId } from "@/lib";
+import { legalConsentSchema } from "@/platform/legal";
 
 import { hashPassword } from "./password";
 import { newPasswordSchema } from "./register";
@@ -21,9 +22,11 @@ const invitedAccountSchema = z.object({
     .min(2, "Escribe tu nombre (mínimo 2 caracteres).")
     .max(120, "El nombre es demasiado largo (máximo 120 caracteres)."),
   password: newPasswordSchema,
+  /** Terms and privacy notice (PIL-09): the caller stores the acceptance. */
+  acceptLegal: legalConsentSchema,
 });
 
-export type InvitedAccountField = "name" | "password";
+export type InvitedAccountField = "name" | "password" | "acceptLegal";
 
 export type PreparedInvitedAccount =
   | { ok: true; name: string; passwordHash: string }
@@ -33,6 +36,7 @@ export type PreparedInvitedAccount =
 export async function prepareInvitedAccount(input: {
   name: string;
   password: string;
+  acceptLegal: boolean;
 }): Promise<PreparedInvitedAccount> {
   const parsed = invitedAccountSchema.safeParse(input);
   if (!parsed.success) {

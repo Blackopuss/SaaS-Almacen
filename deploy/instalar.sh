@@ -65,6 +65,8 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd /
 BASE=/srv/almacen
 LIB=/usr/local/lib/almacen
+CONFIG_DIR=/etc/almacen
+RESPALDO_ENV="$CONFIG_DIR/respaldo.env"
 SECRETO_ROOT=/root/.almacen-mysql-root
 export DEBIAN_FRONTEND=noninteractive
 
@@ -176,9 +178,19 @@ paso "MySQL 9.4 (contenedor, solo en 127.0.0.1)"
 if [[ ! -f "$SECRETO_ROOT" ]]; then
   (umask 077 && secreto > "$SECRETO_ROOT")
 fi
+# La contraseña de root de MySQL va por un archivo (creado 600 por mktemp), no
+# en la línea de comando de docker, donde la vería cualquiera en «ps» mientras
+# corre (auditoría 3). Se borran al terminar. Son dos: con MYSQL_PWD dentro
+# del contenedor, su arranque inicial no entra como root sin contraseña y
+# nunca crea root@'%' (así falló el despliegue de prueba).
+MYSQL_ENV="$(mktemp)"
+MYSQL_INIT_ENV="$(mktemp)"
+trap 'rm -f "$MYSQL_ENV" "$MYSQL_INIT_ENV"' EXIT
+printf 'MYSQL_PWD=%s\n' "$(cat "$SECRETO_ROOT")" > "$MYSQL_ENV"
+printf 'MYSQL_ROOT_PASSWORD=%s\n' "$(cat "$SECRETO_ROOT")" > "$MYSQL_INIT_ENV"
 if ! docker inspect almacen-mysql >/dev/null 2>&1; then
   docker run -d --name almacen-mysql --restart unless-stopped --network host \
-    -e MYSQL_ROOT_PASSWORD="$(cat "$SECRETO_ROOT")" \
+    --env-file "$MYSQL_INIT_ENV" \
     -v almacen-mysql:/var/lib/mysql \
     mysql:9.4 \
     --bind-address=127.0.0.1 --mysqlx=OFF \
@@ -188,11 +200,11 @@ if ! docker inspect almacen-mysql >/dev/null 2>&1; then
     --default-time-zone=+00:00
 fi
 for _ in $(seq 1 60); do
-  docker exec -e MYSQL_PWD="$(cat "$SECRETO_ROOT")" almacen-mysql \
+  docker exec --env-file "$MYSQL_ENV" almacen-mysql \
     mysqladmin -uroot -h127.0.0.1 ping >/dev/null 2>&1 && break
   sleep 2
 done
-docker exec -e MYSQL_PWD="$(cat "$SECRETO_ROOT")" almacen-mysql \
+docker exec --env-file "$MYSQL_ENV" almacen-mysql \
   mysqladmin -uroot -h127.0.0.1 ping >/dev/null || falla "MySQL no arrancó (docker logs almacen-mysql)."
 
 paso "Configuración de producción (secretos generados aquí)"
@@ -208,10 +220,14 @@ if [[ ! -f "$ENV" ]]; then
 fi
 # Si cambió el dominio, la dirección pública lo sigue (los secretos no).
 sed -i "s|^BETTER_AUTH_URL=.*|BETTER_AUTH_URL=https://$DOMINIO|" "$ENV"
+# Claves nuevas para instalaciones anteriores a ellas (vacías: no cambia nada).
+if ! grep -q '^ALERT_EMAIL=' "$ENV"; then
+  printf '%s\n' "" "# Avisos de operación (PIL-04, ADR 0025). Vacío = solo en el registro." "ALERT_EMAIL=" >> "$ENV"
+fi
 valor() { grep -E "^$1=" "$ENV" | head -1 | cut -d= -f2-; }
 
 paso "Base «almacen» y usuarios de mínimo privilegio"
-docker exec -i -e MYSQL_PWD="$(cat "$SECRETO_ROOT")" almacen-mysql mysql -uroot -h127.0.0.1 <<SQL
+docker exec -i --env-file "$MYSQL_ENV" almacen-mysql mysql -uroot -h127.0.0.1 <<SQL
 CREATE DATABASE IF NOT EXISTS \`almacen\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE USER IF NOT EXISTS 'almacen_app'@'127.0.0.1' IDENTIFIED BY '$(valor DATABASE_APP_PASSWORD)';
 ALTER USER 'almacen_app'@'127.0.0.1' IDENTIFIED BY '$(valor DATABASE_APP_PASSWORD)';
@@ -221,11 +237,20 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON \`almacen\`.* TO 'almacen_app'@'127.0.0.
 GRANT ALL PRIVILEGES ON \`almacen\`.* TO 'almacen_migrator'@'127.0.0.1';
 SQL
 
-paso "Respaldos: llave pública de cifrado"
-if [[ -f "$BASE/shared/respaldo.env" ]]; then
-  sed -i "s|^AGE_RECIPIENT=.*|AGE_RECIPIENT=$CLAVE_RESPALDOS|" "$BASE/shared/respaldo.env"
+paso "Respaldos: llave pública de cifrado (configuración solo-root)"
+# La config que el respaldo (root) lee vive en /etc/almacen, fuera del árbol
+# que la app puede escribir ($BASE/shared): así una escritura de la cuenta
+# «almacen» no puede plantar contenido que root ejecute (auditoría 3).
+install -d -o root -g root -m 750 "$CONFIG_DIR"
+# Migración desde la ubicación anterior (shared, escribible por almacen).
+if [[ -f "$BASE/shared/respaldo.env" && ! -f "$RESPALDO_ENV" ]]; then
+  install -o root -g root -m 640 "$BASE/shared/respaldo.env" "$RESPALDO_ENV"
+  rm -f "$BASE/shared/respaldo.env"
+fi
+if [[ -f "$RESPALDO_ENV" ]]; then
+  sed -i "s|^AGE_RECIPIENT=.*|AGE_RECIPIENT=$CLAVE_RESPALDOS|" "$RESPALDO_ENV"
 else
-  cat > "$BASE/shared/respaldo.env" <<EOF
+  cat > "$RESPALDO_ENV" <<EOF
 # Llave pública de age: los respaldos se cifran para ella. La privada vive
 # fuera del servidor (docs/DESPLIEGUE.md).
 AGE_RECIPIENT=$CLAVE_RESPALDOS
@@ -235,7 +260,8 @@ RETENER_DIAS=14
 RCLONE_DESTINO=
 EOF
 fi
-chmod 600 "$BASE/shared/respaldo.env"
+chown root:root "$RESPALDO_ENV"
+chmod 640 "$RESPALDO_ENV"
 
 paso "Scripts de operación y servicios"
 for script in desplegar volver respaldo restaurar almacen; do

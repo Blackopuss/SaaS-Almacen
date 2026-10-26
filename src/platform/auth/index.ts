@@ -38,6 +38,7 @@ export type {
   ResendResult,
 } from "./register";
 export {
+  LEGAL_ACCEPTANCE_PATH,
   MFA_SETUP_PATH,
   getCurrentSession,
   requireSession,

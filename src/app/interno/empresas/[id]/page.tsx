@@ -4,20 +4,26 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer, PageHeader } from "@/components";
-import { formatDate } from "@/lib";
+import { formatDate, formatDecimal } from "@/lib";
 import { moduleRegistry } from "@/modules/registry";
 import {
   PROPOSED_TIERS,
   getCompanyPlan,
+  listManualPayments,
   requirePlatformStaff,
 } from "@/platform/billing";
 
-import { provisionAction } from "./actions";
+import {
+  provisionAction,
+  recordPaymentAction,
+  reversePaymentAction,
+} from "./actions";
+import { PaymentForm, ReversePaymentForm } from "./payment-form";
 import { ProvisionForm } from "./provision-form";
 
 export const metadata: Metadata = { title: "Plan de la empresa" };
 
-/** Plan of one company and the form to assign it (MOD-09). */
+/** Plan of one company, the form to assign it (MOD-09) and its payments (PIL-11). */
 export default async function EmpresaInternaPage({
   params,
 }: PageProps<"/interno/empresas/[id]">) {
@@ -25,6 +31,7 @@ export default async function EmpresaInternaPage({
   const { id } = await params;
   const company = await getCompanyPlan(id);
   if (!company) notFound();
+  const payments = await listManualPayments(company.id);
 
   const moduleNames = moduleRegistry.all
     .filter((m) => company.modules.includes(m.id))
@@ -46,11 +53,13 @@ export default async function EmpresaInternaPage({
     ],
     [
       "Vigencia",
-      company.validUntil
-        ? `Hasta el ${formatDate(company.validUntil)}`
-        : company.modules.length > 0
-          ? "Sin fecha de término"
-          : "Sin plan",
+      company.endedAt
+        ? `Venció el ${formatDate(company.endedAt)} (solo lectura)`
+        : company.validUntil
+          ? `Hasta el ${formatDate(company.validUntil)}`
+          : company.modules.length > 0
+            ? "Sin fecha de término"
+            : "Sin plan",
     ],
   ];
 
@@ -83,6 +92,60 @@ export default async function EmpresaInternaPage({
             </div>
           ))}
         </dl>
+      </section>
+
+      <PaymentForm action={recordPaymentAction.bind(null, company.id)} />
+
+      <section
+        aria-labelledby="pagos"
+        className="rounded-xl border bg-card p-4 sm:p-5"
+      >
+        <h2 id="pagos" className="font-medium">
+          Pagos registrados
+        </h2>
+        {payments.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Todavía no hay pagos registrados.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y">
+            {payments.map((payment) => (
+              <li key={payment.id} className="py-3 first:pt-0 last:pb-0">
+                <p className="font-medium [overflow-wrap:anywhere]">
+                  {payment.kind === "PAYMENT"
+                    ? `$${formatDecimal(payment.amount, { minScale: 2 })} MXN · ${payment.months} ${payment.months === 1 ? "mes" : "meses"} · ${payment.reference}`
+                    : `Anulación de $${formatDecimal(payment.amount, { minScale: 2 })} MXN · ${payment.months} ${payment.months === 1 ? "mes" : "meses"} menos`}
+                  {payment.reversed && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      (anulado)
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                  {payment.kind === "PAYMENT"
+                    ? `Pagado el ${formatDate(payment.paidOn, "UTC")}`
+                    : "Anulado"}
+                  {` · registró ${payment.recordedBy} el ${formatDate(payment.createdAt)} · vigencia hasta el ${formatDate(payment.validUntilAfter)}`}
+                </p>
+                {payment.notes && (
+                  <p className="text-sm [overflow-wrap:anywhere]">
+                    {payment.notes}
+                  </p>
+                )}
+                {payment.kind === "PAYMENT" && !payment.reversed && (
+                  <ReversePaymentForm
+                    id={payment.id}
+                    action={reversePaymentAction.bind(
+                      null,
+                      company.id,
+                      payment.id,
+                    )}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <ProvisionForm

@@ -380,6 +380,46 @@ try {
       `${viewport.name}: «Mi plan» shows product and user quotas, modules and no overflow`,
     );
 
+    // «Comprar plan» (ADR 0028): five tiers as radios, months as a
+    // segmented group, and a total priced by the server. Nothing is sent.
+    // The demo plan has no end date: then the page says so instead.
+    await page.getByRole("link", { name: "Comprar o renovar" }).click();
+    await page.waitForURL("**/configuracion/plan/comprar");
+    await page
+      .getByRole("heading", { name: "Comprar plan", level: 1 })
+      .waitFor();
+    let buyOk;
+    if ((await page.locator('input[name="tier"]').count()) === 0) {
+      buyOk = await page.getByText("no necesitas comprarlo").isVisible();
+    } else {
+      const totalText = () =>
+        page.evaluate(
+          () =>
+            document.querySelector("#resumen + dl > div:last-child")
+              ?.textContent,
+        );
+      const before = await totalText();
+      await page.getByText("12 meses", { exact: true }).click();
+      await page.waitForFunction(
+        (old) =>
+          document.querySelector("#resumen + dl > div:last-child")
+            ?.textContent !== old,
+        before,
+      );
+      buyOk =
+        (await page.locator('input[name="tier"]').count()) === 5 &&
+        (await page.locator('input[name="months"]').count()) === 4 &&
+        (await totalText()) !== before;
+    }
+    const buyOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    await page.screenshot({ path: `${OUT}/comprar-${viewport.name}.png` });
+    check(
+      buyOk && buyOverflow <= 0,
+      `${viewport.name}: «Comprar plan» offers five tiers priced by the server (or says the plan needs none) without overflow`,
+    );
+
     // Internal console (MOD-09): a titular is not platform staff, so the
     // console answers "not found" instead of announcing itself.
     const consoleResponse = await page.goto(`${BASE}/interno`, {
@@ -878,12 +918,23 @@ try {
     const kept = await page.inputValue("#email");
     const cleared = (await page.inputValue("#password")) === "";
     check(
-      errors === 3 &&
+      errors === 4 &&
         focused === "name" &&
         described?.includes("password-error") === true &&
         kept === "no-es-correo" &&
         cleared,
       `${viewport.name}: registration shows inline errors and focuses the first`,
+    );
+    // PIL-09: the terms checkbox is required and links to both documents.
+    check(
+      (await page.getAttribute("#acceptLegal", "aria-describedby")) ===
+        "acceptLegal-error" &&
+        (await page.locator("a[href='/terminos'][target='_blank']").count()) ===
+          1 &&
+        (await page
+          .locator("a[href='/privacidad'][target='_blank']")
+          .count()) === 1,
+      `${viewport.name}: registration asks to accept terms and privacy`,
     );
     await page.getByRole("button", { name: "Mostrar contraseña" }).click();
     check(

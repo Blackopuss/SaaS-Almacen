@@ -18,7 +18,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-import { SITE_NAV } from "./content";
+import { SITE_NAV } from "./site-shared";
 
 /**
  * Header of the public site: brand, sections, theme and account buttons.

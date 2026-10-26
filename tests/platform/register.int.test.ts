@@ -18,7 +18,12 @@ afterAll(async () => {
 describe("registerUser", () => {
   it("creates the account with a normalized email and an OWASP scrypt hash", async () => {
     const result = await registerUser(
-      { name: "  Ana Pérez  ", email: `  ${email}  `, password },
+      {
+        name: "  Ana Pérez  ",
+        email: `  ${email}  `,
+        password,
+        acceptLegal: true,
+      },
       noHeaders,
     );
     expect(result.ok).toBe(true);
@@ -37,7 +42,12 @@ describe("registerUser", () => {
   it("reports every invalid field in Spanish without creating anything", async () => {
     const before = await db.user.count();
     const result = await registerUser(
-      { name: "A", email: "no-es-correo", password: "corta" },
+      {
+        name: "A",
+        email: "no-es-correo",
+        password: "corta",
+        acceptLegal: true,
+      },
       noHeaders,
     );
     expect(result).toEqual({
@@ -57,6 +67,7 @@ describe("registerUser", () => {
         name: "Beto",
         email: `largo.${Date.now()}@example.test`,
         password: "x".repeat(129),
+        acceptLegal: true,
       },
       noHeaders,
     );
@@ -68,6 +79,7 @@ describe("registerUser", () => {
         name: "Beto",
         email: `espacios.${Date.now()}@example.test`,
         password: " ".repeat(12),
+        acceptLegal: true,
       },
       noHeaders,
     );
@@ -78,6 +90,7 @@ describe("registerUser", () => {
         name: "Beto",
         email: `exacta.${Date.now()}@example.test`,
         password: "a".repeat(12),
+        acceptLegal: true,
       },
       noHeaders,
     );
@@ -96,7 +109,12 @@ describe("registerUser", () => {
   it("answers a duplicate email exactly like a new one and warns the owner", async () => {
     const users = await db.user.count();
     const result = await registerUser(
-      { name: "Otra Ana", email: email.toUpperCase(), password },
+      {
+        name: "Otra Ana",
+        email: email.toUpperCase(),
+        password,
+        acceptLegal: true,
+      },
       noHeaders,
     );
     expect(result).toEqual({ ok: true });

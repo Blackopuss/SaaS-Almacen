@@ -101,6 +101,46 @@ jobs:
           sudo age -d -i "$RUNNER_TEMP/llave.txt" "/srv/almacen/backups/$ULTIMO" | gunzip | grep -q "CREATE TABLE \`organization\`"
           sudo journalctl -u almacen-respaldo -n 8 --no-pager
 
+      - name: Un respaldo fallido se avisa de inmediato (PIL-04)
+        run: |
+          sudo grep -q '^ALERT_EMAIL=' /srv/almacen/shared/.env.local
+          sudo mv /etc/almacen/respaldo.env /etc/almacen/respaldo.env.aparte
+          if sudo systemctl start almacen-respaldo.service; then
+            echo "el respaldo sin configuración no falló" >&2; exit 1
+          fi
+          sudo mv /etc/almacen/respaldo.env.aparte /etc/almacen/respaldo.env
+          sudo test -e /srv/almacen/shared/run/ultimo-respaldo.fallido
+          jq -e '.checks.backup == "falla"' <(curl -sk https://localhost/api/salud)
+          sudo systemctl start almacen-respaldo.service
+          sudo test ! -e /srv/almacen/shared/run/ultimo-respaldo.fallido
+          jq -e '.checks.backup == "ok"' <(curl -sk https://localhost/api/salud)
+
+      - name: Endurecimiento (auditoría 3)
+        run: |
+          # La config que root «sourcea»/ejecuta es solo de root y vive fuera
+          # del árbol que la app puede escribir: «almacen» no puede plantarla.
+          [ "$(sudo stat -c '%U %a' /etc/almacen)" = "root 750" ]
+          [ "$(sudo stat -c '%U %a' /etc/almacen/respaldo.env)" = "root 640" ]
+          sudo test ! -e /srv/almacen/shared/respaldo.env
+          if sudo -u almacen bash -c 'echo pwned >> /etc/almacen/respaldo.env' 2>/dev/null; then
+            echo "almacen pudo escribir la config que root ejecuta" >&2; exit 1
+          fi
+          if sudo -u almacen bash -c 'rm -f /etc/almacen/respaldo.env' 2>/dev/null; then
+            echo "almacen pudo reemplazar la config (escritura de directorio)" >&2; exit 1
+          fi
+          # La contraseña de MySQL no aparece en la línea de comando de docker.
+          RAIZ="$(sudo cat /root/.almacen-mysql-root)"
+          if ps -eo args | grep -F -- "$RAIZ" | grep -qv grep; then
+            echo "la contraseña de MySQL quedó visible en ps" >&2; exit 1
+          fi
+          # El token de recuperación no queda en claro en el log de Caddy.
+          curl -fsSk "https://localhost/api/auth/reset-password/token-secreto-de-prueba" -o /dev/null || true
+          sleep 2
+          if sudo grep -qF "token-secreto-de-prueba" /var/log/caddy/almacen.log; then
+            echo "el token quedó en el log de Caddy" >&2; exit 1
+          fi
+          sudo grep -qF "/api/auth/[redactado]" /var/log/caddy/almacen.log
+
       - name: Segundo despliegue y vuelta a la versión anterior
         run: |
           PRIMERA="$(sudo readlink -f /srv/almacen/current)"

@@ -16,7 +16,10 @@ describe("contentSecurityPolicy", () => {
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("base-uri 'self'");
-    expect(policy).toContain("form-action 'self'");
+    // Forms post only here, or are redirected to a provider's checkout.
+    expect(policy).toContain(
+      "form-action 'self' https://checkout.stripe.com https://www.paypal.com https://www.sandbox.paypal.com https://www.mercadopago.com.mx https://sandbox.mercadopago.com.mx;",
+    );
     expect(policy).toMatch(/upgrade-insecure-requests$/);
   });
 

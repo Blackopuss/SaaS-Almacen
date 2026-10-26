@@ -9,7 +9,7 @@ export type RegisterFormState = {
   fieldErrors: Partial<Record<RegisterField, string>>;
   formError?: string;
   /** Echoed back so the form keeps what was typed (never the password). */
-  values: { name: string; email: string };
+  values: { name: string; email: string; acceptLegal: boolean };
 };
 
 export async function registerAction(
@@ -20,6 +20,7 @@ export async function registerAction(
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),
+    acceptLegal: formData.get("acceptLegal") === "1",
   };
 
   const result = await registerUser(input, await headers());
@@ -27,7 +28,11 @@ export async function registerAction(
     return {
       fieldErrors: result.fieldErrors,
       formError: result.formError,
-      values: { name: input.name, email: input.email },
+      values: {
+        name: input.name,
+        email: input.email,
+        acceptLegal: input.acceptLegal,
+      },
     };
   }
   redirect("/verifica-tu-correo");

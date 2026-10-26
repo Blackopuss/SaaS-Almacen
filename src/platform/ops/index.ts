@@ -1,4 +1,6 @@
-// Public API of platform/ops: health of the installation (BAS-11, PIL-04).
+// Public API of platform/ops: health of the installation (BAS-11) and
+// operations alerts (PIL-04).
+export { ALERT_EVERY_MS, runAlertRound } from "./alerts";
 export {
   BACKUP_STALE_AFTER_MS,
   ERROR_ALERT_THRESHOLD,

@@ -231,3 +231,88 @@ export function purchaseOrderEmail(input: {
     ].join("\n"),
   };
 }
+
+/** Operations alert for whoever runs the server (PIL-04). */
+export function operationsAlertEmail(input: {
+  to: string;
+  server: string;
+  failed: string[];
+  recovered: string[];
+  stillFailing: string[];
+}): EmailMessage {
+  const list = (items: string[]) => items.map((item) => `- ${item}`);
+  return {
+    to: input.to,
+    subject:
+      input.failed.length > 0
+        ? `Almacén: falla en el servidor (${input.server})`
+        : `Almacén: el servidor se recuperó (${input.server})`,
+    text: [
+      ...(input.failed.length > 0
+        ? ["Empezó a fallar:", ...list(input.failed), ""]
+        : []),
+      ...(input.recovered.length > 0
+        ? ["Ya funciona otra vez:", ...list(input.recovered), ""]
+        : []),
+      ...(input.stillFailing.length > 0
+        ? ["Sigue fallando:", ...list(input.stillFailing), ""]
+        : []),
+      "Estado en el servidor: curl -s localhost:3000/api/salud",
+      "Registros: journalctl -u almacen-web -u almacen-worker -u almacen-respaldo -n 100",
+      "",
+      "Avisamos cuando algo empieza a fallar y cuando se recupera, no mientras siga igual.",
+    ].join("\n"),
+  };
+}
+
+/** Receipt of a plan bought online (ADR 0028), to the titular. */
+export function planPurchaseEmail(input: {
+  to: string;
+  name: string;
+  organizationName: string;
+  transactionId: string;
+  /** "1,000 productos · Inventario + Compras". */
+  planText: string;
+  months: number;
+  /** Already formatted: "$1,214.52". */
+  subtotal: string;
+  discount: string | null;
+  tax: string;
+  total: string;
+  /** "Tarjeta (Stripe)", "PayPal", "Mercado Pago", "Código PEPITOGRATIS". */
+  paidWith: string;
+  /** "31 de enero de 2027". */
+  validUntil: string;
+  refundTerms: readonly string[];
+  planUrl: string;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    subject: `Tu compra en Almacén (${input.transactionId})`,
+    actionUrl: input.planUrl,
+    text: [
+      `Hola, ${oneLine(input.name, 80)}:`,
+      "",
+      `Gracias por tu compra. El plan de ${company} ya está activo.`,
+      "",
+      `ID de transacción: ${input.transactionId}`,
+      `Plan: ${input.planText}`,
+      `Meses: ${input.months}`,
+      `Subtotal: ${input.subtotal}`,
+      ...(input.discount ? [`Descuento: −${input.discount}`] : []),
+      `IVA (16%): ${input.tax}`,
+      `Total pagado: ${input.total} MXN`,
+      `Forma de pago: ${input.paidWith}`,
+      `Vigente hasta: ${input.validUntil}`,
+      "",
+      "Todas las personas de tu equipo usan este mismo plan; no necesitan comprar nada.",
+      `Ve tu plan en: ${input.planUrl}`,
+      "",
+      "Reembolsos:",
+      ...input.refundTerms.map((line) => `- ${line}`),
+      "",
+      "Guarda este correo: el ID de transacción es tu comprobante para cualquier aclaración.",
+    ].join("\n"),
+  };
+}

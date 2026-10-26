@@ -20,9 +20,11 @@ export {
   existingAccountEmail,
   invitationEmail,
   mfaDisabledEmail,
+  operationsAlertEmail,
   mfaEnabledEmail,
   passwordChangedEmail,
   passwordResetEmail,
+  planPurchaseEmail,
   purchaseOrderEmail,
   verificationEmail,
 } from "./templates";
