@@ -60,7 +60,6 @@ export {
   PLAN_TIERS,
   PURCHASE_MONTHS,
   SOLD_MODULE_NAMES,
-  TAX_RATE,
   planText,
   quote,
 } from "./prices";

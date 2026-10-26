@@ -155,8 +155,8 @@ describe("startCheckout with a provider", () => {
       ok: true,
       next: "https://pay.example.test/session",
     });
-    // (349 + 179) × 3 = 1584 + 16% VAT.
-    expect(fake.createCalls[0]?.total).toBe("1837.44");
+    // (349 + 179) × 3 = 1584, VAT included.
+    expect(fake.createCalls[0]?.total).toBe("1584.00");
     const order = await db.checkoutOrder.findFirst({
       where: { organizationId: c.org },
     });
@@ -245,7 +245,7 @@ describe("confirming the payment", () => {
     });
     fake.status = {
       state: "paid",
-      amount: "2429.04", // 349 × 6 + VAT
+      amount: "2094.00", // 349 × 6, VAT included
       currency: "mxn",
       paymentRef: "pi_1",
     };
@@ -255,7 +255,12 @@ describe("confirming the payment", () => {
       getOrder(actorOf(c), c.orderId),
     ]);
     const view = await getOrder(actorOf(c), c.orderId);
-    expect(view).toMatchObject({ status: "PAID", total: "2429.04" });
+    expect(view).toMatchObject({
+      status: "PAID",
+      subtotal: "2094.00",
+      tax: "0.00",
+      total: "2094.00",
+    });
     const rights = await getFreshEntitlements(c.org);
     expect([...rights.modules]).toEqual(["inventory"]);
     const trail = await listAuditTrail(c.org, { limit: 10 });
@@ -288,7 +293,7 @@ describe("confirming the payment", () => {
     const c = await pendingOrder();
     fake.status = {
       state: "paid",
-      amount: "2429.04",
+      amount: "2094.00",
       currency: "MXN",
       paymentRef: "pi_3",
     };
@@ -388,7 +393,7 @@ describe("codes", () => {
     ).toMatchObject({ ok: false, fieldErrors: { code: expect.any(String) } });
   });
 
-  it("a partial code discounts before VAT and the provider charges the rest", async () => {
+  it("a partial code discounts the subtotal and the provider charges the rest", async () => {
     const c = await company();
     const code = await newCode(50);
     const result = await startCheckout(
@@ -398,7 +403,7 @@ describe("codes", () => {
       c.owner.email,
     );
     expect(result).toMatchObject({ ok: true });
-    expect(fake.createCalls[0]?.total).toBe("607.26");
+    expect(fake.createCalls[0]?.total).toBe("523.50");
   });
 
   it("unknown, disabled and expired codes all answer the same", async () => {

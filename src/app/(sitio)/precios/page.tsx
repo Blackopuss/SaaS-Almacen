@@ -37,7 +37,7 @@ const FAQ = [
   {
     question: "¿Hay permanencia?",
     answer:
-      "No. Pagas mes a mes. Si cancelas, tu cuenta queda en modo consulta para que descargues tu información.",
+      "No. Pagas por adelantado 1, 3, 6 o 12 meses y nada se cobra solo. Si no renuevas, tu cuenta queda en modo consulta para que veas y descargues tu información.",
   },
   {
     question: "¿Necesitan más personas o más productos?",
@@ -59,7 +59,7 @@ export default function PricingPage() {
         </div>
         <p className="mt-6 flex items-start gap-2 text-sm text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          Precios de lanzamiento propuestos, en pesos mexicanos y antes de IVA.
+          Precios de lanzamiento en pesos mexicanos; lo que ves es lo que pagas.
           Pueden ajustarse antes de la apertura; el precio que contrates se
           respeta mientras tengas tu plan.
         </p>

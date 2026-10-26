@@ -277,7 +277,8 @@ export function planPurchaseEmail(input: {
   /** Already formatted: "$1,214.52". */
   subtotal: string;
   discount: string | null;
-  tax: string;
+  /** VAT charged on top; null when the price already included it. */
+  tax: string | null;
   total: string;
   /** "Tarjeta (Stripe)", "PayPal", "Mercado Pago", "Código PEPITOGRATIS". */
   paidWith: string;
@@ -301,7 +302,7 @@ export function planPurchaseEmail(input: {
       `Meses: ${input.months}`,
       `Subtotal: ${input.subtotal}`,
       ...(input.discount ? [`Descuento: −${input.discount}`] : []),
-      `IVA (16%): ${input.tax}`,
+      ...(input.tax ? [`IVA (16%): ${input.tax}`] : []),
       `Total pagado: ${input.total} MXN`,
       `Forma de pago: ${input.paidWith}`,
       `Vigente hasta: ${input.validUntil}`,

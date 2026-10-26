@@ -417,7 +417,8 @@ export async function startCheckout(
           months,
           subtotal: price.subtotal,
           discount: price.discount,
-          tax: price.tax,
+          // VAT charged on top: none, the prices already include it.
+          tax: "0.00",
           total: price.total,
           provider: free ? "CODE" : PROVIDER_ENUM[provider!.id],
           promoCodeId: usable?.id ?? null,
@@ -897,7 +898,8 @@ async function sendReceipt(organizationId: string, orderId: string) {
       months: view.months,
       subtotal: formatMxn(view.subtotal),
       discount: dec(view.discount).isZero() ? null : formatMxn(view.discount),
-      tax: formatMxn(view.tax),
+      // Only orders from before VAT was included carry it apart.
+      tax: dec(view.tax).isZero() ? null : formatMxn(view.tax),
       total: formatMxn(view.total),
       paidWith: PAID_WITH[view.provider],
       validUntil: view.validUntil ? day(view.validUntil) : "",
