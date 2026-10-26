@@ -100,10 +100,7 @@ export default async function ReportesComprasPage({
   return (
     <PageContainer>
       {back}
-      <PageHeader
-        title="Reportes de compras"
-        description="Lo que falta por llegar y lo que le compraste a cada proveedor."
-      />
+      <PageHeader title="Reportes de compras" />
       <nav aria-label="Reporte" className="flex flex-wrap gap-2">
         {(
           [

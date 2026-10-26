@@ -132,8 +132,7 @@ export function ReceiveOrder({
           <DialogHeader>
             <DialogTitle>Recibir la orden {numberText}</DialogTitle>
             <DialogDescription>
-              Escribe lo que llegó de cada producto; ya viene lo que falta. Lo
-              que no llegó queda pendiente para otra recepción (deja 0).
+              Ya viene lo que falta. Si algo no llegó, déjalo en 0.
             </DialogDescription>
           </DialogHeader>
           <input type="hidden" name="idempotencyKey" value={idempotencyKey} />

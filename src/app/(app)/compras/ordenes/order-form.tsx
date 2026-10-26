@@ -75,7 +75,7 @@ export function OrderForm({
         <FormField
           id="supplierId"
           label="Proveedor"
-          hint="A quién le vas a pedir. Después de empezar la orden ya no se cambia."
+          hint="Ya no se cambia después."
           error={state.fieldErrors.supplierId}
         >
           {(control) => (

@@ -17,7 +17,7 @@ registrar lo que llegó y lo que salió sin dar vueltas ni leer párrafos?
 - Antes: **6/10**. Nada bloqueaba una tarea, pero había varios problemas mayores
   (gravedad 3): demasiadas formas de hacer lo mismo, acciones repartidas en
   lugares distintos y mucho texto que nadie lee.
-- Después: **8/10**. Lo que falta para 10 está en «Pendientes».
+- Después: **8.5/10** (tres rondas). Lo que falta para 10 está en «Pendientes».
 
 ## Hallazgos y cambios
 
@@ -49,6 +49,16 @@ registrar lo que llegó y lo que salió sin dar vueltas ni leer párrafos?
 | 19 | Exportar tenía tres tarjetas con dos botones cada una (tres azules compitiendo) y un párrafo técnico al pie. Su título («Exportar a Excel») no coincidía con el enlace. | 2 | Una lista: cada descarga con «Excel» y «CSV». Título «Descargar en Excel», igual que el enlace. |
 | 20 | Editar producto volvía a Inventario en vez de a la ficha, y para piezas mostraba «Precisión: se maneja en enteros» (nada que elegir). | 2 | «Volver al producto». Para unidades enteras ya no se muestra precisión. Presentaciones y Archivar con una línea de texto. |
 
+## Tercera ronda: Compras y Conteos por dentro
+
+| # | Hallazgo (antes) | Gravedad | Cambio |
+| --- | --- | --- | --- |
+| 21 | En una orden en borrador, «Confirmar orden» estaba al pie; arriba solo había «Descargar PDF» y «Editar datos». | 3 | Arriba va la acción del día según el estado: «Confirmar orden» (borrador) o «Recibir mercancía» (enviada). PDF y editar pasan a enlaces junto al estado. |
+| 22 | Los datos de la orden y del proveedor mostraban renglones con «—» (sin fecha esperada, sin notas, sin RFC…). | 2 | Solo se muestran los datos que existen. |
+| 23 | «Nueva orden» obligaba a elegir proveedor aunque solo hubiera uno, y desde la ficha del proveedor no se podía empezar una orden. | 2 | Con un solo proveedor ya viene elegido; la ficha del proveedor tiene «Nueva orden». |
+| 24 | Párrafos de explicación al pie de cada orden (hasta tres renglones) y en el diálogo de recibir. | 1 | Una línea por estado; recibir dice «Ya viene lo que falta. Si algo no llegó, déjalo en 0.». |
+| 25 | El conteo tenía «Cancelar conteo» como botón principal arriba y un párrafo largo al pie. | 2 | Arriba solo «Aplicar conteo» cuando hay diferencias; cancelar va al final; una línea de ayuda. |
+
 La importación mantiene sus garantías: nada se guarda hasta confirmar, la
 revisión vuelve a leer y validar cada fila, y el servidor sigue exigiendo el
 separador decimal (solo cambió que la pantalla lo trae marcado).
@@ -69,7 +79,5 @@ separador decimal (solo cambió que la pantalla lo trae marcado).
 - Probar con 3 a 5 personas reales (método de Krug: tareas como «llegaron 3
   cajas de tornillos, regístralas» y observar sin ayudar). Ninguna auditoría
   sustituye eso.
-- Pantallas de Compras por dentro (orden, recepción, proveedor) y de Conteos
-  por dentro: no se revisaron a fondo en esta ronda.
 - Nombres de tipos de movimiento («Reversa», «Saldo inicial») vienen del
   servicio y de sus pruebas. Si se cambian, se cambian ahí.

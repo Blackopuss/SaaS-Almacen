@@ -69,7 +69,7 @@ export default async function SugerenciasPage() {
       {moduleState === "read_only" && <ReadOnlyNotice module="Compras" />}
       <PageHeader
         title="Qué pedir"
-        description="Lo que está en su mínimo o por debajo y no viene en camino, agrupado por proveedor. Cada grupo se vuelve un borrador que revisas antes de confirmar."
+        description="Lo que está en su mínimo y no viene en camino, por proveedor."
       />
       {suggestions.groups.length === 0 ? (
         <EmptyState
