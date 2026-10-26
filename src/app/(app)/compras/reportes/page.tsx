@@ -116,7 +116,7 @@ export default async function ReportesComprasPage({
                 : "/compras/reportes?vista=proveedores"
             }
             aria-current={view === id ? "page" : undefined}
-            className={`${chip} ${view === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:bg-muted"}`}
+            className={`${chip} ${view === id ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted"}`}
           >
             {label}
           </Link>

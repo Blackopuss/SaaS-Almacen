@@ -79,6 +79,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - Animaciones que dependen de «reducir movimiento» se eligen con CSS (`motion-reduce:`), no con `useReducedMotion`, para que servidor y cliente generen el mismo HTML.
 - Animación con `motion` (`src/components/motion.tsx`): presets cortos, salida más rápida que entrada, `reducedMotion="user"`.
 - Formularios: `FormField` (etiqueta, ayuda y error enlazados con `aria-describedby`) y `PasswordInput`; Server Actions con `useActionState` y validación Zod en el servicio de `platform`/`modules`.
+- **Accesibilidad (PIL-07):** `npm run verify:a11y` (con `npm run dev` activo y la cuenta demo; `UI_BROWSER=chromium` si no hay Edge) pasa axe-core WCAG 2.1 A/AA sin fallas graves ni críticas, sin desbordamiento, con foco visible en cada parada de teclado y objetivos táctiles ≥ 44 px en móvil, en cada pantalla principal y en los detalles de producto, orden y conteo; y comprueba que un formulario enviado vacío lleva el foco a un error explicado. Una pantalla nueva del menú o un flujo principal se agrega a `SCREENS`. Las pantallas de error usan `retry()` (vuelve a pedir al servidor), no `reset()`; `src/app/global-error.tsx` cubre una falla del layout raíz en español.
 - `/sistema-visual` (solo desarrollo) muestra los componentes. Con `npm run dev` activo (puerto 3000 por defecto, `UI_BASE_URL` para otro), `npm run verify:ui` comprueba foco visible, diálogo accesible, tamaños táctiles y desbordamiento en móvil y escritorio (Edge instalado).
 
 ## Navegación y estados (BAS-13)

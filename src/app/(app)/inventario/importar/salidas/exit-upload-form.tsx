@@ -29,7 +29,7 @@ export function ExitUploadForm() {
             name="file"
             type="file"
             accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="h-auto max-w-md py-2"
+            className="h-auto min-h-11 max-w-md py-2"
           />
         )}
       </FormField>

@@ -145,7 +145,7 @@ export default async function ComprasPage({
           <Link
             href={pageHref(1, null)}
             aria-current={list.status === null ? "true" : undefined}
-            className={`${chip} ${list.status === null ? "border-primary bg-primary/10 text-primary" : "bg-card hover:bg-muted"}`}
+            className={`${chip} ${list.status === null ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted"}`}
           >
             Todas
           </Link>
@@ -154,7 +154,7 @@ export default async function ComprasPage({
               key={status}
               href={pageHref(1, status)}
               aria-current={list.status === status ? "true" : undefined}
-              className={`${chip} ${list.status === status ? "border-primary bg-primary/10 text-primary" : "bg-card hover:bg-muted"}`}
+              className={`${chip} ${list.status === status ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted"}`}
             >
               {PURCHASE_ORDER_STATUS_LABELS[status]}
             </Link>
