@@ -7,6 +7,7 @@ import { requireSession, type CurrentUser } from "@/platform/auth";
 import { db } from "@/server";
 
 import { CREATE_ORGANIZATION_PATH } from "./organizations";
+import { supportWindowFor } from "./support";
 
 /**
  * Active company (PLT-11). Each session works in one company, stored on
@@ -23,6 +24,11 @@ export type ActiveOrganization = {
   currency: string;
   /** The person is the company's titular (Organization.ownerUserId). */
   isOwner: boolean;
+  /**
+   * Platform support looking into the company with its titular's leave
+   * (PIL-12): read-only, until this moment. Null for its members.
+   */
+  supportUntil: Date | null;
 };
 
 export type OrganizationContext = {
@@ -84,6 +90,21 @@ export async function resolveActiveOrganization(
       })
     : null;
 
+  // Support is in a company where it has no membership, while the
+  // titular's access stays open (PIL-12).
+  if (!membership && session.activeOrganizationId) {
+    const window = await supportWindowFor(session.activeOrganizationId, userId);
+    if (window) {
+      const company = await db.organization.findUnique({
+        where: { id: session.activeOrganizationId },
+        select: { id: true, name: true, timeZone: true, currency: true },
+      });
+      if (company) {
+        return { ...company, isOwner: false, supportUntil: window.until };
+      }
+    }
+  }
+
   if (!membership) {
     membership = await db.membership.findFirst({
       where: { userId, status: "ACTIVE" },
@@ -101,7 +122,11 @@ export async function resolveActiveOrganization(
   if (!membership) return null;
 
   const { ownerUserId, ...organization } = membership.organization;
-  return { ...organization, isOwner: ownerUserId === userId };
+  return {
+    ...organization,
+    isOwner: ownerUserId === userId,
+    supportUntil: null,
+  };
 }
 
 /**

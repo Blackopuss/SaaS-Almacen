@@ -6,11 +6,14 @@ import { EmptyState, PageContainer, PageHeader } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatDate } from "@/lib";
+import { formatDate, formatDateTime } from "@/lib";
+import { listOpenSupportAccess } from "@/platform/authorization";
 import {
   listCompaniesForStaff,
   requirePlatformStaff,
 } from "@/platform/billing";
+
+import { EnterSupport } from "./enter-support";
 
 export const metadata: Metadata = { title: "Empresas" };
 
@@ -21,7 +24,10 @@ export default async function InternoPage({
   await requirePlatformStaff();
   const { q } = await searchParams;
   const search = typeof q === "string" ? q : "";
-  const companies = await listCompaniesForStaff(search);
+  const [companies, support] = await Promise.all([
+    listCompaniesForStaff(search),
+    listOpenSupportAccess(),
+  ]);
 
   return (
     <PageContainer>
@@ -29,6 +35,36 @@ export default async function InternoPage({
         title="Empresas"
         description="Asigna el plan de cada empresa: cupo de productos, usuarios, módulos y vigencia."
       />
+      {/* Companies whose titular opened support access (PIL-12). */}
+      {support.length > 0 && (
+        <section
+          aria-labelledby="soporte-abierto"
+          className="rounded-xl border bg-card"
+        >
+          <h2 id="soporte-abierto" className="border-b p-4 font-medium sm:px-5">
+            Piden soporte
+          </h2>
+          <ul className="divide-y">
+            {support.map((row) => (
+              <li
+                key={row.organizationId}
+                className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5"
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{row.name}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    Acceso abierto hasta el {formatDateTime(row.until)}
+                  </span>
+                </span>
+                <EnterSupport
+                  organizationId={row.organizationId}
+                  name={row.name}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <form
         role="search"
         className="flex flex-col gap-2 sm:flex-row sm:items-end"

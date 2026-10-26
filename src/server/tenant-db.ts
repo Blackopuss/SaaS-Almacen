@@ -66,6 +66,7 @@ export const TENANT_MODELS = [
   "StoredFile",
   "Subscription",
   "SubscriptionItem",
+  "SupportAccess",
 ] as const;
 
 const tenantModels = new Set<string>(TENANT_MODELS);

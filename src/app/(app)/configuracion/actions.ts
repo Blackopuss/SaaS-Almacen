@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import {
+  grantSupportAccess,
+  revokeSupportAccess,
+} from "@/platform/authorization";
+import { requireOrganizationContext } from "@/platform/tenancy";
+
+import {
   confirmTotpEnrollment,
   disableMfa,
   regenerateBackupCodes,
@@ -112,4 +118,26 @@ export async function disableMfaAction(
   // No revalidation here: the dialog reports success first, then the
   // client refreshes (re-rendering now would unmount the dialog).
   return result.ok ? { done: true } : { error: result.error };
+}
+
+/**
+ * Support access (PIL-12): only the titular opens or closes it; company
+ * and person come from the session. The service checks it again.
+ */
+export async function grantSupportAccessAction(): Promise<void> {
+  const { user, organization } = await requireOrganizationContext();
+  await grantSupportAccess({
+    organizationId: organization.id,
+    userId: user.id,
+  });
+  revalidatePath("/configuracion");
+}
+
+export async function revokeSupportAccessAction(): Promise<void> {
+  const { user, organization } = await requireOrganizationContext();
+  await revokeSupportAccess({
+    organizationId: organization.id,
+    userId: user.id,
+  });
+  revalidatePath("/configuracion");
 }

@@ -158,6 +158,7 @@ model Organization {
   purchaseReturnLines     PurchaseReturnLine[]
   manualPayments          ManualPayment[]
   checkoutOrders          CheckoutOrder[]
+  supportAccesses         SupportAccess[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -724,6 +725,24 @@ model ManualPayment {
   @@index([organizationId, reference])
   @@index([organizationId, createdAt])
   @@map("manual_payment")
+}
+
+/// Temporary, read-only access of platform support to a company (PIL-12).
+/// The titular opens it for a fixed time and may close it earlier; nothing
+/// is ever deleted, so it stays as the record of who allowed what and when.
+model SupportAccess {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  grantedByUserId String       @db.Char(36)
+  expiresAt       DateTime     @db.DateTime(3)
+  revokedAt       DateTime?    @db.DateTime(3)
+  revokedByUserId String?      @db.Char(36)
+  createdAt       DateTime     @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, expiresAt])
+  @@map("support_access")
 }
 
 // ── Product catalog (INV-01) ─────────────────────────────────────────────

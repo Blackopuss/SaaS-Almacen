@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { moduleOpenWork, moduleRegistry } from "@/modules/registry";
+import { requireSession } from "@/platform/auth";
+import { enterSupport } from "@/platform/authorization";
 import {
   provisionCompany,
   recordManualPayment,
@@ -154,4 +157,19 @@ export async function reversePaymentAction(
   }
   revalidatePath(`/interno/empresas/${organizationId}`);
   return { done: true };
+}
+
+/**
+ * Platform staff enters a company as support (PIL-12): only while its
+ * titular keeps the access open; the service checks staff and access.
+ */
+export async function enterSupportAction(
+  organizationId: string,
+): Promise<{ error: string }> {
+  await requirePlatformStaff();
+  const { user, sessionId } = await requireSession();
+  const result = await enterSupport(user.id, sessionId, String(organizationId));
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/", "layout");
+  redirect("/inicio");
 }

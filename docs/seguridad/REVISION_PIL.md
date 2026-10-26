@@ -55,6 +55,15 @@ Sin cambios en servicios, permisos ni rutas. Revisado lo que se tocó:
 - El filtro de proveedor preseleccionado en «Nueva orden» sale de la lista de
   la empresa (con uno solo), no de la dirección.
 
+## Acceso de soporte (PIL-12, ADR 0029)
+
+| Amenaza | Control |
+| --- | --- |
+| Personal de plataforma mira una empresa sin permiso del cliente | Solo con una ventana abierta por el titular (`platform.support.grant`, ningún rol lo tiene); se revisa en cada petición, así que cerrar o vencer la ventana lo corta en el siguiente clic. |
+| Soporte cambia datos o se lleva un archivo del cliente | La política deja a soporte solo permisos `.read`: sin escritura, sin exportaciones, sin costos, sin poderes de titular. Prueba en `policy.test.ts` y `support-access.int.test.ts`. |
+| Alguien que no es personal usa una ventana abierta | `supportWindowFor` exige `platform_staff` activo (con MFA obligatoria); una cuenta común con la empresa forzada en su sesión no obtiene nada (probado). |
+| Se borra o alarga el rastro | `support_access` no se borra ni cambia su fin (disparadores), se cierra una vez y dura como mucho 7 días (`CHECK`); abrir, cerrar, entrar y salir van a la bitácora de la empresa, que el titular ve. |
+
 ## Producción
 
 - Cabeceras verificadas en el sitio: HSTS (`max-age=63072000;

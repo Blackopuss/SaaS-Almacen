@@ -2,6 +2,7 @@ import {
   ChevronRight,
   Gauge,
   History,
+  LifeBuoy,
   MapPin,
   Users,
   type LucideIcon,
@@ -10,8 +11,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageContainer, PageHeader } from "@/components";
+import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib";
 import { getMfaStatus, listActiveSessions } from "@/platform/auth";
+import { getSupportAccess } from "@/platform/authorization";
 import { getModuleAccess } from "@/platform/billing";
+
+import { grantSupportAccessAction, revokeSupportAccessAction } from "./actions";
 
 import { MfaPanel } from "./mfa-panel";
 import { SessionsPanel } from "./sessions-panel";
@@ -25,9 +31,11 @@ export default async function ConfiguracionPage() {
   const showLocations =
     access.moduleState("inventory") !== "none" &&
     access.can("inventory.location.read");
-  const [sessions, mfa] = await Promise.all([
+  const canGrantSupport = access.can("platform.support.grant");
+  const [sessions, mfa, support] = await Promise.all([
     listActiveSessions(user.id, sessionId),
     getMfaStatus(user.id),
+    canGrantSupport ? getSupportAccess(access.organization.id) : null,
   ]);
 
   return (
@@ -73,6 +81,55 @@ export default async function ConfiguracionPage() {
               description="Quién cambió qué y cuándo."
             />
           )}
+        </section>
+      )}
+      {support && (
+        <section aria-labelledby="soporte" className="space-y-3">
+          <h2 id="soporte" className="text-lg font-semibold">
+            Soporte
+          </h2>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 sm:p-5">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground">
+              <LifeBuoy aria-hidden="true" className="size-5" />
+            </span>
+            <p className="min-w-0 flex-1 text-sm">
+              {support.until ? (
+                <>
+                  <span className="block font-medium">
+                    Soporte puede ver tu empresa hasta el{" "}
+                    {formatDateTime(
+                      support.until,
+                      access.organization.timeZone,
+                    )}
+                  </span>
+                  <span className="block text-muted-foreground">
+                    Solo mira, no cambia nada, y queda en la bitácora.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="block font-medium">
+                    ¿Nos pediste ayuda? Permite que soporte vea tu empresa por
+                    24 horas.
+                  </span>
+                  <span className="block text-muted-foreground">
+                    Solo mira, no cambia nada, y queda en la bitácora.
+                  </span>
+                </>
+              )}
+            </p>
+            <form
+              action={
+                support.until
+                  ? revokeSupportAccessAction
+                  : grantSupportAccessAction
+              }
+            >
+              <Button type="submit" variant="outline">
+                {support.until ? "Quitar acceso" : "Permitir acceso"}
+              </Button>
+            </form>
+          </div>
         </section>
       )}
       <section aria-labelledby="seguridad" className="space-y-3">

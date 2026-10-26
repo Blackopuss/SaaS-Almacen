@@ -99,6 +99,26 @@ describe("deny by default", () => {
   });
 });
 
+describe("support (PIL-12)", () => {
+  const support = { isOwner: false, roles: ["viewer"], support: true };
+
+  it("keeps only what reads: no writing, no exports", () => {
+    const granted = [...permissionsOf(support)];
+    expect(granted.length).toBeGreaterThan(0);
+    expect(granted.every((p) => p.endsWith(".read"))).toBe(true);
+    expect(can(support, "inventory.product.read")).toBe(true);
+    expect(can(support, "inventory.export.create")).toBe(false);
+    expect(can(support, "purchasing.report.export")).toBe(false);
+    expect(can(support, "purchasing.cost.read")).toBe(false);
+  });
+
+  it("does not add anything even with more roles or the titular flag", () => {
+    const loaded = { isOwner: true, roles: [...ROLES], support: true };
+    expect(can(loaded, "platform.subscription.create")).toBe(false);
+    expect(can(loaded, "inventory.adjustment.create")).toBe(false);
+  });
+});
+
 describe("combined roles", () => {
   it("join their permissions and add nothing else", () => {
     for (const a of ROLES) {
@@ -182,7 +202,7 @@ describe("rules of the approved matrix", () => {
 
 // USR-03A: only the titular contracts, cancels and changes the payment method.
 describe("actions reserved to the titular", () => {
-  it("are exactly the commercial ones and the transfer", () => {
+  it("are exactly the commercial ones, the transfer and support access", () => {
     expect([...OWNER_ONLY_PERMISSIONS].sort()).toEqual([
       "platform.billing.manage",
       "platform.billing.read",
@@ -192,6 +212,7 @@ describe("actions reserved to the titular", () => {
       "platform.plan.change",
       "platform.subscription.cancel",
       "platform.subscription.create",
+      "platform.support.grant",
     ]);
   });
 
