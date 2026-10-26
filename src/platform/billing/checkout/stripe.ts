@@ -239,7 +239,7 @@ async function fetchStatus({
 
 export const stripeProvider: PaymentProvider = {
   id: "stripe",
-  label: "Tarjeta, Google Pay, Apple Pay u OXXO",
+  label: "Tarjeta u OXXO",
   checkoutHosts: CHECKOUT_HOSTS,
   enabled: () =>
     Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
