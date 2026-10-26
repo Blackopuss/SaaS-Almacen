@@ -14,6 +14,12 @@ import {
 } from "@/modules/inventory";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
+/** An id as it may go into an address: nothing but its own characters. */
+const idPath = (value: string) =>
+  String(value)
+    .replace(/[^0-9a-f-]/gi, "")
+    .slice(0, 36);
+
 export type UploadState = { error?: string };
 
 /** What the file input may send at most; the service checks the real limit. */
@@ -56,7 +62,6 @@ export async function startImportAction(
 export type MappingState = {
   fieldErrors: Partial<Record<ImportColumnKey | "decimalSeparator", string>>;
   formError?: string;
-  saved?: boolean;
   /** What the person had chosen, to show it again after a refusal. */
   values: { mapping: Record<string, string>; decimalSeparator: string };
 };
@@ -111,7 +116,8 @@ export async function saveMappingAction(
     };
   }
   revalidatePath(`/inventario/importar/${String(importId)}`);
-  return { fieldErrors: {}, saved: true, values };
+  // One step: with the columns saved, the review is what comes next.
+  redirect(`/inventario/importar/${idPath(importId)}/revision`);
 }
 
 export type ConfirmImportState =

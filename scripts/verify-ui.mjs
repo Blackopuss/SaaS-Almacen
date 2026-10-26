@@ -342,9 +342,8 @@ try {
     );
     // Unit and precision (INV-06): things counted go in whole units; a
     // measure lets the person choose how fine its quantities are.
-    const wholeOnly = await page
-      .getByText("Se maneja en enteros: no admite fracciones.")
-      .isVisible();
+    // Counted things go in whole units: no precision to choose.
+    const wholeOnly = (await page.locator("#step").count()) === 0;
     await page.selectOption("#unit", "m");
     await page.locator("#step").waitFor();
     const precisions = await page.locator("#step option").count();

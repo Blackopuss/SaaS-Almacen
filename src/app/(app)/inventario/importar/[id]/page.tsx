@@ -10,16 +10,15 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   IMPORT_COLUMNS,
-  IMPORT_STATUS_LABELS,
   getImport,
   isImportEditable,
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
+import { ImportSteps } from "../import-steps";
 import { MappingForm } from "./mapping-form";
 
 export const metadata: Metadata = { title: "Columnas de la importación" };
@@ -99,21 +98,15 @@ export default async function ImportacionPage({
     <PageContainer>
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
+      <ImportSteps current={2} />
       <PageHeader
         title="Columnas de tu archivo"
-        description={`${detail.fileName}${detail.sheetName ? ` · hoja «${detail.sheetName}»` : ""}`}
+        description={`${detail.fileName}${detail.sheetName ? ` · hoja «${detail.sheetName}»` : ""} · ${
+          detail.dataRows === 1
+            ? "1 fila"
+            : `${detail.dataRows.toLocaleString("es-MX")} filas`
+        }`}
       />
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <Badge variant={detail.status === "MAPPING" ? "secondary" : "default"}>
-          {IMPORT_STATUS_LABELS[detail.status]}
-        </Badge>
-        <span className="tabular-nums">
-          {detail.dataRows === 1
-            ? "1 fila con datos"
-            : `${detail.dataRows.toLocaleString("es-MX")} filas con datos`}{" "}
-          · títulos en la fila {detail.headerRow}
-        </span>
-      </p>
       {detail.formulaCells > 0 && (
         <p className="flex max-w-3xl items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
           <CircleAlert
@@ -124,9 +117,7 @@ export default async function ImportacionPage({
             {detail.formulaCells === 1
               ? "1 celda tiene una fórmula"
               : `${detail.formulaCells.toLocaleString("es-MX")} celdas tienen fórmulas`}
-            . No se ejecutan: se toma el resultado que Excel dejó guardado. Si
-            cambiaste algo sin guardar, vuelve a guardar el archivo y súbelo de
-            nuevo.
+            . Se usa el resultado que Excel dejó guardado.
           </span>
         </p>
       )}
@@ -136,7 +127,7 @@ export default async function ImportacionPage({
         className="rounded-xl border bg-card"
       >
         <h2 id="vista-previa" className="border-b p-4 font-medium sm:px-5">
-          Así leímos tus primeras filas
+          Tus primeras filas
         </h2>
         {/* A table of the person's own file: it scrolls inside its box. */}
         <div
@@ -227,7 +218,8 @@ export default async function ImportacionPage({
         </p>
       )}
 
-      {detail.decimalSeparator && (
+      {/* Only worth a look when a number does not read: the review shows the rest. */}
+      {detail.decimalSeparator && unreadable > 0 && (
         <section
           aria-labelledby="numeros"
           className="max-w-3xl rounded-xl border bg-card"
@@ -299,7 +291,7 @@ export default async function ImportacionPage({
           </p>
         </section>
       )}
-      {detail.status !== "MAPPING" && (
+      {!canMap && detail.status !== "MAPPING" && (
         <p>
           <Button asChild>
             <Link href={`/inventario/importar/${detail.id}/revision`}>

@@ -1,4 +1,4 @@
-import { ChevronLeft, Download, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, Download } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -9,7 +9,6 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
-import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib";
 import {
   IMPORT_COLUMNS,
@@ -18,7 +17,11 @@ import {
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
 
+import { ImportSteps } from "./import-steps";
 import { UploadForm } from "./upload-form";
+
+const linkClass =
+  "inline-flex min-h-11 items-center gap-1.5 rounded-lg font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export const metadata: Metadata = { title: "Importar productos" };
 
@@ -72,94 +75,55 @@ export default async function ImportarPage() {
   return (
     <PageContainer>
       {back}
-      <PageHeader
-        title="Importar productos"
-        description="Trae tu catálogo y tus existencias desde Excel, sin capturarlos uno por uno."
-      />
-      <section
-        aria-labelledby="plantilla"
-        className="max-w-3xl space-y-4 rounded-xl border bg-card p-4 sm:p-5"
-      >
-        <div className="flex items-start gap-3">
-          <FileSpreadsheet
-            aria-hidden="true"
-            className="mt-0.5 size-5 shrink-0 text-muted-foreground"
-          />
-          <div className="space-y-1">
-            <h2 id="plantilla" className="font-medium">
-              1. Descarga la plantilla
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Trae los títulos de cada columna y ejemplos de productos por
-              pieza, por metro y por kilogramo, con y sin presentación (caja,
-              rollo, saco). La de Excel incluye una hoja de instrucciones con
-              las unidades válidas.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <a href="/api/importaciones/plantilla?formato=xlsx" download>
-              <Download aria-hidden="true" data-icon="inline-start" />
-              Plantilla de Excel (.xlsx)
-            </a>
-          </Button>
-          <Button asChild variant="outline">
-            <a href="/api/importaciones/plantilla?formato=csv" download>
-              <Download aria-hidden="true" data-icon="inline-start" />
-              Plantilla CSV
-            </a>
-          </Button>
-        </div>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>
-            Cada fila es un producto. Son obligatorias: {required.join(", ")}.
-          </li>
-          <li>
-            La unidad es en qué lo controlas (pieza, metro, kilogramo). Una caja
-            o un rollo van en «Presentación», con cuánto traen.
-          </li>
-          <li>
-            «3» de «Caja» con contenido 100 se registra como 300 piezas de
-            existencia inicial.
-          </li>
-          <li>Decimales con punto (2.75), sin separador de miles.</li>
-          <li>Borra las filas de ejemplo antes de importar.</li>
-        </ul>
-      </section>
+      <ImportSteps current={1} />
+      <PageHeader title="Importar productos" />
       <section
         aria-labelledby="subir"
         className="max-w-3xl space-y-4 rounded-xl border bg-card p-4 sm:p-5"
       >
-        <div className="space-y-1">
-          <h2 id="subir" className="font-medium">
-            2. Sube tu archivo
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Puede ser la plantilla llena o tu propio Excel: en el siguiente paso
-            eliges qué columna es cada dato. Subirlo no cambia tu inventario.
-          </p>
-        </div>
+        <h2 id="subir" className="sr-only">
+          Sube tu archivo
+        </h2>
         <UploadForm />
-      </section>
-      <section
-        aria-labelledby="salidas"
-        className="max-w-3xl space-y-3 rounded-xl border bg-card p-4 sm:p-5"
-      >
-        <div className="space-y-1">
-          <h2 id="salidas" className="font-medium">
-            ¿Tus ventas se registran en otro sistema?
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Sube cada día el archivo de lo que salió y se descuenta de tus
-            existencias, sin capturarlo a mano y sin descontar dos veces.
+        <div className="space-y-2 border-t pt-4">
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="text-muted-foreground">
+              ¿No tienes uno? Descarga la plantilla:
+            </span>
+            <a
+              href="/api/importaciones/plantilla?formato=xlsx"
+              download
+              className={linkClass}
+            >
+              <Download aria-hidden="true" className="size-4" />
+              Excel
+            </a>
+            <a
+              href="/api/importaciones/plantilla?formato=csv"
+              download
+              className={linkClass}
+            >
+              <Download aria-hidden="true" className="size-4" />
+              CSV
+            </a>
           </p>
+          <details className="text-sm">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-lg font-medium text-primary outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+              Cómo llenarla
+            </summary>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>
+                Una fila por producto. Obligatorias: {required.join(", ")}.
+              </li>
+              <li>
+                Unidad: pieza, metro, kilogramo… Una caja o un rollo van en
+                «Presentación», con cuánto traen.
+              </li>
+              <li>Decimales con punto (2.75), sin separador de miles.</li>
+              <li>Borra las filas de ejemplo.</li>
+            </ul>
+          </details>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/inventario/importar/salidas">
-            Importar salidas diarias
-          </Link>
-        </Button>
       </section>
       {imports.length > 0 && (
         <section
@@ -167,7 +131,7 @@ export default async function ImportarPage() {
           className="max-w-3xl rounded-xl border bg-card"
         >
           <h2 id="importaciones" className="border-b p-4 font-medium sm:px-5">
-            Archivos que has subido
+            Archivos anteriores
           </h2>
           <ul className="divide-y">
             {imports.map((item) => (
@@ -193,6 +157,14 @@ export default async function ImportarPage() {
           </ul>
         </section>
       )}
+      <p>
+        <Link
+          href="/inventario/importar/salidas"
+          className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          ¿Vendes con otro sistema? Importa tus salidas diarias
+        </Link>
+      </p>
     </PageContainer>
   );
 }
