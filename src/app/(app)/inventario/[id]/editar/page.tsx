@@ -97,7 +97,7 @@ export default async function EditarProductoPage({
       {back}
       <PageHeader
         title="Editar producto"
-        description="Cambia los datos de la ficha. Las existencias no se editan aquí: se mueven con entradas, salidas y ajustes."
+        description="Las existencias se cambian con entradas y salidas."
       />
       <ProductForm
         action={updateProductAction.bind(null, product.id)}

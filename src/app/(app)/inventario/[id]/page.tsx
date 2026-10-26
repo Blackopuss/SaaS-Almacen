@@ -121,6 +121,7 @@ export default async function ProductoPage({
       </Link>
     </Button>
   );
+  // The two daily actions are buttons; the rest is a quiet row of links.
   const actions = active ? (
     <>
       {access.allows("inventory.entry.create") &&
@@ -133,23 +134,32 @@ export default async function ProductoPage({
       {hasStock &&
         access.allows("inventory.exit.create") &&
         action(
-          `/movimientos/salida?producto=${product.id}`,
+          `/movimientos/salida-rapida?producto=${product.id}`,
           "Salida",
           ArrowUpFromLine,
         )}
-      {hasStock &&
-        access.allows("inventory.transfer.create") &&
-        action(
-          `/movimientos/reubicar?producto=${product.id}`,
-          "Reubicar",
-          ArrowLeftRight,
-        )}
-      {access.allows("inventory.adjustment.create") &&
-        action(`/movimientos/ajuste?producto=${product.id}`, "Ajustar", Scale)}
-      {access.allows("inventory.product.update") &&
-        action(`/inventario/${product.id}/editar`, "Editar ficha", Pencil)}
     </>
   ) : undefined;
+  const occasional = active
+    ? [
+        access.allows("inventory.product.update") && {
+          href: `/inventario/${product.id}/editar`,
+          label: "Editar",
+          icon: Pencil,
+        },
+        hasStock &&
+          access.allows("inventory.transfer.create") && {
+            href: `/movimientos/reubicar?producto=${product.id}`,
+            label: "Cambiar de lugar",
+            icon: ArrowLeftRight,
+          },
+        access.allows("inventory.adjustment.create") && {
+          href: `/movimientos/ajuste?producto=${product.id}`,
+          label: "Corregir existencias",
+          icon: Scale,
+        },
+      ].filter((item) => item !== false)
+    : [];
 
   const facts: [string, string][] = [
     ["Clave (SKU)", product.sku],
@@ -171,6 +181,20 @@ export default async function ProductoPage({
         description={product.description ?? undefined}
         actions={actions}
       />
+      {occasional.length > 0 && (
+        <p className="-mt-2 flex flex-wrap gap-x-6">
+          {occasional.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              {label}
+            </Link>
+          ))}
+        </p>
+      )}
       {!active && (
         <p>
           <Badge variant="secondary">Archivado</Badge>{" "}
@@ -208,7 +232,7 @@ export default async function ProductoPage({
                 </Badge>
               )}
             </p>
-            {minimum !== null && (
+            {minimum !== null && !access.allows("inventory.minimum.update") && (
               <p className="text-sm text-muted-foreground">
                 Mínimo: {formatStock(minimum, product.unitCode)}
               </p>
@@ -221,11 +245,6 @@ export default async function ProductoPage({
                 {equivalence.text}
               </p>
             ))}
-            {stock.equivalences.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Es una equivalencia: no indica cuántos empaques cerrados hay.
-              </p>
-            )}
           </div>
           {stock.locations.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground sm:px-5">
@@ -259,30 +278,91 @@ export default async function ProductoPage({
               </ul>
             </>
           )}
+          {active &&
+            moduleState === "active" &&
+            access.allows("inventory.minimum.update") && (
+              <div className="border-t p-4 sm:px-5">
+                <MinimumForm
+                  productId={product.id}
+                  minimum={minimum ?? ""}
+                  unit={unit.plural}
+                />
+              </div>
+            )}
         </section>
       )}
 
-      {active &&
-        moduleState === "active" &&
-        access.allows("inventory.minimum.update") && (
-          <section
-            aria-label="Mínimo del producto"
-            className="rounded-xl border bg-card p-4 sm:p-5"
-          >
-            <MinimumForm
-              productId={product.id}
-              minimum={minimum ?? ""}
-              unit={unit.plural}
-            />
-          </section>
-        )}
+      {access.can("inventory.movement.read") && (
+        <section
+          aria-labelledby="movimientos-producto"
+          className="rounded-xl border bg-card"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-4 border-b px-4 py-2 sm:px-5">
+            <h2 id="movimientos-producto" className="font-medium">
+              Últimos movimientos
+            </h2>
+            {movements.length > 0 && (
+              <Link
+                href={`/movimientos?producto=${product.id}`}
+                className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Ver todo
+              </Link>
+            )}
+          </div>
+          {movements.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground sm:px-5">
+              Este producto todavía no tiene movimientos.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {movements.map((movement) => (
+                <li key={movement.id} className="space-y-1 p-4 sm:px-5">
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                    <Badge variant="secondary">{movement.typeLabel}</Badge>
+                    {movement.reversedByMovementId && (
+                      <Badge variant="outline">Reversado</Badge>
+                    )}
+                    <time dateTime={movement.createdAt.toISOString()}>
+                      {formatDateTime(movement.createdAt)}
+                    </time>
+                  </p>
+                  {movement.lines
+                    .filter((line) => line.productId === product.id)
+                    .map((line, index) => (
+                      <p key={index} className="[overflow-wrap:anywhere]">
+                        <span className="font-medium tabular-nums">
+                          {line.direction === "IN" ? "+" : "−"}
+                          {line.quantity}
+                        </span>{" "}
+                        {line.captured && (
+                          <span className="text-muted-foreground">
+                            ({line.captured}){" "}
+                          </span>
+                        )}
+                        <span className="text-muted-foreground">
+                          · {line.location}
+                        </span>
+                      </p>
+                    ))}
+                  {movement.reason && (
+                    <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                      {movement.reason}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section
         aria-labelledby="ficha"
         className="rounded-xl border bg-card p-4 sm:p-5"
       >
         <h2 id="ficha" className="font-medium">
-          Ficha
+          Datos del producto
         </h2>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           {facts.map(([term, value]) => (
@@ -343,71 +423,6 @@ export default async function ProductoPage({
               </li>
             ))}
           </ul>
-        </section>
-      )}
-
-      {access.can("inventory.movement.read") && (
-        <section
-          aria-labelledby="movimientos-producto"
-          className="rounded-xl border bg-card"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-x-4 border-b px-4 py-2 sm:px-5">
-            <h2 id="movimientos-producto" className="font-medium">
-              Últimos movimientos
-            </h2>
-            {movements.length > 0 && (
-              <Link
-                href={`/movimientos?producto=${product.id}`}
-                className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                Ver historial completo
-              </Link>
-            )}
-          </div>
-          {movements.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground sm:px-5">
-              Este producto todavía no tiene movimientos.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {movements.map((movement) => (
-                <li key={movement.id} className="space-y-1 p-4 sm:px-5">
-                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                    <Badge variant="secondary">{movement.typeLabel}</Badge>
-                    {movement.reversedByMovementId && (
-                      <Badge variant="outline">Reversado</Badge>
-                    )}
-                    <time dateTime={movement.createdAt.toISOString()}>
-                      {formatDateTime(movement.createdAt)}
-                    </time>
-                  </p>
-                  {movement.lines
-                    .filter((line) => line.productId === product.id)
-                    .map((line, index) => (
-                      <p key={index} className="[overflow-wrap:anywhere]">
-                        <span className="font-medium tabular-nums">
-                          {line.direction === "IN" ? "+" : "−"}
-                          {line.quantity}
-                        </span>{" "}
-                        {line.captured && (
-                          <span className="text-muted-foreground">
-                            ({line.captured}){" "}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground">
-                          · {line.location}
-                        </span>
-                      </p>
-                    ))}
-                  {movement.reason && (
-                    <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                      {movement.reason}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
       )}
     </PageContainer>

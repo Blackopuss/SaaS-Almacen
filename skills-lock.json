@@ -12,6 +12,21 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "d8e7d3afe37dcc8a97b99ffb5afdb4d0919ae0092ea8b68f44eb201f035e33ac"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/impeccable/SKILL.md",
+      "commit": "3671d50f0ac9a662ce0615e85a256110c9cd720b",
+      "note": "Solo SKILL.md y reference/; sin scripts/ (el lanzador descarga un binario)",
+      "computedHash": "d26824bfcbdf2d41e595e368566866fef4516d6d31b4be9e05be3c544775cb50"
+    },
+    "ux-heuristics": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "ux-heuristics/SKILL.md",
+      "commit": "c172996495bed0fcd26896a9416b2093fd7073f0",
+      "computedHash": "cb1ea3de8b6e605614cc59b21d41830d2d82af22e51069bb4c5bb53790cd622b"
     }
   }
 }

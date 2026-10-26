@@ -32,8 +32,8 @@ export function MinimumForm({
     <form action={formAction} noValidate className="space-y-2">
       <FormField
         id="minimum"
-        label={`Mínimo (${unit})`}
-        hint="Cuando haya esta cantidad o menos, el producto aparece en «Existencias bajas». Déjalo vacío para no avisar."
+        label={`Avisarme cuando queden (${unit})`}
+        hint="Vacío = sin aviso."
         error={state.error}
       >
         {(control) => (

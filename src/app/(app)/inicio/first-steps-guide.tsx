@@ -44,23 +44,22 @@ export function FirstStepsGuide({
       done: steps.hasProducts,
       body: (
         <>
-          Lo más rápido es subir tu Excel: descargas la plantilla, la llenas (o
-          usas tu propio archivo) y entran todos de una vez, con sus existencias
-          si las pones.{" "}
+          Sube tu Excel y entran todos de una vez, o agrégalos uno por uno.
           {can.createLocation && (
             <>
-              Si acomodas por zonas o estantes,{" "}
+              {" "}
+              ¿Acomodas por zonas o estantes?{" "}
               <Link href="/ubicaciones" className={textLink}>
-                créalos primero en Ubicaciones
-              </Link>{" "}
-              para poder nombrarlos en el archivo.
+                Créalos antes
+              </Link>
+              .
             </>
           )}
         </>
       ),
       actions: [
         ...(can.importProducts
-          ? [{ href: "/inventario/importar", label: "Importar desde Excel" }]
+          ? [{ href: "/inventario/importar", label: "Subir Excel" }]
           : []),
         ...(can.createProduct
           ? [{ href: "/inventario/nuevo", label: "Agregar uno a mano" }]
@@ -70,12 +69,12 @@ export function FirstStepsGuide({
     {
       title: "Di cuánto tienes",
       done: steps.hasStock,
-      body: "Si tu archivo no traía existencias, captura lo que hay hoy de cada producto, por ubicación. Es tu punto de partida: se hace una vez.",
+      body: "Captura lo que hay hoy de cada producto. Se hace una sola vez.",
       actions: can.openingBalance
         ? [
             {
               href: "/movimientos/saldo-inicial",
-              label: "Capturar saldo inicial",
+              label: "Capturar existencias",
             },
           ]
         : [],
@@ -83,13 +82,13 @@ export function FirstStepsGuide({
     {
       title: "Registra tu primer movimiento",
       done: steps.hasMovement,
-      body: "De aquí en adelante, lo que llega es una entrada y lo que se vende o se usa es una salida. Con eso tus existencias se mantienen solas.",
+      body: "Lo que llega es una entrada; lo que se vende o se usa, una salida.",
       actions: [
         ...(can.entry
           ? [{ href: "/movimientos/entrada", label: "Registrar entrada" }]
           : []),
         ...(can.exit
-          ? [{ href: "/movimientos/salida-rapida", label: "Salida rápida" }]
+          ? [{ href: "/movimientos/salida-rapida", label: "Registrar salida" }]
           : []),
       ],
     },

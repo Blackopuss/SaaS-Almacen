@@ -226,8 +226,10 @@ try {
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
+      // Ubicaciones lives under Configuración, which stays marked.
+      const menuHref = path === "/ubicaciones" ? "/configuracion" : path;
       const current = await page
-        .locator(`nav a[aria-current="page"][href="${path}"]`)
+        .locator(`nav a[aria-current="page"][href="${menuHref}"]`)
         .count();
       const visibleNav =
         mobile &&

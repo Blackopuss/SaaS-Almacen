@@ -26,7 +26,7 @@ export function OpenCountForm({
       <FormField
         id="locationId"
         label="¿Qué ubicación vas a contar?"
-        hint="Se cuenta una ubicación a la vez. Puedes tener conteos abiertos en ubicaciones distintas."
+        hint="Una ubicación a la vez."
         error={state.error}
       >
         {(control) => (
@@ -58,7 +58,7 @@ export function OpenCountForm({
       <FormField
         id="note"
         label="Nota (opcional)"
-        hint="Por ejemplo: cierre de mes, revisión por faltante."
+        hint="Por ejemplo: cierre de mes."
       >
         {(control) => (
           <Input

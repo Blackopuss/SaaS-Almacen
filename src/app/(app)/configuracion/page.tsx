@@ -2,6 +2,7 @@ import {
   ChevronRight,
   Gauge,
   History,
+  MapPin,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -10,7 +11,7 @@ import Link from "next/link";
 
 import { PageContainer, PageHeader } from "@/components";
 import { getMfaStatus, listActiveSessions } from "@/platform/auth";
-import { getAccess } from "@/platform/authorization";
+import { getModuleAccess } from "@/platform/billing";
 
 import { MfaPanel } from "./mfa-panel";
 import { SessionsPanel } from "./sessions-panel";
@@ -18,8 +19,12 @@ import { SessionsPanel } from "./sessions-panel";
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
-  const access = await getAccess();
+  const access = await getModuleAccess();
   const { user, sessionId } = access;
+  // Locations are set up once, so they live here and not in the menu.
+  const showLocations =
+    access.moduleState("inventory") !== "none" &&
+    access.can("inventory.location.read");
   const [sessions, mfa] = await Promise.all([
     listActiveSessions(user.id, sessionId),
     getMfaStatus(user.id),
@@ -27,17 +32,23 @@ export default async function ConfiguracionPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Configuración"
-        description="Tu negocio, usuarios, plan y seguridad."
-      />
-      {(access.can("platform.team.read") ||
+      <PageHeader title="Configuración" />
+      {(showLocations ||
+        access.can("platform.team.read") ||
         access.can("platform.plan.read") ||
         access.can("platform.audit.read")) && (
         <section aria-labelledby="empresa" className="space-y-3">
           <h2 id="empresa" className="text-lg font-semibold">
-            Empresa
+            Tu negocio
           </h2>
+          {showLocations && (
+            <SettingsLink
+              href="/ubicaciones"
+              icon={MapPin}
+              title="Ubicaciones"
+              description="Zonas, pasillos y estantes."
+            />
+          )}
           {access.can("platform.team.read") && (
             <SettingsLink
               href="/configuracion/equipo"
@@ -92,7 +103,10 @@ function SettingsLink({
   description,
 }: {
   href:
-    "/configuracion/equipo" | "/configuracion/plan" | "/configuracion/bitacora";
+    | "/ubicaciones"
+    | "/configuracion/equipo"
+    | "/configuracion/plan"
+    | "/configuracion/bitacora";
   icon: LucideIcon;
   title: string;
   description: string;
