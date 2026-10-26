@@ -41,7 +41,10 @@ export function CheckoutForm({
   providers,
   refundTerms,
   initial,
+  lockPurchasing = false,
 }: {
+  /** Renewal of a live plan: Compras stays as it is. */
+  lockPurchasing?: boolean;
   tiers: TierCard[];
   months: number[];
   quotes: Record<string, ShownQuote>;
@@ -76,6 +79,7 @@ export function CheckoutForm({
         providers={providers}
         refundTerms={refundTerms}
         busy={busy}
+        lockPurchasing={lockPurchasing}
       />
     </form>
   );
@@ -105,7 +109,9 @@ function Choices({
   providers,
   refundTerms,
   busy,
+  lockPurchasing,
 }: {
+  lockPurchasing: boolean;
   state: CheckoutState;
   values: CheckoutValues;
   tiers: TierCard[];
@@ -195,28 +201,32 @@ function Choices({
           </div>
         </fieldset>
 
-        <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-          <input
-            type="checkbox"
-            name="purchasing"
-            value="1"
-            defaultChecked={purchasing}
-            onChange={(event) => setPurchasing(event.currentTarget.checked)}
-            className="mt-0.5 size-5 accent-primary"
-          />
-          <span>
-            <span className="block font-medium">
-              Agregar Compras{" "}
-              <span className="font-normal text-muted-foreground tabular-nums">
-                (+{chosenTier?.purchasingMonthly} al mes)
+        {lockPurchasing ? (
+          purchasing && <input type="hidden" name="purchasing" value="1" />
+        ) : (
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+            <input
+              type="checkbox"
+              name="purchasing"
+              value="1"
+              defaultChecked={purchasing}
+              onChange={(event) => setPurchasing(event.currentTarget.checked)}
+              className="mt-0.5 size-5 accent-primary"
+            />
+            <span>
+              <span className="block font-medium">
+                Agregar Compras{" "}
+                <span className="font-normal text-muted-foreground tabular-nums">
+                  (+{chosenTier?.purchasingMonthly} al mes)
+                </span>
+              </span>
+              <span className="block text-sm text-muted-foreground">
+                Proveedores, órdenes de compra, recepciones y sugerencias de
+                compra.
               </span>
             </span>
-            <span className="block text-sm text-muted-foreground">
-              Proveedores, órdenes de compra, recepciones y sugerencias de
-              compra.
-            </span>
-          </span>
-        </label>
+          </label>
+        )}
 
         <fieldset className="space-y-3">
           <legend className="text-lg font-semibold">¿Por cuántos meses?</legend>
