@@ -9,7 +9,6 @@ import {
   Filter,
   Scale,
   Search,
-  Zap,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Form from "next/form";
@@ -144,42 +143,32 @@ export default async function MovimientosPage({
       </Link>
     </Button>
   ) : undefined;
+  // One exit screen for one product or many (the quick exit, INV-28).
   const exitButton = access.allows("inventory.exit.create") ? (
     <Button asChild variant="outline">
-      <Link href="/movimientos/salida">
+      <Link href="/movimientos/salida-rapida">
         <ArrowUpFromLine aria-hidden="true" data-icon="inline-start" />
         Registrar salida
       </Link>
     </Button>
   ) : undefined;
-  const quickExitButton = access.allows("inventory.exit.create") ? (
-    <Button asChild variant="outline">
-      <Link href="/movimientos/salida-rapida">
-        <Zap aria-hidden="true" data-icon="inline-start" />
-        Salida rápida
-      </Link>
-    </Button>
-  ) : undefined;
-  // The daily three are buttons; what is done now and then goes in a row of
-  // links under the title, each saying what it is for (like Inventario).
+  // The daily two are buttons; what is done now and then goes in a quiet
+  // row of links under the title, named by what it does (KISS).
   const occasional = [
     access.allows("inventory.transfer.create") && {
       href: "/movimientos/reubicar",
       icon: ArrowLeftRight,
-      label: "Reubicar",
-      hint: "cambiar de lugar",
+      label: "Cambiar de lugar",
     },
     access.allows("inventory.adjustment.create") && {
       href: "/movimientos/ajuste",
       icon: Scale,
-      label: "Ajustar",
-      hint: "corregir lo que hay",
+      label: "Corregir existencias",
     },
     access.allows("inventory.opening.create") && {
       href: "/movimientos/saldo-inicial",
       icon: ClipboardList,
       label: "Saldo inicial",
-      hint: "lo que tenías al empezar",
     },
   ].filter((item) => item !== false);
   const canReverse = access.allows("inventory.movement.reverse");
@@ -188,21 +177,16 @@ export default async function MovimientosPage({
       <>
         {entryButton}
         {exitButton}
-        {quickExitButton}
       </>
     ) : undefined;
 
   return (
     <PageContainer>
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
-      <PageHeader
-        title="Movimientos"
-        description="Entradas, salidas, reubicaciones y ajustes."
-        actions={actions}
-      />
+      <PageHeader title="Movimientos" actions={actions} />
       {occasional.length > 0 && (
-        <p className="flex flex-wrap gap-x-6">
-          {occasional.map(({ href, icon: Icon, label, hint }) => (
+        <p className="-mt-2 flex flex-wrap gap-x-6">
+          {occasional.map(({ href, icon: Icon, label }) => (
             <Link
               key={href}
               href={href}
@@ -210,9 +194,6 @@ export default async function MovimientosPage({
             >
               <Icon aria-hidden="true" className="size-4" />
               {label}
-              <span className="font-normal text-muted-foreground">
-                · {hint}
-              </span>
             </Link>
           ))}
         </p>
@@ -270,7 +251,7 @@ export default async function MovimientosPage({
           action="/movimientos"
           role="search"
           aria-label="Filtrar movimientos"
-          className="flex max-w-4xl flex-wrap items-end gap-2"
+          className="flex max-w-4xl flex-wrap items-center gap-2"
         >
           {applied.productId ? (
             <input type="hidden" name="producto" value={applied.productId} />
@@ -294,63 +275,86 @@ export default async function MovimientosPage({
               />
             </div>
           )}
-          <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
-            <label htmlFor="desde" className="text-sm text-muted-foreground">
-              Desde
-            </label>
-            <Input
-              id="desde"
-              name="desde"
-              type="date"
-              defaultValue={applied.from ?? ""}
-              key={applied.from ?? ""}
-              max={applied.to ?? undefined}
-            />
-          </div>
-          <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
-            <label htmlFor="hasta" className="text-sm text-muted-foreground">
-              Hasta
-            </label>
-            <Input
-              id="hasta"
-              name="hasta"
-              type="date"
-              defaultValue={applied.to ?? ""}
-              key={applied.to ?? ""}
-              min={applied.from ?? undefined}
-            />
-          </div>
-          <div className="flex w-full flex-wrap gap-2">
-            <FilterSelect
-              id="tipo"
-              name="tipo"
-              label="Filtrar por tipo de movimiento"
-              value={applied.type ?? ""}
-              allLabel="Tipo"
-              options={TYPE_OPTIONS}
-            />
-            {authors.length > 0 && (
-              <FilterSelect
-                id="persona"
-                name="persona"
-                label="Filtrar por persona"
-                value={
-                  authors.some((author) => author.userId === applied.userId)
-                    ? (applied.userId ?? "")
-                    : ""
-                }
-                allLabel="Persona"
-                options={authors.map((author) => ({
-                  id: author.userId,
-                  name: author.name,
-                }))}
-              />
+          <Button type="submit" variant="outline">
+            <Search aria-hidden="true" data-icon="inline-start" />
+            Buscar
+          </Button>
+          {/* Dates, kind and person are for looking back: folded by default. */}
+          <details
+            className="group w-full"
+            open={Boolean(
+              applied.from || applied.to || applied.userId || applied.type,
             )}
-            <Button type="submit" variant="outline">
-              <Filter aria-hidden="true" data-icon="inline-start" />
-              Filtrar
-            </Button>
-          </div>
+          >
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <Filter aria-hidden="true" className="size-4" />
+              Más filtros
+            </summary>
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+              <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
+                <label
+                  htmlFor="desde"
+                  className="text-sm text-muted-foreground"
+                >
+                  Desde
+                </label>
+                <Input
+                  id="desde"
+                  name="desde"
+                  type="date"
+                  defaultValue={applied.from ?? ""}
+                  key={applied.from ?? ""}
+                  max={applied.to ?? undefined}
+                />
+              </div>
+              <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1">
+                <label
+                  htmlFor="hasta"
+                  className="text-sm text-muted-foreground"
+                >
+                  Hasta
+                </label>
+                <Input
+                  id="hasta"
+                  name="hasta"
+                  type="date"
+                  defaultValue={applied.to ?? ""}
+                  key={applied.to ?? ""}
+                  min={applied.from ?? undefined}
+                />
+              </div>
+              <div className="flex w-full flex-wrap gap-2">
+                <FilterSelect
+                  id="tipo"
+                  name="tipo"
+                  label="Filtrar por tipo de movimiento"
+                  value={applied.type ?? ""}
+                  allLabel="Tipo"
+                  options={TYPE_OPTIONS}
+                />
+                {authors.length > 0 && (
+                  <FilterSelect
+                    id="persona"
+                    name="persona"
+                    label="Filtrar por persona"
+                    value={
+                      authors.some((author) => author.userId === applied.userId)
+                        ? (applied.userId ?? "")
+                        : ""
+                    }
+                    allLabel="Persona"
+                    options={authors.map((author) => ({
+                      id: author.userId,
+                      name: author.name,
+                    }))}
+                  />
+                )}
+                <Button type="submit" variant="outline">
+                  Aplicar
+                </Button>
+              </div>
+            </div>
+          </details>
         </Form>
       )}
       {narrowed && (
@@ -392,7 +396,7 @@ export default async function MovimientosPage({
         <EmptyState
           icon={ArrowLeftRight}
           title="Sin movimientos registrados"
-          description="Cada entrada, salida o reubicación aparecerá aquí con su autor y motivo."
+          description="Aquí verás cada entrada y salida."
           action={
             actions && <div className="flex flex-wrap gap-2">{actions}</div>
           }
@@ -414,76 +418,84 @@ export default async function MovimientosPage({
           </div>
           <ul className="divide-y">
             {movements.map((movement) => (
-              <li key={movement.id} className="space-y-2 p-4 sm:px-5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <Badge variant="secondary">{movement.typeLabel}</Badge>
-                  {movement.reversedByMovementId && (
-                    <Badge variant="outline">Reversado</Badge>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    <time dateTime={movement.createdAt.toISOString()}>
-                      {formatDateTime(movement.createdAt)}
-                    </time>
-                    {" · "}
-                    {movement.authorName ??
-                      "Alguien que ya no está en el equipo"}
-                  </p>
-                </div>
-                <ul className="space-y-1">
-                  {movement.lines.map((line, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      {line.direction === "IN" ? (
-                        <ArrowDownToLine
-                          aria-hidden="true"
-                          className="mt-1 size-4 shrink-0 text-success"
-                        />
-                      ) : (
-                        <ArrowUpFromLine
-                          aria-hidden="true"
-                          className="mt-1 size-4 shrink-0 text-muted-foreground"
-                        />
-                      )}
-                      <p className="min-w-0 [overflow-wrap:anywhere]">
-                        <span className="sr-only">
-                          {line.direction === "IN" ? "Entran" : "Salen"}{" "}
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          {line.quantity}
-                        </span>{" "}
-                        {line.captured && (
-                          <span className="text-muted-foreground">
-                            ({line.captured}){" "}
-                          </span>
+              <li
+                key={movement.id}
+                className="flex items-start gap-3 p-4 sm:px-5"
+              >
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Badge variant="secondary">{movement.typeLabel}</Badge>
+                    {movement.reversedByMovementId && (
+                      <Badge variant="outline">Reversado</Badge>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      <time dateTime={movement.createdAt.toISOString()}>
+                        {formatDateTime(movement.createdAt)}
+                      </time>
+                      {" · "}
+                      {movement.authorName ??
+                        "Alguien que ya no está en el equipo"}
+                    </p>
+                  </div>
+                  <ul className="space-y-1">
+                    {movement.lines.map((line, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        {line.direction === "IN" ? (
+                          <ArrowDownToLine
+                            aria-hidden="true"
+                            className="mt-1 size-4 shrink-0 text-success"
+                          />
+                        ) : (
+                          <ArrowUpFromLine
+                            aria-hidden="true"
+                            className="mt-1 size-4 shrink-0 text-muted-foreground"
+                          />
                         )}
-                        de {line.productName}{" "}
-                        <span className="text-muted-foreground">
-                          ({line.sku}) · {line.location}
-                        </span>
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                        <p className="min-w-0 [overflow-wrap:anywhere]">
+                          <span className="sr-only">
+                            {line.direction === "IN" ? "Entran" : "Salen"}{" "}
+                          </span>
+                          <span className="font-medium tabular-nums">
+                            {line.quantity}
+                          </span>{" "}
+                          {line.captured && (
+                            <span className="text-muted-foreground">
+                              ({line.captured}){" "}
+                            </span>
+                          )}
+                          de {line.productName}{" "}
+                          <span className="text-muted-foreground">
+                            ({line.sku}) · {line.location}
+                          </span>
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  {(movement.reference || movement.reason) && (
+                    <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                      {[
+                        movement.reference &&
+                          `Referencia: ${movement.reference}`,
+                        movement.reason,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </div>
                 {canReverse &&
                   movement.type !== "REVERSAL" &&
                   movement.type !== "RECEIPT" &&
                   movement.type !== "RETURN" &&
                   !movement.reversedByMovementId && (
-                    <ReverseMovement
-                      movementId={movement.id}
-                      idempotencyKey={newId()}
-                      description={`${movement.typeLabel} de ${movement.lines[0]?.quantity ?? ""} de ${movement.lines[0]?.productName ?? ""}`}
-                    />
+                    <div className="shrink-0">
+                      <ReverseMovement
+                        movementId={movement.id}
+                        idempotencyKey={newId()}
+                        description={`${movement.typeLabel} de ${movement.lines[0]?.quantity ?? ""} de ${movement.lines[0]?.productName ?? ""}`}
+                      />
+                    </div>
                   )}
-                {(movement.reference || movement.reason) && (
-                  <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                    {[
-                      movement.reference && `Referencia: ${movement.reference}`,
-                      movement.reason,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
               </li>
             ))}
           </ul>

@@ -4,7 +4,6 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheck,
-  Zap,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -23,7 +22,6 @@ import {
   getModuleAccess,
   getPlanOverview,
   usageLevel,
-  usagePercent,
 } from "@/platform/billing";
 
 import { FirstStepsGuide } from "./first-steps-guide";
@@ -33,21 +31,14 @@ export const metadata: Metadata = { title: "Inicio" };
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 
-const BAR_COLOR = {
-  ok: "bg-primary",
-  high: "bg-warning",
-  almost: "bg-warning",
-  full: "bg-destructive",
-} as const;
-
 /** How many of each list fit at a glance. */
 const SHOWN = 5;
 
 /**
- * Home (INV-35): what needs attention today — products to restock, what
- * moved last and how much of the plan is in use. Each block appears only
- * for who may see its section; all of it is read from the same services
- * as those sections.
+ * Home (INV-35): what needs attention today — products to restock and what
+ * moved last. The plan shows up only when it needs attention (KISS). Each
+ * block appears only for who may see its section; all of it is read from
+ * the same services as those sections.
  */
 export default async function InicioPage() {
   const access = await getModuleAccess();
@@ -94,8 +85,8 @@ export default async function InicioPage() {
         {canExit && (
           <Button asChild variant="outline">
             <Link href="/movimientos/salida-rapida">
-              <Zap aria-hidden="true" data-icon="inline-start" />
-              Salida rápida
+              <ArrowUpFromLine aria-hidden="true" data-icon="inline-start" />
+              Registrar salida
             </Link>
           </Button>
         )}
@@ -104,6 +95,15 @@ export default async function InicioPage() {
   const nothing = !low && !movements && !plan;
   const products = plan?.products;
   const level = products ? usageLevel(products.used, products.limit) : "ok";
+  // Day to day the plan is noise: it shows up only when it needs attention.
+  const planNotice =
+    plan?.status === "read_only"
+      ? "Tu plan ya no está vigente: todo queda en solo lectura."
+      : products && products.limit !== null && level !== "ok"
+        ? level === "full"
+          ? `Llegaste al límite de tu plan: ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos.`
+          : `Ya usas ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos de tu plan.`
+        : null;
 
   return (
     <PageContainer>
@@ -113,6 +113,20 @@ export default async function InicioPage() {
         description={access.organization.name}
         actions={actions}
       />
+
+      {planNotice && (
+        <Link
+          href="/configuracion/plan"
+          className="flex min-h-11 items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm outline-none hover:bg-warning/15 focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className={`mt-0.5 size-4 shrink-0 ${level === "full" || plan?.status === "read_only" ? "text-destructive" : "text-warning"}`}
+          />
+          <span className="flex-1">{planNotice}</span>
+          <span className="font-medium text-primary">Ver mi plan</span>
+        </Link>
+      )}
 
       {nothing && (
         <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground sm:p-5">
@@ -135,7 +149,7 @@ export default async function InicioPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         {low && (
           <section
             aria-labelledby="inicio-bajos"
@@ -167,7 +181,7 @@ export default async function InicioPage() {
                   className="mt-0.5 size-4 shrink-0 text-success"
                 />
                 {low.withMinimum === 0
-                  ? "Ningún producto tiene mínimo todavía. Escríbelo en la ficha de un producto para que te avise aquí."
+                  ? "Pon un mínimo en un producto y aquí te avisamos cuando se esté acabando."
                   : "Todo está por encima de su mínimo."}
               </p>
             ) : (
@@ -197,97 +211,10 @@ export default async function InicioPage() {
           </section>
         )}
 
-        {products && (
-          <section
-            aria-labelledby="inicio-cupo"
-            className="rounded-xl border bg-card"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-x-4 border-b px-4 py-2 sm:px-5">
-              <h2 id="inicio-cupo" className="font-medium">
-                Uso de tu plan
-              </h2>
-              <Link href="/configuracion/plan" className={linkClass}>
-                Mi plan
-                <ChevronRight aria-hidden="true" className="size-4" />
-              </Link>
-            </div>
-            <div className="space-y-3 p-4 sm:p-5">
-              {products.limit === null ? (
-                <p className="text-sm text-muted-foreground">
-                  Tu empresa todavía no tiene un plan con cupo de productos.
-                </p>
-              ) : (
-                <>
-                  <p
-                    id="inicio-cupo-productos"
-                    className="text-sm text-muted-foreground"
-                  >
-                    Productos activos
-                  </p>
-                  <p className="text-2xl font-semibold tracking-tight tabular-nums">
-                    {products.used.toLocaleString("es-MX")}{" "}
-                    <span className="text-base font-normal text-muted-foreground">
-                      de {products.limit.toLocaleString("es-MX")}
-                    </span>
-                  </p>
-                  <div
-                    role="progressbar"
-                    aria-labelledby="inicio-cupo-productos"
-                    aria-valuemin={0}
-                    aria-valuemax={products.limit}
-                    aria-valuenow={Math.min(products.used, products.limit)}
-                    aria-valuetext={`${products.used} de ${products.limit}`}
-                    className="h-2 overflow-hidden rounded-full bg-muted"
-                  >
-                    <div
-                      className={`h-full rounded-full ${BAR_COLOR[level]}`}
-                      style={{
-                        width: `${usagePercent(products.used, products.limit)}%`,
-                      }}
-                    />
-                  </div>
-                  {level !== "ok" && (
-                    <p className="flex items-start gap-1.5 text-sm">
-                      <CircleAlert
-                        aria-hidden="true"
-                        className={`mt-0.5 size-4 shrink-0 ${level === "full" ? "text-destructive" : "text-warning"}`}
-                      />
-                      {level === "full"
-                        ? "Llegaste al límite de tu plan."
-                        : level === "almost"
-                          ? "Ya usas más del 90% de tu cupo."
-                          : "Ya usas más del 80% de tu cupo."}
-                    </p>
-                  )}
-                </>
-              )}
-              {plan && (
-                <p className="text-sm text-muted-foreground tabular-nums">
-                  Personas:{" "}
-                  {(
-                    plan.seats.members + plan.seats.pendingInvitations
-                  ).toLocaleString("es-MX")}
-                  {plan.seats.limit !== null &&
-                    ` de ${plan.seats.limit.toLocaleString("es-MX")}`}
-                </p>
-              )}
-              {plan?.status === "read_only" && (
-                <p className="flex items-start gap-1.5 text-sm">
-                  <CircleAlert
-                    aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-destructive"
-                  />
-                  Tu plan ya no está vigente: todo queda en solo lectura.
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-
         {movements && (
           <section
             aria-labelledby="inicio-movimientos"
-            className="rounded-xl border bg-card lg:col-span-2"
+            className="rounded-xl border bg-card"
           >
             <div className="flex flex-wrap items-center justify-between gap-x-4 border-b px-4 py-2 sm:px-5">
               <h2 id="inicio-movimientos" className="font-medium">
@@ -302,8 +229,7 @@ export default async function InicioPage() {
             </div>
             {movements.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground sm:px-5">
-                Todavía no hay movimientos. Cada entrada, salida o ajuste
-                aparecerá aquí.
+                Todavía no hay movimientos.
               </p>
             ) : (
               <ul className="divide-y">

@@ -1,6 +1,6 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
@@ -30,7 +30,8 @@ Contexto compartido por Claude Code y Codex. Leer antes de trabajar:
 - Cantidades y dinero con decimal exacto; nunca `number` de punto flotante para stock o importes.
 - Secretos solo en `.env.local` (ignorado por git). Plantilla sin secretos en `.env.example`.
 - Antes de cerrar un paso: `npm run check` y `npm run build` deben pasar.
-- Para UI usar las skills `ui-ux-pro-max` (diseño) y `web-design-guidelines` (revisión).
+- Para UI usar las skills `ux-heuristics` (usabilidad: Krug y Nielsen), `impeccable` (`distill`, `critique`, `clarify`, `polish`), `ui-ux-pro-max` (sistema visual) y `web-design-guidelines` (revisión final). Todas en `.agents/skills` (enlazadas en `.claude/skills`). De `impeccable` solo se instalaron `SKILL.md` y `reference/`: su lanzador descarga un binario, así que se sigue su ruta «Launcher unavailable» (leer el contexto del proyecto directamente).
+- **Sencillez (KISS) en la app** (`docs/ux/AUDITORIA_KISS.md`): cualquier persona debe poder usarla desde cero sin dar vueltas. Ver «Navegación y estados».
 
 ## Arquitectura (BAS-02)
 
@@ -82,10 +83,15 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 
 ## Navegación y estados (BAS-13)
 
-- Pantallas de la app en `src/app/(app)/` con `AppShell`: barra lateral en escritorio; en móvil, barra inferior con 4 secciones y «Más». Secciones en `src/components/app-shell/nav.ts`, cada una con su `module` para ocultarla si no está contratado (MOD-05).
+- Pantallas de la app en `src/app/(app)/` con `AppShell`: barra lateral en escritorio; en móvil, barra inferior con 4 secciones y «Más». Secciones en `src/components/app-shell/nav.ts`, cada una con su `module` para ocultarla si no está contratado (MOD-05). El menú tiene solo lo que se usa seguido (Inicio, Inventario, Movimientos, Conteos, Compras, Configuración); lo que se configura una vez vive dentro de Configuración (Ubicaciones, con `also` en `nav.ts` para marcar la sección). Una sección nueva no entra al menú sin una razón de uso diario.
 - Estados reutilizables en `src/components/states.tsx`: `PageHeader`, `EmptyState`, `ErrorState`, `LoadingState`, `PageContainer`. Cada sección tiene `loading.tsx` y `error.tsx` compartidos.
 - No mostrar botones deshabilitados sin explicación; una acción aparece cuando su paso está implementado.
-- Encabezado de una sección: como mucho tres botones, para lo de todos los días; lo ocasional va en una fila de enlaces bajo el título (ver Inventario y Movimientos), con una frase corta de para qué sirve si el nombre es jerga («Saldo inicial · lo que tenías al empezar»). Nada de botones con solo un ícono en listas: ícono + texto desde `sm`.
+- **Reglas KISS de pantalla** (auditoría `docs/ux/AUDITORIA_KISS.md`):
+  - Encabezado: como mucho **dos** botones, para lo de todos los días (verbo + sustantivo: «Registrar entrada»). Lo ocasional va en una fila de enlaces bajo el título, nombrados por lo que hacen («Cambiar de lugar», «Corregir existencias»), sin frases de explicación al lado. Lo raro (exportar, archivados) va en enlaces discretos al pie de la lista.
+  - Sin descripción bajo el título si solo repite el nombre de la sección. Ayudas de campo de una línea, solo si evitan un error; si una etiqueta necesita explicación, se cambia la etiqueta.
+  - Una sola forma de hacer cada cosa: la salida es siempre `/movimientos/salida-rapida` («Registrar salida», uno o varios productos); no agregar otra pantalla para lo mismo. El nombre de un enlace es el título de la pantalla a la que lleva.
+  - Listas: la fila completa abre el detalle (enlace con `after:absolute after:inset-0`); las acciones viven en el detalle, no en botones pequeños por fila. Nada de botones con solo un ícono.
+  - Filtros que se usan poco van plegados (`<details>` «Más filtros»), abiertos solo si hay uno aplicado. Datos administrativos (cupo del plan) no ocupan el Inicio: aparecen solo como aviso cuando requieren atención.
 
 ## Autenticación y decisiones (BAS-04/05)
 
@@ -179,7 +185,7 @@ Dentro de un mismo módulo o área se usan imports relativos libremente. `eslint
 - **Conteo y movimientos posteriores (INV-32):** nunca comparar lo contado con el saldo de hoy. Diferencia = contado − `systemQuantity`; movido después = saldo de hoy − `systemQuantity`; objetivo = saldo de hoy + diferencia. Si el objetivo es negativo no se aplica: se recuenta.
 - **Aplicar conteos (INV-33):** el estado del conteo, leído bajo su candado, es la guarda de idempotencia; la clave `count:<id>` es la segunda. No usar `useTransition` como candado de un envío: sigue pendiente hasta que la pantalla se repinta y descarta lo que llegue mientras; usar una bandera propia (`busy` en `capture-form.tsx`).
 - **Reconciliación (INV-34):** una diferencia entre saldo e historial es un defecto que se investiga; ninguna tarea ni pantalla «repara» saldos por su cuenta. Comprobar con `npm run stock:reconcile` (o `DATABASE_NAME=almacen_test npm run stock:reconcile`). Un caso de aceptación nuevo de la fase 1 se agrega a `phase1-cases.int.test.ts`.
-- **Inicio (INV-35):** un bloque nuevo del panel se pinta solo si `access.can(...)` de su sección y reutiliza el servicio de esa sección; el panel no tiene consultas propias. La barra inferior móvil admite cuatro secciones (`mobile: true` en `nav.ts`).
+- **Inicio (INV-35):** un bloque nuevo del panel se pinta solo si `access.can(...)` de su sección y reutiliza el servicio de esa sección; el panel no tiene consultas propias. Solo lleva lo que pide atención hoy (existencias bajas, últimos movimientos, guía de primer uso); el plan aparece solo como aviso. La barra inferior móvil admite cuatro secciones (`mobile: true` en `nav.ts`).
 - **Trabajos en segundo plano (IMP-01, ADR 0013):** encolar con `enqueueJob(tx, organizationId, …)` dentro de la transacción del cambio que lo origina; el tipo es `modulo.accion` en minúsculas y su manejador se agrega a `src/modules/registry/jobs.ts`. Un manejador puede correr dos veces: debe ser idempotente (usar `context.jobId` como clave) y trabajar solo con `forOrganization(context.organizationId)`. En el `payload` van ids y opciones, nunca secretos ni la empresa.
 - **Archivos (IMP-02, ADR 0014):** todo archivo de un cliente pasa por `storeFile` con un propósito de `FILE_PURPOSES` (agregar ahí uno nuevo con sus permisos de la matriz); nunca escribir en disco desde otro lugar ni usar el nombre del archivo como ruta. Para descargar, `createFileLink` y un enlace normal a su `url`; no servir archivos desde `public/` ni devolverlos en una Server Action. Quien procesa un archivo usa `readStoredFile(organizationId, fileId)` con la empresa de la sesión o del trabajo.
 - **Hojas de cálculo (IMP-03):** todo CSV o XLSX que salga del sistema se escribe con `buildCsv`/`buildXlsx` de `@/platform/files` (celdas de texto y fórmulas neutralizadas con `'`); no concatenar CSV a mano. Una columna nueva de importación se agrega a `IMPORT_COLUMNS` con su ayuda y ejemplo. Las descargas van por una ruta `GET` bajo `/api/…` que llama `requireOrganizationContext()` y responde `attachment` + `nosniff` + `no-store` (y se agrega a `PROTECTED` en `proxy.ts`).

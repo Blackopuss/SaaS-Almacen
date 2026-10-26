@@ -60,7 +60,7 @@ export function AppShell({
   const items = NAV_ITEMS.filter((item) => allowedHrefs.includes(item.href));
   const primary = items.filter((item) => item.mobile);
   const secondary = items.filter((item) => !item.mobile);
-  const current = NAV_ITEMS.find((item) => isActive(pathname, item.href));
+  const current = NAV_ITEMS.find((item) => isActive(pathname, item));
 
   return (
     <div className="flex min-h-dvh w-full">
@@ -78,10 +78,7 @@ export function AppShell({
           <ul className="space-y-1">
             {items.map((item) => (
               <li key={item.href}>
-                <SidebarLink
-                  item={item}
-                  active={isActive(pathname, item.href)}
-                />
+                <SidebarLink item={item} active={isActive(pathname, item)} />
               </li>
             ))}
           </ul>
@@ -117,7 +114,7 @@ export function AppShell({
         <ul className="grid grid-cols-5">
           {primary.map((item) => (
             <li key={item.href}>
-              <BottomLink item={item} active={isActive(pathname, item.href)} />
+              <BottomLink item={item} active={isActive(pathname, item)} />
             </li>
           ))}
           <li>
@@ -126,7 +123,7 @@ export function AppShell({
               user={user}
               signOutAction={signOutAction}
               items={secondary}
-              active={secondary.some((item) => isActive(pathname, item.href))}
+              active={secondary.some((item) => isActive(pathname, item))}
               pathname={pathname}
             />
           </li>
@@ -139,7 +136,7 @@ export function AppShell({
 function Brand() {
   return (
     <Link
-      href="/inventario"
+      href="/inicio"
       className="m-3 flex h-12 items-center gap-2.5 rounded-lg px-3 font-semibold tracking-tight focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
@@ -225,7 +222,7 @@ function MoreMenu({
           <ul className="space-y-1">
             {items.map((item) => {
               const Icon = item.icon;
-              const current = isActive(pathname, item.href);
+              const current = isActive(pathname, item);
               return (
                 <li key={item.href}>
                   <Link

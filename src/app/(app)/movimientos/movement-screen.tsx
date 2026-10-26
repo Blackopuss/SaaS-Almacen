@@ -54,7 +54,7 @@ const KINDS = {
   adjustment: {
     path: "/movimientos/ajuste",
     permission: "inventory.adjustment.create",
-    title: "Ajustar existencias",
+    title: "Corregir existencias",
     find: "Busca el producto cuya cantidad no coincide.",
     searchLabel: "Buscar el producto que se ajusta",
     archived: "Reactívalo en Inventario para ajustar sus existencias.",
@@ -62,7 +62,7 @@ const KINDS = {
   transfer: {
     path: "/movimientos/reubicar",
     permission: "inventory.transfer.create",
-    title: "Reubicar",
+    title: "Cambiar de lugar",
     find: "Busca el producto que vas a cambiar de lugar.",
     searchLabel: "Buscar el producto que se reubica",
     archived: "Reactívalo en Inventario para reubicarlo.",
