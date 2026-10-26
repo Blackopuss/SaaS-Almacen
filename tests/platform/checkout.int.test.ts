@@ -316,6 +316,28 @@ describe("confirming the payment", () => {
     expect(await handleWebhook("nadie", request)).toEqual({ status: 404 });
   });
 
+  it("forged deliveries from one IP are cut off; other IPs still answer", async () => {
+    fake.webhook = null;
+    const from = (ip: string) => ({
+      headers: new Headers({ "x-forwarded-for": ip }),
+      rawBody: "{}",
+      url: new URL("https://almacen.test/api/pagos/stripe/webhook"),
+    });
+    const forger = `203.0.113.${Date.now() % 250}`;
+    for (let i = 0; i < 30; i++) {
+      expect(await handleWebhook("stripe", from(forger))).toEqual({
+        status: 400,
+      });
+    }
+    // Blocked before verifying: no more calls to the provider from there.
+    expect(await handleWebhook("stripe", from(forger))).toEqual({
+      status: 429,
+    });
+    expect(await handleWebhook("stripe", from("198.51.100.7"))).toEqual({
+      status: 400,
+    });
+  });
+
   it("a paid order is final in the database", async () => {
     const c = await pendingOrder();
     await expect(

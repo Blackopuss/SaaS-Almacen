@@ -7,7 +7,9 @@ import { z } from "zod";
 import { dec, formatDecimal, log, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import {
+  blockedFor,
   clientIp,
+  recordAttempt,
   reserveAttempt,
   tooManyAttemptsMessage,
 } from "@/platform/auth";
@@ -85,6 +87,16 @@ const hourly = (max: number) => ({
 });
 const ipHash = (ip: string) =>
   createHash("sha256").update(ip).digest("hex").slice(0, 32);
+
+/**
+ * Webhook deliveries whose signature did not check out, per IP (PIL-05):
+ * a real provider never fails it, while each forged PayPal delivery costs a
+ * call to PayPal with our credentials. Valid deliveries never count.
+ */
+const webhookIpKey = (headers: Headers) => ({
+  key: `webhook:ip:${ipHash(clientIp(headers))}`,
+  rule: hourly(30),
+});
 
 /** Every start of a checkout or try of a code counts here first. */
 function attemptKeys(actor: Actor, headers: Headers) {
@@ -671,6 +683,8 @@ export async function handleWebhook(
 ): Promise<{ status: number }> {
   const provider = findProvider(providerId);
   if (!provider || !provider.enabled()) return { status: 404 };
+  const ipKey = webhookIpKey(request.headers);
+  if ((await blockedFor([ipKey])) > 0) return { status: 429 };
   let event;
   try {
     event = await provider.verifyWebhook(request);
@@ -683,6 +697,7 @@ export async function handleWebhook(
   }
   if (!event) {
     log.warn("payment_webhook_rejected", { provider: provider.id });
+    await recordAttempt([ipKey]);
     return { status: 400 };
   }
   const providerEnum: ProviderEnum = PROVIDER_ENUM[provider.id];

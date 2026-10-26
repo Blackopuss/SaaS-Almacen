@@ -215,10 +215,11 @@ try {
     const page = await signedInPage(browser, viewport);
     const mobile = viewport.name === "mobile";
 
-    await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    // «/» is the public site (ADR 0022); the app starts at Inicio.
+    await page.goto(`${BASE}/inicio`, { waitUntil: "networkidle" });
     check(
       new URL(page.url()).pathname === "/inicio",
-      `${viewport.name}: / redirects to /inicio`,
+      `${viewport.name}: signed in, the app opens on /inicio`,
     );
 
     for (const path of SECTIONS) {
@@ -713,7 +714,7 @@ try {
     await second.waitForTimeout(1500); // let the door animation finish
     await second.screenshot({ path: `${OUT}/verificar-respaldo-desktop.png` });
     await second.getByRole("button", { name: "Verificar" }).click();
-    await second.waitForURL("**/inventario", { timeout: 20000 });
+    await second.waitForURL("**/inicio", { timeout: 20000 });
     check(true, "MFA: signing in with a backup code works (typed loosely)");
     await other.close();
 
@@ -752,10 +753,15 @@ try {
     );
     await anonymous.close();
 
+    // With MFA on, the screen stays (it must not hide fresh backup codes)
+    // but asks nothing: it says it is on and offers to continue.
     await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inicio",
-      "MFA: the mandatory setup screen sends accounts with MFA to the app",
+      (await page
+        .getByText("La verificación en dos pasos ya está activada")
+        .isVisible()) &&
+        (await page.getByRole("button", { name: "Continuar" }).isVisible()),
+      "MFA: the mandatory setup screen asks nothing of accounts with MFA",
     );
     await page.context().close();
   }
