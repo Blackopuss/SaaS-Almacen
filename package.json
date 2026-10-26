@@ -36,7 +36,8 @@
     "stock:reconcile": "tsx --conditions=react-server scripts/stock-reconcile.mts",
     "worker": "tsx scripts/worker.mts",
     "correo:prueba": "tsx --conditions=react-server scripts/mail-test.mts",
-    "verify:a11y": "node scripts/verify-a11y.mjs"
+    "verify:a11y": "node scripts/verify-a11y.mjs",
+    "load:test": "tsx scripts/load-test.mts"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.1",
