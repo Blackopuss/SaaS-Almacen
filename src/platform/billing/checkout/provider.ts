@@ -80,7 +80,7 @@ export type CheckoutRef = { providerRef: string; orderId: string };
 
 export interface PaymentProvider {
   readonly id: ProviderId;
-  /** Shown on the payment button, e.g. "Tarjeta, Google Pay u OXXO". */
+  /** Short name in the list of ways to pay, e.g. "Tarjeta u OXXO". */
   readonly label: string;
   /** Whether its keys are configured; a provider without keys is not offered. */
   enabled(): boolean;

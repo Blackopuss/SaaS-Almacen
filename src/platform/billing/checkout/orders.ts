@@ -68,8 +68,14 @@ type ProviderEnum = (typeof PROVIDER_ENUM)[ProviderId];
 
 /** A checkout can be paid for this long (OXXO vouchers take days). */
 const ORDER_LIFETIME_MS = 72 * 3_600_000;
-/** Unfinished checkouts a company may have at once. */
+/**
+ * Checkouts a company may open within PENDING_WINDOW_MS. A checkout left
+ * on the provider's page stays PENDING until the provider expires it (about
+ * a day), so only recent ones count: abandoned ones stop blocking soon,
+ * and the attempt limits keep stopping bots.
+ */
 const MAX_PENDING = 3;
+const PENDING_WINDOW_MS = 3_600_000;
 export const RECEIPT_JOB_TYPE = "billing.purchase_receipt";
 
 const hourly = (max: number) => ({
@@ -376,13 +382,13 @@ export async function startCheckout(
         where: {
           organizationId: actor.organizationId,
           status: "PENDING",
-          expiresAt: { gt: now },
+          createdAt: { gt: new Date(now.getTime() - PENDING_WINDOW_MS) },
         },
       });
       if (pending >= MAX_PENDING) {
         throw new Rejected(
           fail(
-            "Tienes varias compras sin terminar. Termina una o espera a que venzan antes de empezar otra.",
+            "Abriste varios pagos en la última hora sin terminarlos. Termina uno o inténtalo de nuevo en un rato.",
           ),
         );
       }

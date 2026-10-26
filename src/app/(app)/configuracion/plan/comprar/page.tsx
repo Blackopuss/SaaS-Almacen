@@ -6,6 +6,7 @@ import { NoAccessState, PageContainer, PageHeader } from "@/components";
 import { formatDate } from "@/lib";
 import { getAccess } from "@/platform/authorization";
 import {
+  CONTACT_EMAIL,
   PLAN_TIERS,
   formatMxn,
   getCheckoutOptions,
@@ -86,6 +87,8 @@ export default async function BuyPlanPage({
   // While the plan is live it can only be renewed as it is (the service decides).
   const renewalOnly = current?.live === true && current.validUntil !== null;
   const unlimited = current?.live === true && current.validUntil === null;
+  // A live plan offers only itself: the other tiers would just be refused.
+  const lockedTier = renewalOnly ? (current?.tierId ?? null) : null;
   const currentText =
     current && current.productLimit !== null
       ? planText(current.productLimit, current.purchasing ? ["purchasing"] : [])
@@ -119,17 +122,25 @@ export default async function BuyPlanPage({
 
       {unlimited ? (
         <Note>Tu plan no tiene fecha de término: no necesitas comprarlo.</Note>
+      ) : renewalOnly && !lockedTier ? (
+        <Note>
+          Tu plan es especial y no se renueva en línea. Escríbenos a{" "}
+          {CONTACT_EMAIL} para renovarlo.
+        </Note>
       ) : (
         <>
           {renewalOnly && (
             <Note>
               Mientras tu plan esté vigente puedes renovarlo igual; los meses
               nuevos empiezan al terminar los que ya tienes. Para cambiar de
-              nivel o de módulos escríbenos.
+              nivel o de módulos escríbenos a {CONTACT_EMAIL}.
             </Note>
           )}
           <CheckoutForm
-            tiers={tiers}
+            tiers={
+              lockedTier ? tiers.filter((t) => t.id === lockedTier) : tiers
+            }
+            lockPurchasing={renewalOnly}
             months={[...options.months]}
             quotes={quotes}
             providers={options.providers}
