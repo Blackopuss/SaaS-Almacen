@@ -36,6 +36,31 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la caja se busca y se bloquea solo en esa empresa",
     coveredBy: "tests/sales/cash.int.test.ts",
   },
+  findQuoteProductsAction: {
+    input: "texto buscado (nombre, clave o código de barras)",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo busca productos de esa empresa",
+    coveredBy: "tests/sales/quotes.int.test.ts",
+  },
+  loadQuoteProductAction: {
+    input: "id del producto",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el producto se busca solo en esa empresa",
+    coveredBy: "tests/sales/quotes.int.test.ts",
+  },
+  previewQuoteAction: {
+    input: "líneas (id de producto, presentación y cantidad) y descuento",
+    identity:
+      "sesión y empresa activa (getModuleAccess); precios de esa empresa",
+    coveredBy: "tests/sales/quotes.int.test.ts",
+  },
+  saveQuoteAction: {
+    input:
+      "id de la cotización (al editar), cliente, vigencia, notas, descuento y líneas",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); cotización, cliente y productos se buscan solo en esa empresa",
+    coveredBy: "tests/sales/quotes.int.test.ts",
+  },
   returnSaleAction: {
     input:
       "id de la venta, cantidades por línea, motivo, forma de reembolso y referencia",

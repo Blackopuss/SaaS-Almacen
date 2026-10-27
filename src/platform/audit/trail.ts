@@ -52,6 +52,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "sales.returned": "Registró una devolución de venta",
   "sales.cancelled": "Canceló una venta",
   "sales.report_exported": "Exportó un reporte de ventas a un archivo",
+  "sales.quote_created": "Hizo una cotización",
+  "sales.quote_updated": "Cambió una cotización en borrador",
   "sales.settings_changed": "Cambió el IVA de sus ventas",
   "purchase_order.delivery_requested":
     "Pidió enviar una orden de compra por correo",
@@ -160,6 +162,7 @@ const FACT_LABELS: readonly (readonly [string, string])[] = [
   ["lugaresDevueltos", "Lugares devueltos al plan"],
   ["cambios", "Cambió"],
   ["venta", "Venta"],
+  ["cotizacion", "Cotización"],
   ["porcentaje", "Descuento"],
   ["fondo", "Fondo"],
   ["importe", "Importe"],

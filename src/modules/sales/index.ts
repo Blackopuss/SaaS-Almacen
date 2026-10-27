@@ -97,3 +97,24 @@ export type {
   SalesReportKind,
   SalesReportRow,
 } from "./reports";
+export {
+  QUOTE_DEFAULT_DAYS,
+  QUOTE_MAX_LINES,
+  QUOTE_PAGE_SIZE,
+  QUOTE_STATUS_LABELS,
+  createQuote,
+  defaultQuoteValidity,
+  getQuote,
+  listQuotes,
+  previewQuote,
+  updateQuote,
+} from "./quotes";
+export type {
+  QuoteField,
+  QuoteInput,
+  QuotePreview,
+  QuoteResult,
+  QuoteStatus,
+  QuoteSummary,
+  QuoteView,
+} from "./quotes";

@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { dec, formatDateTime } from "@/lib";
 import { assertModulePermission } from "@/platform/billing";
-import { getUnit } from "@/platform/catalog";
+import { getUnit, pluralizeName } from "@/platform/catalog";
 import { forOrganization } from "@/server";
 
 import { formatPercent } from "./discounts";
@@ -135,7 +135,7 @@ async function loadTicket(
       const unit = getUnit(line.unitCode);
       const captured = dec(line.capturedQuantity.toString());
       const quantity = line.presentation
-        ? `${captured.toString()} ${line.presentation.name.toLowerCase()} de ${dec(line.factor.toString()).toString()} ${unit.plural}`
+        ? `${captured.toString()} ${pluralizeName(line.presentation.name, captured)} de ${dec(line.factor.toString()).toString()} ${unit.plural}`
         : `${captured.toString()} ${captured.equals(1) ? unit.name : unit.plural}`;
       return {
         name: line.product.name,

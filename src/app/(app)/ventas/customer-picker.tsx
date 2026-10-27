@@ -23,11 +23,14 @@ export function CustomerPicker({
   value,
   onChange,
   canCreate,
+  emptyLabel = "Público en general",
 }: {
   value: CustomerSummary | null;
   onChange: (customer: CustomerSummary | null) => void;
   /** The server says whether this person may register customers. */
   canCreate: boolean;
+  /** What shows while no customer is chosen. */
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -105,7 +108,7 @@ export function CustomerPicker({
         </span>
         <p className="min-w-0 flex-1 text-sm">
           <span className="block font-medium [overflow-wrap:anywhere]">
-            {value?.name ?? "Público en general"}
+            {value?.name ?? emptyLabel}
           </span>
           {value && (value.phone || value.rfc) && (
             <span className="block text-muted-foreground">
