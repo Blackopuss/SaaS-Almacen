@@ -16,6 +16,7 @@ const PROTECTED = [
   "/ubicaciones",
   "/conteos",
   "/compras",
+  "/ventas",
   "/configuracion",
   "/activa-dos-pasos",
   "/acepta-terminos",

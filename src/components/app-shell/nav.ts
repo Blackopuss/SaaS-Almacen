@@ -5,6 +5,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,13 +14,16 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   /** Module that must be contracted to show the item (MOD-05); null = always. */
-  module: "inventory" | "purchasing" | null;
+  module: "inventory" | "purchasing" | "sales" | null;
   /**
    * Permission needed to see the item and open its screen (USR-09), from
    * the catalog in platform/authorization; null = every member.
    */
   permission: string | null;
-  /** Shown in the mobile bottom bar (max 4 + «Más»). */
+  /**
+   * Shown in the mobile bottom bar: the first 4 the person may see, in
+   * this order; the rest go to «Más».
+   */
   mobile: boolean;
   /** Other screens that live under this item (set up once, reached from it). */
   also?: readonly string[];
@@ -33,6 +37,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: House,
     module: null,
     permission: null,
+    mobile: true,
+  },
+  {
+    // Selling is what a store does most: first after Inicio (VEN-06).
+    href: "/ventas",
+    label: "Ventas",
+    icon: Store,
+    module: "sales",
+    permission: "sales.sale.create",
     mobile: true,
   },
   {

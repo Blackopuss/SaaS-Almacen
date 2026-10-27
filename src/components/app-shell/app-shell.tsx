@@ -58,8 +58,9 @@ export function AppShell({
   );
   const pathname = usePathname();
   const items = NAV_ITEMS.filter((item) => allowedHrefs.includes(item.href));
-  const primary = items.filter((item) => item.mobile);
-  const secondary = items.filter((item) => !item.mobile);
+  // The bottom bar holds 4 sections; the rest go to «Más».
+  const primary = items.filter((item) => item.mobile).slice(0, 4);
+  const secondary = items.filter((item) => !primary.includes(item));
   const current = NAV_ITEMS.find((item) => isActive(pathname, item));
 
   return (

@@ -18,6 +18,25 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  findSaleProductsAction: {
+    input: "texto buscado (nombre, clave o código de barras)",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo lee productos de esa empresa",
+    coveredBy: "tests/sales/cart.int.test.ts",
+  },
+  loadSaleProductAction: {
+    input: "id de producto",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el producto se busca solo en esa empresa",
+    coveredBy: "tests/sales/cart.int.test.ts",
+  },
+  quoteSaleAction: {
+    input:
+      "líneas del carrito: id de producto, presentación, cantidad tecleada y ubicación",
+    identity:
+      "sesión y empresa activa (getModuleAccess); productos, precios e IVA se leen solo de esa empresa; solo lee",
+    coveredBy: "tests/sales/cart.int.test.ts",
+  },
   updateSalesSettingsAction: {
     input: "modo de IVA (incluido o sumado) y tasa",
     identity:
