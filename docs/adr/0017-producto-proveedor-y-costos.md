@@ -1,6 +1,6 @@
 # ADR 0017 — Relación producto-proveedor y último costo
 
-Fecha: 2026-10-10 · Estado: aceptada (un punto a confirmar por el fundador) · Paso: CMP-03
+Fecha: 2026-10-10 · Estado: aceptada (un punto a confirmar por el fundador) · Paso: CMP-03 · Cambiada por ADR 0031: el costo también se captura a mano, con permiso, y el inventario se valora a costo promedio
 
 ## Contexto
 

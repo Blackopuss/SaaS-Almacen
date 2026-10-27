@@ -44,6 +44,7 @@ export const TENANT_MODELS = [
   "Product",
   "ProductBrand",
   "ProductCategory",
+  "ProductCost",
   "ProductImport",
   "ProductImportItem",
   "ProductPresentation",

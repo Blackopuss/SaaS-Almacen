@@ -138,6 +138,7 @@ model Organization {
   stockMovementLines      StockMovementLine[]
   stockBalances           StockBalance[]
   stockMinimums           StockMinimum[]
+  productCosts            ProductCost[]
   stockCounts             StockCount[]
   stockCountLines         StockCountLine[]
   stockCountCaptures      StockCountCapture[]
@@ -816,6 +817,7 @@ model Product {
   orderLines     PurchaseOrderLine[]
   receiptLines   PurchaseReceiptLine[]
   returnLines    PurchaseReturnLine[]
+  cost           ProductCost?
   status         ProductStatus         @default(ACTIVE)
   createdAt      DateTime              @default(now()) @db.DateTime(3)
   updatedAt      DateTime              @updatedAt @db.DateTime(3)
@@ -1010,6 +1012,10 @@ model StockMovementLine {
   /// Unit of the product when it moved (fixed after its first movement).
   unitCode              String               @db.VarChar(12)
   unit                  Unit                 @relation("LineUnit", fields: [unitCode], references: [code], onDelete: Restrict)
+  /// Cost of one unit of the product this line was valued at, before taxes
+  /// (VAL-01, ADR 0031): the cost of an entry, or the average cost an exit
+  /// took. Null when the product had no known cost.
+  unitCost              Decimal?             @db.Decimal(18, 6)
   createdAt             DateTime             @default(now()) @db.DateTime(3)
 
   @@unique([organizationId, id])
@@ -1038,6 +1044,26 @@ model StockBalance {
   @@unique([organizationId, productId, locationId])
   @@index([organizationId, locationId])
   @@map("stock_balance")
+}
+
+/// Average cost of a product (VAL-01, ADR 0031): the value of all its stock
+/// and the price of one unit of the product, before taxes, kept up to date
+/// in the same transaction as each movement (src/modules/inventory/
+/// average-cost.ts). A table of its own so that cost is only read on
+/// purpose, by whoever may see costs. No row while the cost is unknown.
+model ProductCost {
+  id             String       @id @db.Char(36)
+  organizationId String       @db.Char(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId      String       @db.Char(36)
+  product        Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  averageCost    Decimal      @db.Decimal(18, 6)
+  stockValue     Decimal      @db.Decimal(20, 6)
+  updatedAt      DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, productId])
+  @@map("product_cost")
 }
 
 /// Lowest stock a company wants of a product, in the product's unit
