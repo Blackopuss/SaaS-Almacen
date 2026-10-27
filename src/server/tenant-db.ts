@@ -59,6 +59,8 @@ export const TENANT_MODELS = [
   "CashMovement",
   "SaleReturn",
   "SaleReturnLine",
+  "SalesQuote",
+  "SalesQuoteLine",
   "PurchaseOrder",
   "PurchaseOrderDelivery",
   "PurchaseOrderLine",
@@ -280,6 +282,7 @@ const LOCKABLE = {
   stockCount: "stock_count",
   cashSession: "cash_session",
   sale: "sale",
+  salesQuote: "sales_quote",
 } as const;
 
 /**

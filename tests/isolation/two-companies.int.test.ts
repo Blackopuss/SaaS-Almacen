@@ -562,6 +562,45 @@ beforeAll(async () => {
         refund: "120",
       },
     });
+    // A quote to a customer (COT-01) and its line.
+    const customerId = newId();
+    await db.contact.create({
+      data: {
+        id: customerId,
+        organizationId,
+        name: "Constructora del Sur",
+        isCustomer: true,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const quoteId = newId();
+    await db.salesQuote.create({
+      data: {
+        id: quoteId,
+        organizationId,
+        number: 1,
+        customerId,
+        validUntil: new Date("2026-11-30"),
+        pricesIncludeTax: true,
+        taxRate: "16",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesQuoteLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        quoteId,
+        lineNumber: 1,
+        productId,
+        capturedQuantity: "2",
+        factor: "1",
+        baseQuantity: "2",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "240",
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {
