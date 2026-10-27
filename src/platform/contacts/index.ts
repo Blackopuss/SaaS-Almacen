@@ -26,9 +26,11 @@ export {
   customerSchema,
   findCustomers,
   getCustomer,
+  setCustomerEmail,
 } from "./customers";
 export type {
   CreateCustomerResult,
+  CustomerEmailResult,
   CustomerField,
   CustomerInput,
   CustomerSummary,

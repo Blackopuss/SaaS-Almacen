@@ -118,3 +118,18 @@ export type {
   QuoteSummary,
   QuoteView,
 } from "./quotes";
+export { buildQuotePdf, composeQuotePdf } from "./quote-pdf";
+export type { QuotePdf } from "./quote-pdf";
+export {
+  QUOTE_DELIVERY_JOB_TYPE,
+  QUOTE_DELIVERY_STATUS_LABELS,
+  deliverQuote,
+  getQuoteDeliveries,
+  requestQuoteDelivery,
+  salesJobHandlers,
+} from "./quote-delivery";
+export type {
+  QuoteDelivery,
+  QuoteDeliveryPanel,
+  RequestQuoteDeliveryResult,
+} from "./quote-delivery";

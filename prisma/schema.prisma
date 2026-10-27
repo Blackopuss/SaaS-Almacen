@@ -172,6 +172,7 @@ model Organization {
   saleReturnLines            SaleReturnLine[]
   salesQuotes                SalesQuote[]
   salesQuoteLines            SalesQuoteLine[]
+  salesQuoteDeliveries       SalesQuoteDelivery[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -2183,34 +2184,35 @@ enum SalesQuoteStatus {
 /// stock nor the cash register. Its totals are not stored: they come from
 /// its lines with `saleTotals`, like a sale's.
 model SalesQuote {
-  id               String           @id @db.Char(36)
-  organizationId   String           @db.Char(36)
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id               String               @id @db.Char(36)
+  organizationId   String               @db.Char(36)
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive number of the company: 1, 2, 3…
   number           Int
-  status           SalesQuoteStatus @default(DRAFT)
+  status           SalesQuoteStatus     @default(DRAFT)
   /// Always a customer: a quote goes to someone.
-  customerId       String           @db.Char(36)
-  customer         Contact          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  customerId       String               @db.Char(36)
+  customer         Contact              @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
   /// Last day it holds, of the company's calendar.
-  validUntil       DateTime         @db.Date
+  validUntil       DateTime             @db.Date
   /// VAT rule when it was written (VEN-04).
   pricesIncludeTax Boolean
-  taxRate          Decimal          @db.Decimal(5, 2)
+  taxRate          Decimal              @db.Decimal(5, 2)
   /// Discount of the whole quote, in percent, and why (VEN-14).
-  discountPercent  Decimal          @default(0) @db.Decimal(5, 2)
-  discountReason   String?          @db.VarChar(200)
+  discountPercent  Decimal              @default(0) @db.Decimal(5, 2)
+  discountReason   String?              @db.VarChar(200)
   /// For the customer: conditions, delivery, what was talked about.
-  notes            String?          @db.VarChar(1000)
-  createdByUserId  String           @db.Char(36)
-  createdAt        DateTime         @default(now()) @db.DateTime(3)
-  updatedAt        DateTime         @updatedAt @db.DateTime(3)
-  sentAt           DateTime?        @db.DateTime(3)
+  notes            String?              @db.VarChar(1000)
+  createdByUserId  String               @db.Char(36)
+  createdAt        DateTime             @default(now()) @db.DateTime(3)
+  updatedAt        DateTime             @updatedAt @db.DateTime(3)
+  sentAt           DateTime?            @db.DateTime(3)
   /// Accepted or rejected: when, by whom (who recorded it) and why.
-  decidedAt        DateTime?        @db.DateTime(3)
-  decidedByUserId  String?          @db.Char(36)
-  rejectReason     String?          @db.VarChar(500)
+  decidedAt        DateTime?            @db.DateTime(3)
+  decidedByUserId  String?              @db.Char(36)
+  rejectReason     String?              @db.VarChar(500)
   lines            SalesQuoteLine[]
+  deliveries       SalesQuoteDelivery[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -2249,4 +2251,40 @@ model SalesQuoteLine {
   @@unique([organizationId, quoteId, lineNumber])
   @@index([organizationId, productId])
   @@map("sales_quote_line")
+}
+
+/// How a mail of a quote ended (COT-03).
+enum SalesQuoteDeliveryStatus {
+  /// Waiting for the worker, or between attempts.
+  QUEUED
+  SENT
+  /// It will not be tried again; a person may ask for another one.
+  FAILED
+}
+
+/// A quote sent to its customer by mail (COT-03, like ADR 0020): asked
+/// for by a person, sent by the worker with the PDF attached.
+model SalesQuoteDelivery {
+  id                String                   @id @db.Char(36)
+  organizationId    String                   @db.Char(36)
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  quoteId           String                   @db.Char(36)
+  quote             SalesQuote               @relation(fields: [organizationId, quoteId], references: [organizationId, id], onDelete: Restrict)
+  /// The customer's address when it was asked for; never typed on the spot.
+  recipient         String                   @db.VarChar(254)
+  status            SalesQuoteDeliveryStatus @default(QUEUED)
+  /// The job that sends it (a row of `job` of the same company).
+  jobId             String                   @db.Char(36)
+  requestedByUserId String                   @db.Char(36)
+  requestedAt       DateTime                 @default(now()) @db.DateTime(3)
+  sentAt            DateTime?                @db.DateTime(3)
+  failedAt          DateTime?                @db.DateTime(3)
+  /// Why it was not sent, for people; never the answer of a mail server.
+  failureReason     String?                  @db.VarChar(300)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, jobId])
+  @@index([organizationId, quoteId, requestedAt])
+  @@index([organizationId, requestedAt])
+  @@map("sales_quote_delivery")
 }

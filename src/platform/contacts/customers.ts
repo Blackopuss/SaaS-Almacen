@@ -202,3 +202,64 @@ export async function createCustomer(
   });
   return { ok: true, customer: { id, ...data } };
 }
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type CustomerEmailResult =
+  | { ok: true; email: string }
+  | { ok: false; reason: "invalid" | "not_found"; error: string };
+
+/**
+ * Writes the mail of a customer (COT-03): where its quotes are sent. It is
+ * saved in the card, checked here, so that a quote is only ever mailed to
+ * an address of the card.
+ */
+export async function setCustomerEmail(
+  actor: ContactActor,
+  customerId: string,
+  email: string,
+): Promise<CustomerEmailResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(organizationId, userId, "sales.customer.create");
+  const text = String(email ?? "")
+    .trim()
+    .toLowerCase();
+  if (text.length > 254 || !EMAIL.test(text) || !NO_CONTROL.test(text)) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: "Escribe un correo válido, por ejemplo nombre@empresa.com.",
+    };
+  }
+  const id = String(customerId).slice(0, 36);
+  return forOrganization(organizationId).$transaction(async (tx) => {
+    const customer = await tx.contact.findFirst({
+      where: { id, isCustomer: true, archivedAt: null },
+      select: { id: true, name: true, email: true },
+    });
+    if (!customer) {
+      return {
+        ok: false,
+        reason: "not_found",
+        error: "Ese cliente ya no existe.",
+      };
+    }
+    if (customer.email === text) return { ok: true, email: text };
+    await tx.contact.update({
+      where: { id: customer.id },
+      data: { email: text },
+    });
+    await recordAuditEvent(tx, {
+      organizationId,
+      actorUserId: userId,
+      action: "customer.email_updated",
+      target: { type: "contact", id: customer.id },
+      metadata: {
+        nombre: customer.name,
+        antes: customer.email ?? "sin correo",
+        correo: text,
+      },
+    });
+    return { ok: true, email: text };
+  });
+}

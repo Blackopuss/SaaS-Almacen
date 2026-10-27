@@ -1,4 +1,4 @@
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, FileDown, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,8 +11,11 @@ import {
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getQuote } from "@/modules/sales";
+import { formatDateTime } from "@/lib";
+import { getQuote, getQuoteDeliveries } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
+
+import { QuoteDeliveryPanel } from "./delivery-panel";
 
 export const metadata: Metadata = { title: "Cotización" };
 
@@ -50,11 +53,17 @@ export default async function CotizacionPage({
     );
   }
   const { id } = await params;
-  const quote = await getQuote(
-    { organizationId: access.organization.id, userId: access.user.id },
-    id,
-  );
-  if (!quote) notFound();
+  const actor = {
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  };
+  const [quote, delivery] = await Promise.all([
+    getQuote(actor, id),
+    getQuoteDeliveries(actor, id),
+  ]);
+  if (!quote || !delivery) notFound();
+  const zone = access.organization.timeZone;
+  const active = access.moduleState("sales") === "active";
   const edit =
     quote.status === "DRAFT" && access.allows("sales.quote.create") ? (
       <Button asChild variant="outline">
@@ -69,6 +78,15 @@ export default async function CotizacionPage({
     <PageContainer>
       {back}
       <PageHeader title={`Cotización ${quote.number}`} actions={edit} />
+      <p className="-mt-2 flex flex-wrap gap-x-6">
+        <a
+          href={`/api/ventas/cotizaciones/${quote.id}/pdf`}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <FileDown aria-hidden="true" className="size-4" />
+          Descargar PDF
+        </a>
+      </p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
           <section
@@ -107,6 +125,27 @@ export default async function CotizacionPage({
               </p>
             )}
           </section>
+          <QuoteDeliveryPanel
+            quoteId={quote.id}
+            number={quote.number}
+            customerName={quote.customer.name}
+            draft={quote.status === "DRAFT"}
+            inProgress={delivery.inProgress}
+            send={active ? delivery.send : undefined}
+            canWriteEmail={access.allows("sales.customer.create")}
+            deliveries={delivery.deliveries.map((row) => ({
+              id: row.id,
+              recipient: row.recipient,
+              status: row.status,
+              statusLabel: row.statusLabel,
+              requestedText: formatDateTime(row.requestedAt, zone),
+              endedText: row.sentAt ? formatDateTime(row.sentAt, zone) : null,
+              failureReason: row.failureReason,
+              attempts: row.attempts,
+              maxAttempts: row.maxAttempts,
+              retrying: row.retrying,
+            }))}
+          />
           <section
             aria-labelledby="productos-cotizados"
             className="rounded-xl border bg-card"

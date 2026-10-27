@@ -232,6 +232,38 @@ export function purchaseOrderEmail(input: {
   };
 }
 
+/** A quote to a customer, with its PDF (COT-03). */
+export function salesQuoteEmail(input: {
+  to: string;
+  /** Who is greeted: the customer. */
+  greeting: string;
+  organizationName: string;
+  quoteNumber: number;
+  /** «12 de noviembre de 2026». */
+  validUntil: string;
+  /** «$1,252.81». */
+  total: string;
+  sender: { name: string; email: string };
+  pdf: EmailAttachment;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.sender.email,
+    subject: `Cotización ${input.quoteNumber} de ${company}`,
+    attachments: [input.pdf],
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `${company} te envía su cotización ${input.quoteNumber} por ${oneLine(input.total, 30)}. Va adjunta en PDF y vale hasta el ${oneLine(input.validUntil, 40)}.`,
+      "",
+      `Para aceptarla o si tienes dudas, responde a este correo: le llega a ${oneLine(input.sender.name, 120)} (${input.sender.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}. Si no esperabas esta cotización, ignora el mensaje.`,
+    ].join("\n"),
+  };
+}
+
 /** Operations alert for whoever runs the server (PIL-04). */
 export function operationsAlertEmail(input: {
   to: string;

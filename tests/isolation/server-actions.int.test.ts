@@ -61,6 +61,18 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); cotización, cliente y productos se buscan solo en esa empresa",
     coveredBy: "tests/sales/quotes.int.test.ts",
   },
+  sendQuoteAction: {
+    input: "id de la cotización",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa y el correo sale de la ficha del cliente",
+    coveredBy: "tests/sales/quote-delivery.int.test.ts",
+  },
+  setQuoteCustomerEmailAction: {
+    input: "id de la cotización y el correo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el cliente es el de la cotización, buscada solo en esa empresa",
+    coveredBy: "tests/sales/quote-delivery.int.test.ts",
+  },
   returnSaleAction: {
     input:
       "id de la venta, cantidades por línea, motivo, forma de reembolso y referencia",

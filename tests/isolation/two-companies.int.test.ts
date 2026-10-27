@@ -601,6 +601,21 @@ beforeAll(async () => {
         amount: "240",
       },
     });
+    // Sent by mail (COT-03): the quote leaves the draft first.
+    await db.salesQuote.update({
+      where: { id: quoteId },
+      data: { status: "SENT", sentAt: new Date() },
+    });
+    await db.salesQuoteDelivery.create({
+      data: {
+        id: newId(),
+        organizationId,
+        quoteId,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+        requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {

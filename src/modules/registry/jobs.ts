@@ -3,6 +3,7 @@ import {
   inventoryJobHandlers,
 } from "@/modules/inventory";
 import { purchasingJobHandlers } from "@/modules/purchasing";
+import { salesJobHandlers } from "@/modules/sales";
 import { billingJobHandlers } from "@/platform/billing";
 import type { JobHandlers } from "@/platform/jobs";
 
@@ -15,5 +16,6 @@ export const jobHandlers: JobHandlers = {
   ...inventoryJobHandlers,
   ...exitImportJobHandlers,
   ...purchasingJobHandlers,
+  ...salesJobHandlers,
   ...billingJobHandlers,
 };

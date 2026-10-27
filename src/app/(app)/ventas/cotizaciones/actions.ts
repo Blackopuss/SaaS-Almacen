@@ -8,8 +8,10 @@ import {
   QUOTE_MAX_LINES,
   createQuote,
   findSaleProducts,
+  getQuote,
   getSaleProduct,
   previewQuote,
+  requestQuoteDelivery,
   updateQuote,
   type QuoteField,
   type QuotePreview,
@@ -17,6 +19,7 @@ import {
   type SaleSearch,
 } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
+import { setCustomerEmail } from "@/platform/contacts";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
 /**
@@ -149,4 +152,67 @@ export async function saveQuoteAction(
   }
   revalidatePath("/ventas/cotizaciones");
   redirect(`/ventas/cotizaciones/${idPath(result.quoteId)}`);
+}
+
+export type QuoteActionResult =
+  { ok: true; message: string } | { ok: false; error: string };
+
+async function actorOfSession() {
+  const { user, organization } = await requireOrganizationContext();
+  return { organizationId: organization.id, userId: user.id };
+}
+
+/**
+ * Mails a quote to its customer (COT-03): a draft becomes «Enviada». The
+ * address is the one of the customer's card, never one sent from here.
+ */
+export async function sendQuoteAction(
+  quoteId: string,
+): Promise<QuoteActionResult> {
+  const actor = await actorOfSession();
+  try {
+    const result = await requestQuoteDelivery(actor, String(quoteId));
+    if (!result.ok) return { ok: false, error: result.message };
+    revalidatePath(`/ventas/cotizaciones/${idPath(quoteId)}`);
+    revalidatePath("/ventas/cotizaciones");
+    return {
+      ok: true,
+      message: result.repeated
+        ? `Ya hay un envío en camino a ${result.recipient}.`
+        : `La cotización va en camino a ${result.recipient}.`,
+    };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Writes the mail of the quote's customer in its card. The customer is
+ * the one of the quote, looked for in the company of the session.
+ */
+export async function setQuoteCustomerEmailAction(
+  quoteId: string,
+  email: string,
+): Promise<QuoteActionResult> {
+  const actor = await actorOfSession();
+  try {
+    const quote = await getQuote(actor, String(quoteId));
+    if (!quote) return { ok: false, error: "Esa cotización no existe." };
+    const result = await setCustomerEmail(
+      actor,
+      quote.customer.id,
+      String(email ?? "").slice(0, 300),
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath(`/ventas/cotizaciones/${idPath(quote.id)}`);
+    return { ok: true, message: `Guardamos ${result.email}.` };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }

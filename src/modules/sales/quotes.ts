@@ -397,6 +397,7 @@ export type QuoteView = {
     name: string;
     phone: string | null;
     rfc: string | null;
+    email: string | null;
   };
   /** «2026-11-12». */
   validUntil: string;
@@ -443,7 +444,9 @@ export async function getQuote(
     where: { id: String(quoteId).slice(0, 36) },
     include: {
       organization: { select: { timeZone: true } },
-      customer: { select: { id: true, name: true, phone: true, rfc: true } },
+      customer: {
+        select: { id: true, name: true, phone: true, rfc: true, email: true },
+      },
       lines: {
         orderBy: { lineNumber: "asc" },
         include: {
