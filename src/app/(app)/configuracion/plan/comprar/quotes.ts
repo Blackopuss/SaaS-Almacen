@@ -13,7 +13,6 @@ export type ShownQuote = {
   monthly: string;
   subtotal: string;
   discount: string | null;
-  tax: string;
   total: string;
   free: boolean;
 };
@@ -27,7 +26,6 @@ export function showQuote(value: Quote): ShownQuote {
     monthly: formatMxn(value.monthly),
     subtotal: formatMxn(value.subtotal),
     discount: value.discount === "0.00" ? null : formatMxn(value.discount),
-    tax: formatMxn(value.tax),
     total: formatMxn(value.total),
     free: value.total === "0.00",
   };

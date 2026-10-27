@@ -16,11 +16,11 @@ import { getModuleAccess } from "@/platform/billing";
 import { loadExitProduct } from "./exit-product";
 import { QuickExitForm } from "./quick-exit-form";
 
-export const metadata: Metadata = { title: "Salida rápida" };
+export const metadata: Metadata = { title: "Registrar salida" };
 
 /**
- * Quick exit of several products (INV-28): what a sale takes from the
- * shelves, in one confirmation. No prices, charges or tickets.
+ * The exit screen (INV-28): one product or several, in one confirmation.
+ * It is the only exit the app offers (KISS); no prices, charges or tickets.
  */
 export default async function SalidaRapidaPage({
   searchParams,
@@ -70,8 +70,8 @@ export default async function SalidaRapidaPage({
     <PageContainer>
       {back}
       <PageHeader
-        title="Salida rápida"
-        description="Varios productos en una sola confirmación. Solo registra lo que sale: no cobra ni genera ticket."
+        title="Registrar salida"
+        description="Lo que se vendió o se usó. No cobra ni genera ticket."
       />
       <QuickExitForm
         idempotencyKey={newId()}

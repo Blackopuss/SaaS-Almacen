@@ -63,7 +63,7 @@ export default async function ConteosPage() {
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
       <PageHeader
         title="Conteos"
-        description="Compara lo que hay físicamente con el sistema."
+        description="Cuenta lo que hay y compáralo con el sistema."
       />
       {canOpen && locations.length > 0 && (
         <section
@@ -85,7 +85,7 @@ export default async function ConteosPage() {
         <EmptyState
           icon={ClipboardCheck}
           title="Sin conteos"
-          description="Inicia un conteo físico para detectar diferencias. Capturar no cambia tus existencias."
+          description="Contar no cambia tus existencias hasta que lo apliques."
         />
       ) : (
         <section

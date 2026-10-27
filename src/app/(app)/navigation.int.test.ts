@@ -42,7 +42,6 @@ describe("menu by role", () => {
       "Inicio",
       "Inventario",
       "Movimientos",
-      "Ubicaciones",
       "Conteos",
       "Configuración",
     ]);
@@ -53,7 +52,6 @@ describe("menu by role", () => {
       "Inicio",
       "Inventario",
       "Movimientos",
-      "Ubicaciones",
       "Compras",
       "Configuración",
     ]);

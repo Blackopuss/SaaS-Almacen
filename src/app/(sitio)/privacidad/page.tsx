@@ -63,8 +63,9 @@ export default function PrivacyPage() {
                 invitas a tu equipo, con su rol.
               </li>
               <li>
-                <strong>Contratación:</strong> plan, módulos y, cuando aplique,
-                datos de facturación.
+                <strong>Contratación:</strong> plan, módulos, meses pagados, ID
+                de transacción y el proveedor con el que pagaste. Los datos de
+                tu tarjeta los recibe ese proveedor, nunca nosotros.
               </li>
             </ul>
           ),
@@ -80,6 +81,19 @@ export default function PrivacyPage() {
               empresa es la responsable y {SITE.name} actúa como encargado: solo
               los tratamos para prestarte el servicio y no los usamos para otros
               fines.
+            </p>
+          ),
+        },
+        {
+          id: "soporte",
+          title: "Acceso de soporte",
+          body: (
+            <p>
+              Nuestro equipo no entra a la información de tu empresa salvo que
+              el titular lo permita desde Configuración, por 24 horas y solo
+              para consultar. El titular puede quitar ese acceso en cualquier
+              momento, y cada entrada y salida queda en la bitácora de la
+              empresa.
             </p>
           ),
         },
@@ -132,11 +146,24 @@ export default function PrivacyPage() {
           id: "transferencias",
           title: "Con quién los compartimos",
           body: (
-            <p>
-              Solo con proveedores que nos ayudan a operar el servicio
-              (hospedaje, envío de correo y cobro), bajo contrato y para esos
-              fines, y con autoridades cuando la ley lo exija.
-            </p>
+            <>
+              <p>
+                Solo con proveedores que nos ayudan a operar el servicio, para
+                esos fines, y con autoridades cuando la ley lo exija:
+              </p>
+              <ul>
+                <li>Hospedaje: Amazon Web Services.</li>
+                <li>Envío de correo: Google (Gmail).</li>
+                <li>
+                  Cobro: Stripe, PayPal o Mercado Pago, según la forma de pago
+                  que elijas.
+                </li>
+              </ul>
+              <p>
+                Algunos de estos proveedores guardan información fuera de
+                México.
+              </p>
+            </>
           ),
         },
         {
@@ -165,10 +192,13 @@ export default function PrivacyPage() {
           body: (
             <ul>
               <li>Conexión cifrada y contraseñas con huella resistente.</li>
-              <li>Verificación en dos pasos, obligatoria para titulares.</li>
+              <li>
+                Verificación en dos pasos, obligatoria para titulares y
+                administradores.
+              </li>
               <li>Separación estricta entre empresas y permisos por rol.</li>
               <li>Bitácora de cambios sensibles que no se puede alterar.</li>
-              <li>Revisiones de seguridad periódicas.</li>
+              <li>Respaldos cifrados y revisiones de seguridad periódicas.</li>
             </ul>
           ),
         },

@@ -29,6 +29,8 @@ import { RemoveLine } from "./remove-line";
 
 export const metadata: Metadata = { title: "Orden de compra" };
 
+const quietLink =
+  "inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 const textLink =
   "rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 
@@ -128,7 +130,7 @@ export default async function OrdenPage({
         title={`Orden ${order.numberText}`}
         description={order.supplierName}
         actions={
-          canEdit || canExport || canReceive ? (
+          (canReceive && receipts) || canSubmit ? (
             <>
               {canReceive && receipts && (
                 <ReceiveOrder
@@ -160,26 +162,51 @@ export default async function OrdenPage({
                   }
                 />
               )}
-              {canExport && (
-                <Button asChild variant="outline">
-                  <a href={`/api/compras/ordenes/${order.id}/pdf`} download>
-                    <Download aria-hidden="true" data-icon="inline-start" />
-                    Descargar PDF
-                  </a>
-                </Button>
-              )}
-              {canEdit && (
-                <Button asChild variant="outline">
-                  <Link href={`/compras/ordenes/${order.id}/editar`}>
-                    <Pencil aria-hidden="true" data-icon="inline-start" />
-                    Editar datos
-                  </Link>
-                </Button>
+              {canSubmit && (
+                <SubmitOrder
+                  orderId={order.id}
+                  numberText={order.numberText}
+                  supplierName={order.supplierName}
+                  lines={order.lines.length}
+                />
               )}
             </>
           ) : undefined
         }
       />
+      {/* State first, then the now-and-then options as quiet links (KISS). */}
+      <p className="-mt-2 flex flex-wrap items-center gap-x-6">
+        <Badge
+          variant={
+            order.status === "DRAFT"
+              ? "secondary"
+              : order.status === "CANCELLED" || order.status === "CLOSED"
+                ? "outline"
+                : "default"
+          }
+        >
+          {order.statusLabel}
+        </Badge>
+        {canExport && (
+          <a
+            href={`/api/compras/ordenes/${order.id}/pdf`}
+            download
+            className={quietLink}
+          >
+            <Download aria-hidden="true" className="size-4" />
+            Descargar PDF
+          </a>
+        )}
+        {canEdit && (
+          <Link
+            href={`/compras/ordenes/${order.id}/editar`}
+            className={quietLink}
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Editar datos
+          </Link>
+        )}
+      </p>
 
       <section
         aria-label="Datos de la orden"
@@ -188,22 +215,6 @@ export default async function OrdenPage({
         <dl className="divide-y">
           {(
             [
-              [
-                "Estado",
-                <Badge
-                  key="status"
-                  variant={
-                    order.status === "DRAFT"
-                      ? "secondary"
-                      : order.status === "CANCELLED" ||
-                          order.status === "CLOSED"
-                        ? "outline"
-                        : "default"
-                  }
-                >
-                  {order.statusLabel}
-                </Badge>,
-              ],
               ...(order.sentAt
                 ? ([
                     ["Confirmada", formatDateTime(order.sentAt, zone)],
@@ -240,8 +251,9 @@ ${order.closeReason ?? ""}`,
                   order.supplierName
                 ),
               ],
-              ["Se espera", expected ?? "—"],
-              ["Notas", order.notes ?? "—"],
+              // Empty data is not shown: no rows of dashes.
+              ...(expected ? ([["Se espera", expected]] as const) : []),
+              ...(order.notes ? ([["Notas", order.notes]] as const) : []),
               [
                 "Empezada",
                 formatDate(order.createdAt, access.organization.timeZone),
@@ -276,7 +288,7 @@ ${order.closeReason ?? ""}`,
             )}
           </h2>
           {canEdit && (
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href={addHref}>
                 <Plus aria-hidden="true" data-icon="inline-start" />
                 Agregar producto
@@ -287,7 +299,7 @@ ${order.closeReason ?? ""}`,
         {order.lines.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground sm:px-5">
             {canEdit
-              ? "Esta orden todavía no pide nada. Agrega el primer producto."
+              ? "Todavía no tiene productos."
               : "Esta orden no tiene productos."}
           </p>
         ) : (
@@ -498,16 +510,8 @@ ${order.closeReason ?? ""}`,
           }))}
         />
       )}
-      {(canSubmit || canCancel || canClose) && (
+      {(canCancel || canClose) && (
         <div className="flex max-w-3xl flex-wrap gap-3">
-          {canSubmit && (
-            <SubmitOrder
-              orderId={order.id}
-              numberText={order.numberText}
-              supplierName={order.supplierName}
-              lines={order.lines.length}
-            />
-          )}
           {canCancel && (
             <CancelOrder
               orderId={order.id}
@@ -529,17 +533,17 @@ ${order.closeReason ?? ""}`,
       <p className="max-w-3xl text-sm text-muted-foreground">
         {order.status === "DRAFT"
           ? order.lines.length === 0
-            ? "Es un borrador: agrega al menos un producto para poder confirmarla."
-            : "Es un borrador: puedes cambiarlo las veces que haga falta. Al confirmarla queda como enviada y sus productos ya no cambian."
+            ? "Agrega al menos un producto para poder confirmarla."
+            : "Puedes cambiarla hasta que la confirmes."
           : order.status === "SENT"
-            ? "Está confirmada como enviada: sus productos ya no cambian. Mandarla por correo no cambia su estado. Cuando llegue la mercancía, usa «Recibir mercancía»: entra al inventario y la orden queda recibida."
+            ? "Cuando llegue la mercancía, usa «Recibir mercancía»."
             : order.status === "CANCELLED"
-              ? "Está cancelada: se conserva como historia y ya no cambia."
+              ? "Cancelada. Se conserva como historia."
               : order.status === "PARTIAL"
-                ? "Ya se recibió una parte: lo que falta aparece en Recepciones y se recibe cuando llegue. Si el resto ya no va a llegar, ciérrala con faltante."
+                ? "Lo que falta se recibe cuando llegue. Si ya no va a llegar, ciérrala con faltante."
                 : order.status === "CLOSED"
-                  ? "Se cerró con faltante: lo que llegó se queda como está y lo que faltó ya no se espera. Si todavía lo necesitas, pídelo en otra orden."
-                  : "Ya se recibió completa."}
+                  ? "Cerrada con faltante. Si aún lo necesitas, pídelo en otra orden."
+                  : "Recibida completa."}
       </p>
     </PageContainer>
   );

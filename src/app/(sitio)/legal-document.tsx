@@ -1,5 +1,3 @@
-import { TriangleAlert } from "lucide-react";
-
 import { legalVersionDate } from "@/platform/legal";
 
 import { PageHero } from "./sections";
@@ -7,9 +5,10 @@ import { PageHero } from "./sections";
 export type LegalSection = { id: string; title: string; body: React.ReactNode };
 
 /**
- * Layout of a legal document: title, draft notice, table of contents (sticky
- * on desktop) and numbered sections. The texts are drafts until a
- * professional reviews them (PIL-08).
+ * Layout of a legal document: title, version, table of contents (sticky
+ * on desktop) and numbered sections. The texts follow the product and were
+ * approved by the founder (2026-10-26); a lawyer's review (PIL-08) is
+ * still pending.
  */
 export function LegalDocument({
   eyebrow,
@@ -50,17 +49,6 @@ export function LegalDocument({
           </ol>
         </nav>
         <article className="max-w-3xl">
-          <p
-            role="note"
-            className="mb-8 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm"
-          >
-            <TriangleAlert
-              className="mt-0.5 size-4 shrink-0 text-warning"
-              aria-hidden="true"
-            />
-            Versión preliminar. Este documento está en revisión profesional
-            antes de la apertura del servicio y puede cambiar.
-          </p>
           <div className="space-y-4 text-muted-foreground">{intro}</div>
           {sections.map((section, index) => (
             <section

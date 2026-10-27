@@ -1,12 +1,15 @@
 /**
  * Refund terms shown before paying and sent with every purchase (ADR
- * 0028). Draft written for the pilot: the founder confirms it with the
- * external review of the legal texts (PIL-08) and, when it changes, the
+ * 0028), approved by the founder (2026-10-26). When they change, the
  * version of the terms goes up too (PIL-09). Pure: no database.
  */
 
-/** Pending (founder): the real contact mailbox; the public site uses it too. */
-export const CONTACT_EMAIL = "contacto@almacen.mx";
+/**
+ * Contact mailbox (founder, 2026-10-26): the same Gmail account that sends
+ * the service's mail. The public site, the legal texts and the receipts use
+ * it. Move it to an address of the own domain when there is one.
+ */
+export const CONTACT_EMAIL = "awsnotificacion@gmail.com";
 
 export const REFUND_DAYS = 10;
 

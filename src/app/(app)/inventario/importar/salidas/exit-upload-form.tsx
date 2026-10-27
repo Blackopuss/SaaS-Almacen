@@ -20,7 +20,7 @@ export function ExitUploadForm() {
       <FormField
         id="file"
         label="Tu archivo de salidas"
-        hint="CSV o Excel (.xlsx), hasta 10 MB. Solo se lee su texto: las fórmulas y macros no se ejecutan."
+        hint="CSV o Excel (.xlsx), hasta 10 MB."
         error={state.error}
       >
         {(control) => (
@@ -29,7 +29,7 @@ export function ExitUploadForm() {
             name="file"
             type="file"
             accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="h-auto max-w-md py-2"
+            className="h-auto min-h-11 max-w-md py-2"
           />
         )}
       </FormField>
@@ -42,10 +42,10 @@ export function ExitUploadForm() {
         }
       >
         <legend className="text-sm font-medium">
-          ¿Cómo vienen los decimales en tu archivo?
+          ¿Cómo escribe los decimales tu archivo?
         </legend>
-        <p id="separator-hint" className="text-sm text-muted-foreground">
-          No lo adivinamos: «1,5» puede ser uno y medio o mil quinientos.
+        <p id="separator-hint" className="sr-only">
+          Por ejemplo, dos punto setenta y cinco.
         </p>
         {/* React resets the form after its action: the key makes the
             options show again what the person had chosen. */}
@@ -62,7 +62,11 @@ export function ExitUploadForm() {
                 type="radio"
                 name="decimalSeparator"
                 value={option.value}
-                defaultChecked={state.decimalSeparator === option.value}
+                // «Punto» is the Mexican way; the review shows every row
+                // as read before anything leaves the inventory.
+                defaultChecked={
+                  (state.decimalSeparator || ".") === option.value
+                }
                 className="size-4 accent-primary"
               />
               <span>
@@ -90,7 +94,7 @@ export function ExitUploadForm() {
         ) : (
           <Upload aria-hidden="true" data-icon="inline-start" />
         )}
-        {pending ? "Leyendo tu archivo…" : "Subir y revisar"}
+        {pending ? "Leyendo tu archivo…" : "Subir archivo"}
       </Button>
     </form>
   );

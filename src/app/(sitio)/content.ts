@@ -1,7 +1,7 @@
 /**
  * Content of the public site (landing, prices, about, legal). One place for
- * the data the founder still has to confirm: contact address, legal name and
- * launch prices (FUN-06, PIL-08). The capacity tiers come from the plan
+ * the data the founder still has to confirm: legal name and launch prices
+ * (FUN-06, PIL-08). The capacity tiers come from the plan
  * (PROPOSED_TIERS); the prices below are a proposal, not an approved list.
  */
 
@@ -11,7 +11,7 @@ export { SITE_NAV, formatCount, formatMoney } from "./site-shared";
 
 export const SITE = {
   name: "Almacén",
-  /** Pending (founder): the real contact mailbox (also in the receipts). */
+  /** Contact mailbox (also in the receipts and legal texts). */
   contactEmail: CONTACT_EMAIL,
   /** Pending (founder): legal name of the company that runs the service. */
   legalName: "Almacén (razón social por confirmar)",
@@ -44,7 +44,7 @@ export const FOOTER_LINKS = [
 ] as const;
 
 /**
- * Monthly prices in MXN before VAT, per capacity tier (same order as
+ * Monthly prices in MXN, VAT included, per capacity tier (same order as
  * PROPOSED_TIERS). Proposal for the launch: the founder confirms them in
  * FUN-06 before anyone is charged.
  */

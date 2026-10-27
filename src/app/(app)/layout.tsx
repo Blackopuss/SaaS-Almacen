@@ -1,9 +1,17 @@
+import { LifeBuoy } from "lucide-react";
+
 import { AppShell, visibleNavItems } from "@/components";
+import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib";
 import { isPermission } from "@/platform/authorization";
 import { getModuleAccess } from "@/platform/billing";
 import { listMyOrganizations } from "@/platform/tenancy";
 
-import { signOutAction, switchOrganizationAction } from "./actions";
+import {
+  leaveSupportAction,
+  signOutAction,
+  switchOrganizationAction,
+} from "./actions";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   // Shows who is signed in and in which company; each page also validates
@@ -26,6 +34,25 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       signOutAction={signOutAction}
       switchOrganizationAction={switchOrganizationAction}
     >
+      {/* Support looking in with the titular's leave (PIL-12): always said. */}
+      {organization.supportUntil && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm sm:px-6"
+        >
+          <LifeBuoy aria-hidden="true" className="size-4 shrink-0" />
+          <span className="flex-1">
+            <span className="font-medium">Modo soporte:</span> solo lectura en{" "}
+            {organization.name} hasta el{" "}
+            {formatDateTime(organization.supportUntil, organization.timeZone)}
+          </span>
+          <form action={leaveSupportAction}>
+            <Button type="submit" variant="outline">
+              Salir
+            </Button>
+          </form>
+        </div>
+      )}
       {children}
     </AppShell>
   );

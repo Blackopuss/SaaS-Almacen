@@ -22,3 +22,5 @@ export type {
   OrganizationContext,
   SwitchOrganizationResult,
 } from "./context";
+export { openSupportAccess, supportWindowFor } from "./support";
+export type { SupportWindow } from "./support";

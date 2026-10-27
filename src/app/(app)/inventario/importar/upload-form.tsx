@@ -19,8 +19,8 @@ export function UploadForm() {
     <form action={formAction} noValidate className="space-y-4">
       <FormField
         id="file"
-        label="Tu archivo"
-        hint="Excel (.xlsx) o CSV, hasta 10 MB y 20,000 filas. Solo se lee su texto: las fórmulas y macros no se ejecutan."
+        label="Tu Excel con productos"
+        hint="Excel (.xlsx) o CSV, hasta 10 MB. Puede ser tu propio archivo."
         error={state.error}
       >
         {(control) => (
@@ -29,7 +29,7 @@ export function UploadForm() {
             name="file"
             type="file"
             accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="h-auto max-w-md py-2"
+            className="h-auto min-h-11 max-w-md py-2"
           />
         )}
       </FormField>
@@ -39,7 +39,7 @@ export function UploadForm() {
         ) : (
           <Upload aria-hidden="true" data-icon="inline-start" />
         )}
-        {pending ? "Leyendo tu archivo…" : "Subir y revisar columnas"}
+        {pending ? "Leyendo tu archivo…" : "Subir archivo"}
       </Button>
     </form>
   );

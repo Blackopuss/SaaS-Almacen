@@ -136,7 +136,7 @@ export function PriceCalculator({ tiers }: { tiers: PriceTier[] }) {
               {formatMoney(amount)}
             </span>
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">MXN, más IVA</p>
+          <p className="mt-1 text-sm text-muted-foreground">MXN</p>
           <ul className="mt-6 space-y-2.5 text-sm">
             {[
               `${tier.users} personas incluidas`,

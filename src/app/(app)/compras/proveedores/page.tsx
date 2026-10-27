@@ -92,11 +92,7 @@ export default async function ProveedoresPage({
     <PageContainer>
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Compras" />}
-      <PageHeader
-        title="Proveedores"
-        description="A quién le compras: sus datos para pedirle y recibirle."
-        actions={addButton}
-      />
+      <PageHeader title="Proveedores" actions={addButton} />
       {(list.total > 0 || search) && (
         <Form
           action="/compras/proveedores"

@@ -87,16 +87,8 @@ export default async function ConteoPage({
         title={`Conteo de ${count.location}`}
         description={count.note ?? undefined}
         actions={
-          canCapture || canApply ? (
-            <>
-              {canApply && (
-                <ApplyCount
-                  countId={count.id}
-                  differences={count.differences}
-                />
-              )}
-              {canCapture && <CancelCount countId={count.id} />}
-            </>
+          canApply ? (
+            <ApplyCount countId={count.id} differences={count.differences} />
           ) : undefined
         }
       />
@@ -188,7 +180,7 @@ export default async function ConteoPage({
             <ClipboardCheck aria-hidden="true" className="size-5 shrink-0" />
             <p>
               {open
-                ? "Busca o escanea el primer producto y escribe cuántos hay. Puedes capturar cajas y piezas por separado: se suman en la unidad del producto."
+                ? "Busca o escanea un producto y escribe cuántos hay. Cajas y piezas se suman solas."
                 : "Este conteo se cerró sin capturas."}
             </p>
           </div>
@@ -315,11 +307,14 @@ export default async function ConteoPage({
       </section>
       {open && count.lines.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Capturar no cambia tus existencias. Cada diferencia se compara con lo
-          que el sistema tenía al contar ese producto; lo que se mueva después
-          se respeta y se muestra aquí. Al terminar, «Aplicar conteo» registra
-          las diferencias como un ajuste.
+          Contar no cambia tus existencias hasta que pulses «Aplicar conteo».
         </p>
+      )}
+      {/* Rare and final: out of the header, at the end (KISS). */}
+      {canCapture && (
+        <div>
+          <CancelCount countId={count.id} />
+        </div>
       )}
     </PageContainer>
   );

@@ -8,6 +8,7 @@ import {
   requireSession,
   signOut,
 } from "@/platform/auth";
+import { leaveSupport } from "@/platform/authorization";
 import { switchOrganization } from "@/platform/tenancy";
 
 export async function signOutAction(): Promise<void> {
@@ -30,4 +31,12 @@ export async function switchOrganizationAction(
   // so nothing from the previous company stays on screen.
   revalidatePath("/", "layout");
   redirect(DEFAULT_AFTER_SIGN_IN);
+}
+
+/** Support leaves the company it was looking into (PIL-12). */
+export async function leaveSupportAction(): Promise<void> {
+  const { user, sessionId } = await requireSession();
+  await leaveSupport(user.id, sessionId);
+  revalidatePath("/", "layout");
+  redirect("/interno");
 }

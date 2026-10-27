@@ -100,3 +100,13 @@ export {
   seatLimitMessage,
 } from "./seats";
 export type { SeatUsage } from "./seats";
+export {
+  SUPPORT_ACCESS_HOURS,
+  enterSupport,
+  getSupportAccess,
+  grantSupportAccess,
+  leaveSupport,
+  listOpenSupportAccess,
+  revokeSupportAccess,
+} from "./support";
+export type { EnterSupportResult, SupportAccessView } from "./support";

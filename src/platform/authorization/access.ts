@@ -5,6 +5,7 @@ import { cache } from "react";
 import { ForbiddenError } from "@/lib";
 import {
   requireOrganizationContext,
+  supportWindowFor,
   type OrganizationContext,
 } from "@/platform/tenancy";
 import { db, forOrganization } from "@/server";
@@ -30,6 +31,7 @@ export const OWNER_ONLY_MESSAGE =
   "Solo el titular de la empresa puede hacer esto.";
 
 const NOBODY: Subject = { isOwner: false, roles: [] };
+const SUPPORT: Subject = { isOwner: false, roles: ["viewer"], support: true };
 
 /** Titular flag and roles of the person in that company. */
 export async function loadSubject(
@@ -42,7 +44,11 @@ export async function loadSubject(
       select: { roles: { select: { role: true } } },
     },
   );
-  if (!membership) return NOBODY;
+  if (!membership) {
+    // Support with the titular's leave reads like Consulta, nothing more
+    // (PIL-12): no writing, no exports, no costs, no titular powers.
+    return (await supportWindowFor(organizationId, userId)) ? SUPPORT : NOBODY;
+  }
   const organization = await db.organization.findUnique({
     where: { id: organizationId },
     select: { ownerUserId: true },

@@ -515,6 +515,14 @@ beforeAll(async () => {
         expiresAt: new Date(Date.now() + 3_600_000),
       },
     });
+    await db.supportAccess.create({
+      data: {
+        id: newId(),
+        organizationId,
+        grantedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
   }
   workerSession = await newSession(ids.worker);
   betoSession = await newSession(ids.beto);

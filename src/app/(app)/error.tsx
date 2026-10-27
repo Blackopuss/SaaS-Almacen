@@ -7,22 +7,27 @@ import { Button } from "@/components/ui/button";
 
 export default function SectionError({
   error,
-  reset,
+  retry,
 }: {
-  error: Error & { digest?: string };
-  reset: () => void;
+  error: unknown;
+  /** Asks the server again (reset() would only re-render what failed). */
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
+  const digest =
+    error instanceof Error && "digest" in error
+      ? String((error as Error & { digest?: string }).digest ?? "")
+      : "";
 
   return (
     <PageContainer>
       <ErrorState
-        action={<Button onClick={reset}>Reintentar</Button>}
+        action={<Button onClick={() => retry()}>Reintentar</Button>}
         description={
-          error.digest
-            ? `Inténtalo de nuevo. Si continúa, comparte este código con soporte: ${error.digest}`
+          digest
+            ? `Inténtalo de nuevo. Si continúa, comparte este código con soporte: ${digest}`
             : undefined
         }
       />

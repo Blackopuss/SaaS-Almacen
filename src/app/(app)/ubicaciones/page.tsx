@@ -1,4 +1,5 @@
 import {
+  ChevronLeft,
   Columns3,
   LayoutGrid,
   MapPin,
@@ -117,26 +118,24 @@ export default async function UbicacionesPage({
 
   return (
     <PageContainer>
+      {/* Locations are set up once: they are reached from Configuración. */}
+      <Link
+        href="/configuracion"
+        className="inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <ChevronLeft aria-hidden="true" className="size-4" />
+        Configuración
+      </Link>
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
       <PageHeader
         title="Ubicaciones"
-        description="Dónde está cada cosa en tu negocio: zonas, pasillos y estantes."
+        description="Zonas, pasillos y estantes."
         actions={
           canCreate && !showArchived ? (
             <AddLocationDialog places={places} />
           ) : undefined
         }
       />
-      <p>
-        <Link
-          href={showArchived ? "/ubicaciones" : "/ubicaciones?archivadas=1"}
-          className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {showArchived
-            ? "Ver ubicaciones activas"
-            : "Ver ubicaciones archivadas"}
-        </Link>
-      </p>
       {showArchived && archived.length === 0 ? (
         <EmptyState
           icon={MapPin}
@@ -225,12 +224,20 @@ export default async function UbicacionesPage({
           {!showArchived && active.length === 1 && (
             <p className="border-t p-4 text-sm text-muted-foreground sm:px-5">
               {canCreate
-                ? "Puedes trabajar solo con «General» o agregar tus zonas, pasillos y estantes cuando quieras."
+                ? "Puedes trabajar solo con «General» y agregar zonas cuando las necesites."
                 : "Tu negocio todavía no tiene zonas, pasillos ni estantes: todo está en «General»."}
             </p>
           )}
         </section>
       )}
+      <p>
+        <Link
+          href={showArchived ? "/ubicaciones" : "/ubicaciones?archivadas=1"}
+          className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {showArchived ? "Ver ubicaciones activas" : "Ver archivadas"}
+        </Link>
+      </p>
     </PageContainer>
   );
 }

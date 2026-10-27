@@ -1,4 +1,4 @@
-# Matriz OWASP ASVS — iniciada en PLT-16
+# Matriz OWASP ASVS — iniciada en PLT-16, revisada en PIL-05 (2026-10-26)
 
 Objetivo: ASVS 5.0, nivel 2, como guía verificable (no es una certificación). Esta matriz se organiza por capítulo de ASVS 5.0 y nombra cada requisito por su tema; los identificadores exactos se agregan al revisarla contra el texto oficial antes del piloto.
 
@@ -9,7 +9,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V1 Codificación y sanitización | Salida escapada en HTML | Cumple | React escapa por defecto; sin `dangerouslySetInnerHTML` con datos de usuario. |
 | V1 | Consultas parametrizadas | Cumple | Prisma; SQL directo solo en `throttle.ts` y `lockRows` (tabla de una lista fija, valores como parámetros); prohibido en el cliente de empresa (`tenant-db.ts`). Comodines de `LIKE` escapados en búsquedas (INV-11, INV-27). |
 | V2 Validación y lógica de negocio | Validación en servidor con mensajes claros | Cumple | Zod en servicios (`register.ts`, `recovery.ts`, `organizations.ts`). Fechas de reportes de Compras validadas antes de calcular con ellas (CMP-S10, `reports.int.test.ts`). |
-| V2 | Límites anti-automatización | Cumple | `throttle.ts` (cuenta e IP); el intento se aparta antes de verificar (`reserveAttempt`), así que las peticiones simultáneas no pasan del tope; IP tomada desde el final de `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`); desafío MFA limitado; pruebas en `throttle.int.test.ts` (ráfaga de 20). Auditoría 1 (`AUDITORIA_1.md`). |
+| V2 | Límites anti-automatización | Cumple | `throttle.ts` (cuenta e IP); avisos de pago con firma inválida limitados por IP (PIL-S01); el intento se aparta antes de verificar (`reserveAttempt`), así que las peticiones simultáneas no pasan del tope; IP tomada desde el final de `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`); desafío MFA limitado; pruebas en `throttle.int.test.ts` (ráfaga de 20). Auditoría 1 (`AUDITORIA_1.md`). |
 | V2 | Concurrencia en operaciones críticas | Cumple | Alta de empresa, cupos y equipo con bloqueo de fila; inventario con candado por producto en orden fijo, lectura tras el candado (READ COMMITTED), resta condicionada y `CHECK` (`REVISION_INV.md`); recepciones y devoluciones con candados productos → ubicaciones → orden y límites acumulados repetidos por disparadores (`REVISION_CMP.md`). |
 | V2 | Operaciones que no se duplican al reintentar | Cumple | Clave de confirmación única por empresa en cada movimiento, recepción y devolución, comparada con lo pedido; conteos aplicados una sola vez; sugerencias que cuentan lo ya pedido (`idempotency.int.test.ts`, `count-apply.int.test.ts`, `receipts.int.test.ts`, `returns.int.test.ts`, `suggestions.int.test.ts`). |
 | V2 | Integridad de datos de negocio | Cumple | Saldos derivados de movimientos inmutables; cantidades con decimal exacto y regla por producto; reconciliación `npm run stock:reconcile` (sin programar todavía: INV-S03). |
@@ -24,7 +24,7 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V6 | Sin enumeración de cuentas (mensajes y tiempos) | Cumple | Respuestas neutrales; hash simulado; correos después de responder (PLT16-03). |
 | V6 | Recuperación segura | Cumple | Token de un solo uso con vencimiento; cierra sesiones; no quita MFA (`recovery.int.test.ts`). |
 | V6 | MFA (TOTP), un solo uso, recuperación | Cumple | `mfa*.int.test.ts`; obligatoria para titulares. |
-| V6 | MFA obligatoria para administradores y personal de plataforma | Parcial | Titulares y administradores: `isMfaRequired` + `roles.int.test.ts`; personal de plataforma en MOD-09. |
+| V6 | MFA obligatoria para administradores y personal de plataforma | Cumple | `isMfaRequired` incluye titulares, administradores y personal de plataforma activo (`mfa-policy.ts`, `roles.int.test.ts`, MOD-09). |
 | V6 | Avisos de cambios de seguridad | Cumple | Correos de contraseña, MFA y códigos de recuperación. |
 | V7 Gestión de sesiones | Sesión en servidor, revocación inmediata | Cumple | `cookieCache` apagado; `sessions.int.test.ts`. |
 | V7 | Nueva sesión al autenticarse y al elevar (MFA) | Cumple | Better Auth + rotación al activar/desactivar MFA. |
@@ -39,15 +39,16 @@ Estados: **Cumple** (con evidencia), **Parcial**, **Pendiente** (con paso del pl
 | V10 OAuth/OIDC | — | N/A | Sin inicio de sesión con terceros. |
 | V11 Criptografía | Secretos MFA cifrados; aleatoriedad segura | Cumple | Cifrado de Better Auth con `BETTER_AUTH_SECRET`; `crypto.randomInt` para códigos de recuperación. |
 | V11 | Rotación del secreto | Pendiente | Plan de rotación antes de producción (ADR 0003, requisito 3). |
-| V12 Comunicación segura | TLS | Pendiente | BAS-09 (HTTPS + HSTS ya configurado para producción). |
+| V12 Comunicación segura | TLS | Cumple | Producción detrás de Caddy con HTTPS automático; HSTS `max-age=63072000; includeSubDomains` verificado en el sitio (PIL-05, `REVISION_PIL.md`). |
 | V13 Configuración | Secretos fuera del repositorio; usuarios de base con mínimo privilegio | Cumple | `.env.local` ignorado; `almacen_app` sin DDL. |
 | V13 | Páginas de desarrollo cerradas en producción | Cumple | `/correos`, `/sistema-visual` (PLT16-06). |
 | V5 | Correo saliente sin inyección de cabeceras | Cumple | `sendEmail` rechaza destinatario, «responder a» y asunto con saltos de línea o más de un destinatario, y adjuntos con nombre o tipo fuera de lo permitido; el destinatario de una orden sale de la ficha del proveedor, con límites diarios (CMP-06B, ADR 0020). Pendiente al elegir proveedor de correo: SPF, DKIM y DMARC. |
 | V14 Protección de datos | Sin secretos en registros, correos ni bitácora | Cumple | `sanitizeMetadata`; tokens nunca enviados al navegador. |
 | V14 | Consentimiento del aviso de privacidad y de los términos | Cumple | PIL-09 (ADR 0026): casilla obligatoria al crear cuenta (registro e invitación); versión, fecha, persona, IP y navegador en `legal_acceptance` (solo agregar, disparadores); una versión nueva detiene a cada persona en `/acepta-terminos` desde `requireSession` (`legal-acceptance.int.test.ts`). Los textos siguen en revisión profesional (PIL-08). |
-| V14 | Respaldos cifrados | Pendiente | BAS-11. |
+| V14 | Respaldos cifrados | Cumple | `deploy/bin/respaldo`: restauración de prueba antes de guardar y cifrado con `age`; configuración solo-root en `/etc/almacen` (ADR 0024, auditoría 3). Respaldo continuo y simulacro medido: PIL-02/03. |
 | V15 Codificación segura y arquitectura | Dependencias con versión exacta y auditoría | Cumple | `.npmrc save-exact`; `npm audit --omit=dev` en CI. |
 | V16 Registro de seguridad y errores | Bitácora inmutable de cambios sensibles | Cumple | ADR 0006; `audit.int.test.ts`. |
 | V16 | Errores sin detalles internos al usuario | Cumple | Mensajes genéricos; detalles solo en el log del servidor. |
-| V16 | Monitoreo y alertas | Pendiente | BAS-11. |
+| V16 | Monitoreo y alertas | Cumple | `/api/salud` y alertas por correo de cambios de estado (PIL-04, ADR 0025). |
 | V17 WebRTC | — | N/A | No se usa. |
+| V2 | Pagos en línea | Cumple | Plan aplicado solo tras confirmar con el proveedor importe y moneda exactos; avisos firmados e idempotentes; precios solo del servidor (ADR 0028, `REVISION_PIL.md`, `checkout.int.test.ts`, pruebas de cada proveedor). |

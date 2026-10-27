@@ -89,6 +89,11 @@ export default async function ProveedorPage({
   ) : null;
   const canEdit =
     moduleState === "active" && access.allows("purchasing.supplier.update");
+  // The daily thing to do with a supplier: order from it.
+  const canOrder =
+    moduleState === "active" &&
+    !supplier.archived &&
+    access.allows("purchasing.order.create");
   const rows: [string, string | null][] = [
     ["Razón social", supplier.legalName],
     ["RFC", supplier.rfc],
@@ -105,15 +110,28 @@ export default async function ProveedorPage({
       {moduleState === "read_only" && <ReadOnlyNotice module="Compras" />}
       <PageHeader
         title={supplier.name}
-        description="Proveedor"
         actions={
-          canEdit ? (
-            <Button asChild variant="outline">
-              <Link href={`/compras/proveedores/${supplier.id}/editar`}>
-                <Pencil aria-hidden="true" data-icon="inline-start" />
-                Editar
-              </Link>
-            </Button>
+          canOrder || canEdit ? (
+            <>
+              {canOrder && (
+                <Button asChild>
+                  <Link
+                    href={`/compras/ordenes/nueva?proveedor=${supplier.id}`}
+                  >
+                    <Plus aria-hidden="true" data-icon="inline-start" />
+                    Nueva orden
+                  </Link>
+                </Button>
+              )}
+              {canEdit && (
+                <Button asChild variant="outline">
+                  <Link href={`/compras/proveedores/${supplier.id}/editar`}>
+                    <Pencil aria-hidden="true" data-icon="inline-start" />
+                    Editar
+                  </Link>
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />
@@ -149,20 +167,28 @@ export default async function ProveedorPage({
             {supplier.archived && <Badge variant="warning">Archivado</Badge>}
           </p>
         )}
+        {/* Empty data is not shown: no rows of dashes. */}
+        {rows.every(([, value]) => !value) && (
+          <p className="p-4 text-sm text-muted-foreground sm:px-5">
+            Sin datos de contacto todavía.
+          </p>
+        )}
         <dl className="divide-y">
-          {rows.map(([term, value]) => (
-            <div
-              key={term}
-              className="grid gap-1 p-4 sm:grid-cols-[12rem_1fr] sm:gap-4 sm:px-5"
-            >
-              <dt className="text-sm text-muted-foreground">{term}</dt>
-              <dd
-                className={`[overflow-wrap:anywhere] whitespace-pre-line ${value ? "" : "text-muted-foreground"}`}
+          {rows
+            .filter(([, value]) => value)
+            .map(([term, value]) => (
+              <div
+                key={term}
+                className="grid gap-1 p-4 sm:grid-cols-[12rem_1fr] sm:gap-4 sm:px-5"
               >
-                {value ?? "—"}
-              </dd>
-            </div>
-          ))}
+                <dt className="text-sm text-muted-foreground">{term}</dt>
+                <dd
+                  className={`[overflow-wrap:anywhere] whitespace-pre-line ${value ? "" : "text-muted-foreground"}`}
+                >
+                  {value ?? "—"}
+                </dd>
+              </div>
+            ))}
         </dl>
       </section>
 
@@ -185,8 +211,7 @@ export default async function ProveedorPage({
           </div>
           {links.total === 0 ? (
             <p className="p-4 text-sm text-muted-foreground sm:px-5">
-              Todavía no has dicho qué productos te vende. Vincúlalos para tener
-              a la mano su código y cómo se lo compras.
+              Todavía no tiene productos vinculados.
             </p>
           ) : (
             <ul className="divide-y">

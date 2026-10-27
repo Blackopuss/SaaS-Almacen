@@ -2,7 +2,6 @@ import {
   ArrowLeftRight,
   ClipboardCheck,
   House,
-  MapPin,
   Package,
   Settings,
   ShoppingCart,
@@ -22,6 +21,8 @@ export type NavItem = {
   permission: string | null;
   /** Shown in the mobile bottom bar (max 4 + «Más»). */
   mobile: boolean;
+  /** Other screens that live under this item (set up once, reached from it). */
+  also?: readonly string[];
 };
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -51,15 +52,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     mobile: true,
   },
   {
-    href: "/ubicaciones",
-    label: "Ubicaciones",
-    icon: MapPin,
-    module: "inventory",
-    permission: "inventory.location.read",
-    // The bottom bar holds four: locations change the least day to day.
-    mobile: false,
-  },
-  {
     href: "/conteos",
     label: "Conteos",
     icon: ClipboardCheck,
@@ -82,11 +74,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
     module: null,
     permission: null,
     mobile: false,
+    // Locations are set up once, so they live in Configuración (KISS).
+    also: ["/ubicaciones"],
   },
 ];
 
-export function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+const under = (pathname: string, href: string) =>
+  pathname === href || pathname.startsWith(`${href}/`);
+
+export function isActive(
+  pathname: string,
+  item: Pick<NavItem, "href" | "also">,
+): boolean {
+  return [item.href, ...(item.also ?? [])].some((href) =>
+    under(pathname, href),
+  );
 }
 
 /** Items the person may see; the screens check the same permission again. */

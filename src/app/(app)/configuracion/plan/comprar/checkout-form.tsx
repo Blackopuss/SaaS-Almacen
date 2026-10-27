@@ -155,7 +155,7 @@ function Choices({
         <fieldset className="min-w-0 space-y-3">
           <legend className="text-lg font-semibold">Plan</legend>
           <p className="text-sm text-muted-foreground">
-            Cada plan incluye Inventario. Precios al mes, más IVA.
+            Cada plan incluye Inventario. Precios al mes.
           </p>
           {errors.tier && (
             <p className="text-sm text-destructive">{errors.tier}</p>
@@ -346,10 +346,6 @@ function Choices({
               <dd>−{shown.discount}</dd>
             </div>
           )}
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">IVA 16%</dt>
-            <dd>{shown?.tax}</dd>
-          </div>
           <div className="flex justify-between gap-3 border-t pt-2 text-base font-semibold">
             <dt>Total</dt>
             <dd>{shown?.total} MXN</dd>

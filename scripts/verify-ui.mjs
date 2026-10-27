@@ -215,10 +215,11 @@ try {
     const page = await signedInPage(browser, viewport);
     const mobile = viewport.name === "mobile";
 
-    await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    // «/» is the public site (ADR 0022); the app starts at Inicio.
+    await page.goto(`${BASE}/inicio`, { waitUntil: "networkidle" });
     check(
       new URL(page.url()).pathname === "/inicio",
-      `${viewport.name}: / redirects to /inicio`,
+      `${viewport.name}: signed in, the app opens on /inicio`,
     );
 
     for (const path of SECTIONS) {
@@ -226,8 +227,10 @@ try {
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
+      // Ubicaciones lives under Configuración, which stays marked.
+      const menuHref = path === "/ubicaciones" ? "/configuracion" : path;
       const current = await page
-        .locator(`nav a[aria-current="page"][href="${path}"]`)
+        .locator(`nav a[aria-current="page"][href="${menuHref}"]`)
         .count();
       const visibleNav =
         mobile &&
@@ -340,9 +343,8 @@ try {
     );
     // Unit and precision (INV-06): things counted go in whole units; a
     // measure lets the person choose how fine its quantities are.
-    const wholeOnly = await page
-      .getByText("Se maneja en enteros: no admite fracciones.")
-      .isVisible();
+    // Counted things go in whole units: no precision to choose.
+    const wholeOnly = (await page.locator("#step").count()) === 0;
     await page.selectOption("#unit", "m");
     await page.locator("#step").waitFor();
     const precisions = await page.locator("#step option").count();
@@ -712,7 +714,7 @@ try {
     await second.waitForTimeout(1500); // let the door animation finish
     await second.screenshot({ path: `${OUT}/verificar-respaldo-desktop.png` });
     await second.getByRole("button", { name: "Verificar" }).click();
-    await second.waitForURL("**/inventario", { timeout: 20000 });
+    await second.waitForURL("**/inicio", { timeout: 20000 });
     check(true, "MFA: signing in with a backup code works (typed loosely)");
     await other.close();
 
@@ -751,10 +753,15 @@ try {
     );
     await anonymous.close();
 
+    // With MFA on, the screen stays (it must not hide fresh backup codes)
+    // but asks nothing: it says it is on and offers to continue.
     await page.goto(`${BASE}/activa-dos-pasos`, { waitUntil: "networkidle" });
     check(
-      new URL(page.url()).pathname === "/inicio",
-      "MFA: the mandatory setup screen sends accounts with MFA to the app",
+      (await page
+        .getByText("La verificación en dos pasos ya está activada")
+        .isVisible()) &&
+        (await page.getByRole("button", { name: "Continuar" }).isVisible()),
+      "MFA: the mandatory setup screen asks nothing of accounts with MFA",
     );
     await page.context().close();
   }

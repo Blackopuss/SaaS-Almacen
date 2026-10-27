@@ -7,24 +7,23 @@ import { PLAN_TIERS, findTier, quote } from "./prices";
 const t100 = findTier("t100")!;
 
 describe("purchase quote", () => {
-  it("multiplies the monthly price by the months and adds VAT", () => {
+  it("multiplies the monthly price by the months; VAT is already inside", () => {
     expect(quote(t100, [], 1)).toEqual({
       monthly: "349.00",
       subtotal: "349.00",
       discount: "0.00",
-      tax: "55.84",
-      total: "404.84",
+      total: "349.00",
     });
     expect(quote(t100, ["purchasing"], 12).subtotal).toBe("6336.00");
   });
 
-  it("takes a code's discount before VAT; 100% is free", () => {
+  it("takes a code's discount from the subtotal; 100% is free", () => {
     const half = quote(t100, [], 3, 50);
-    expect(half).toMatchObject({
+    expect(half).toEqual({
+      monthly: "349.00",
       subtotal: "1047.00",
       discount: "523.50",
-      tax: "83.76",
-      total: "607.26",
+      total: "523.50",
     });
     expect(quote(t100, ["purchasing"], 6, 100).total).toBe("0.00");
   });

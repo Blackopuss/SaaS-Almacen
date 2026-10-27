@@ -496,6 +496,30 @@ const REVIEWED: Record<string, Review> = {
     identity: "sesión propia",
     coveredBy: "tests/platform/session.int.test.ts",
   },
+  grantSupportAccessAction: {
+    input: "nada",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo el titular (assertOwnerAction)",
+    coveredBy: "tests/platform/support-access.int.test.ts",
+  },
+  revokeSupportAccessAction: {
+    input: "nada",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo el titular (assertOwnerAction)",
+    coveredBy: "tests/platform/support-access.int.test.ts",
+  },
+  enterSupportAction: {
+    input: "id de empresa",
+    identity:
+      "sesión de personal de plataforma (requirePlatformStaff); entra solo si el titular de esa empresa tiene abierto el acceso, y solo a leer",
+    coveredBy: "tests/platform/support-access.int.test.ts",
+  },
+  leaveSupportAction: {
+    input: "nada",
+    identity:
+      "sesión propia; solo deja la empresa donde la persona no es miembro",
+    coveredBy: "tests/platform/support-access.int.test.ts",
+  },
   switchOrganizationAction: {
     input: "id de empresa",
     identity: "sesión; membresía activa revisada en servidor",

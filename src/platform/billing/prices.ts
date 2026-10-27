@@ -4,7 +4,9 @@ import { dec, type Decimal } from "@/lib";
  * Price list of the online purchase (ADR 0028). The single source of the
  * amounts a customer pays: the public site shows these same prices and the
  * checkout computes every total here, on the server. Prices are monthly,
- * in MXN, before VAT; a proposal until the founder confirms them (FUN-06).
+ * in MXN, with VAT (IVA) already included: what is listed is what is
+ * paid, and VAT is not shown apart (founder, 2026-10-26). A proposal until
+ * the founder confirms the amounts (FUN-06).
  * Pure: no database.
  */
 
@@ -67,9 +69,6 @@ export function planText(
 export const PURCHASE_MONTHS = [1, 3, 6, 12] as const;
 export type PurchaseMonths = (typeof PURCHASE_MONTHS)[number];
 
-/** IVA in Mexico. Prices are before VAT; the customer pays it on top. */
-export const TAX_RATE = "0.16";
-
 export function findTier(id: string): PlanTier | null {
   return PLAN_TIERS.find((tier) => tier.id === id) ?? null;
 }
@@ -79,13 +78,13 @@ export function isPurchaseMonths(value: number): value is PurchaseMonths {
 }
 
 export type Quote = {
-  /** Monthly price of what was chosen, before VAT. */
+  /** Monthly price of what was chosen, VAT included. */
   monthly: string;
   /** monthly × months. */
   subtotal: string;
   /** Discount of a code, taken from the subtotal. */
   discount: string;
-  tax: string;
+  /** What is paid: subtotal minus discount (VAT already inside). */
   total: string;
 };
 
@@ -93,8 +92,8 @@ const money = (value: Decimal) => value.toDecimalPlaces(2).toFixed(2);
 
 /**
  * What a purchase costs: the monthly price of the tier and its modules
- * times the months, minus a code's discount (a whole percentage), plus VAT
- * on what remains. Rounded to cents once per step, half up.
+ * times the months, minus a code's discount (a whole percentage). Prices
+ * include VAT, so nothing is added on top. Rounded to cents, half up.
  */
 export function quote(
   tier: PlanTier,
@@ -110,13 +109,10 @@ export function quote(
   for (const sold of chosen) monthly = monthly.plus(tier.prices[sold]);
   const subtotal = monthly.times(months);
   const discount = dec(money(subtotal.times(percentOff).dividedBy(100)));
-  const taxable = subtotal.minus(discount);
-  const tax = dec(money(taxable.times(TAX_RATE)));
   return {
     monthly: money(monthly),
     subtotal: money(subtotal),
     discount: money(discount),
-    tax: money(tax),
-    total: money(taxable.plus(tax)),
+    total: money(subtotal.minus(discount)),
   };
 }

@@ -100,10 +100,7 @@ export default async function ReportesComprasPage({
   return (
     <PageContainer>
       {back}
-      <PageHeader
-        title="Reportes de compras"
-        description="Lo que falta por llegar y lo que le compraste a cada proveedor."
-      />
+      <PageHeader title="Reportes de compras" />
       <nav aria-label="Reporte" className="flex flex-wrap gap-2">
         {(
           [
@@ -119,7 +116,7 @@ export default async function ReportesComprasPage({
                 : "/compras/reportes?vista=proveedores"
             }
             aria-current={view === id ? "page" : undefined}
-            className={`${chip} ${view === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:bg-muted"}`}
+            className={`${chip} ${view === id ? "border-primary bg-accent text-accent-foreground" : "bg-card hover:bg-muted"}`}
           >
             {label}
           </Link>

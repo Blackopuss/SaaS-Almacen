@@ -19,6 +19,11 @@ export type Subject = {
   isOwner: boolean;
   /** Roles of their active membership. Values outside the catalog are ignored. */
   roles: readonly string[];
+  /**
+   * Platform support with the titular's leave (PIL-12): of its roles it
+   * keeps only what reads, never what writes or takes data out (exports).
+   */
+  support?: boolean;
 };
 
 /** Known roles of the subject, without repeats, in catalog order. */
@@ -34,6 +39,9 @@ export function permissionsOf(subject: Subject): ReadonlySet<Permission> {
   }
   for (const role of knownRoles(subject.roles)) {
     for (const permission of ROLE_PERMISSIONS[role]) granted.add(permission);
+  }
+  if (subject.support === true) {
+    return new Set([...granted].filter((p) => p.endsWith(".read")));
   }
   return granted;
 }

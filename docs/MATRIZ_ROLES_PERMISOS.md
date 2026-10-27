@@ -81,6 +81,7 @@ La lectura de auditoría no evita permisos sobre información comercial: ocultar
 | `platform.subscription.cancel` | Cancelar la suscripción conforme a sus condiciones; USR-03A, MOD-11. | Sí | No | No | No | No |
 | `platform.billing.read` | Consultar información de pago y comprobantes de la suscripción; sección 4; alcance propuesto solo para titular. | Sí | No | No | No | No |
 | `platform.billing.manage` | Cambiar método de pago y gestionar su autorización; no permite alterar derechos efectivos directamente; USR-03A. | Sí | No | No | No | No |
+| `platform.support.grant` | Permitir o quitar el acceso temporal de soporte, solo lectura y registrado en la bitácora; PIL-12. | Sí | No | No | No | No |
 | `platform.provisioning.manage` | Asignar nivel, módulos y vigencia desde consola interna con MFA y auditoría; MOD-09. Exclusivo de personal de plataforma. | No | No | No | No | No |
 
 «Administrador no cobra» significa aquí que no contrata, cancela, altera conceptos con costo ni administra métodos de pago de la suscripción. No se introduce cobro de ventas ni caja: pertenecen a Ventas. La salida rápida «por venta» de INV-28 no cobra ni emite ticket.

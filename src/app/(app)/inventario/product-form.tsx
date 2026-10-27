@@ -110,7 +110,7 @@ export function ProductForm({
         <FormField
           id="sku"
           label="Clave (SKU)"
-          hint="El código con el que lo identificas. No se repite."
+          hint="Tu código para este producto."
           error={state.fieldErrors.sku}
         >
           {(control) => (
@@ -130,7 +130,6 @@ export function ProductForm({
         <FormField
           id="barcode"
           label="Código de barras (opcional)"
-          hint="Puedes escribirlo o leerlo con el lector."
           error={state.fieldErrors.barcode}
         >
           {(control) => (
@@ -166,7 +165,7 @@ export function ProductForm({
         <FormField
           id="unit"
           label="¿En qué unidad lo controlas?"
-          hint="Sus existencias se llevan siempre en esta unidad. Cajas, rollos o sacos se configuran después como presentaciones."
+          hint="Las cajas o rollos se agregan después."
           error={state.fieldErrors.unit}
         >
           {(control) => (
@@ -192,7 +191,7 @@ export function ProductForm({
           <FormField
             id="step"
             label="Precisión de las cantidades"
-            hint="La fracción más pequeña que registras. Por ejemplo, 0.01 permite 2.75."
+            hint="Por ejemplo, 0.01 permite 2.75."
             error={state.fieldErrors.step}
           >
             {(control) => (
@@ -218,13 +217,8 @@ export function ProductForm({
             )}
           </FormField>
         ) : (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Precisión de las cantidades</p>
-            <p className="text-sm text-muted-foreground">
-              Se maneja en enteros: no admite fracciones.
-            </p>
-            <input type="hidden" name="step" value="1" />
-          </div>
+          // Counted things go in whole units: nothing to choose (KISS).
+          <input type="hidden" name="step" value="1" />
         )}
       </div>
 
@@ -232,7 +226,6 @@ export function ProductForm({
         <FormField
           id="category"
           label="Categoría (opcional)"
-          hint="Elige una o escribe una nueva."
           error={state.fieldErrors.category}
         >
           {(control) => (
@@ -250,7 +243,6 @@ export function ProductForm({
         <FormField
           id="brand"
           label="Marca (opcional)"
-          hint="Elige una o escribe una nueva."
           error={state.fieldErrors.brand}
         >
           {(control) => (

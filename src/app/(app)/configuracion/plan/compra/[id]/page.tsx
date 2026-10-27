@@ -124,10 +124,13 @@ export default async function OrderPage({
               <dd>−{formatMxn(order.discount)}</dd>
             </div>
           )}
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">IVA 16%</dt>
-            <dd>{formatMxn(order.tax)}</dd>
-          </div>
+          {/* Only purchases from before VAT was included carry it apart. */}
+          {order.tax !== "0.00" && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">IVA 16%</dt>
+              <dd>{formatMxn(order.tax)}</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-3 border-t pt-2 text-base font-semibold">
             <dt>Total</dt>
             <dd>{formatMxn(order.total)} MXN</dd>

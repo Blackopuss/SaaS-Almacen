@@ -61,7 +61,7 @@ export default async function NuevoProductoPage() {
       {back}
       <PageHeader
         title="Nuevo producto"
-        description="Solo la clave y el nombre son obligatorios. Las existencias se registran después con una entrada."
+        description="Solo la clave y el nombre son obligatorios."
       />
       <ProductForm
         action={createProductAction}

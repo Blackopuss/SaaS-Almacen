@@ -463,10 +463,7 @@ export function QuickExitForm({
           {lines.length === 0 ? (
             <div className="flex items-start gap-3 p-4 text-sm text-muted-foreground sm:px-5">
               <PackageSearch aria-hidden="true" className="size-5 shrink-0" />
-              <p>
-                Busca o escanea el primer producto. Cada uno se agrega como una
-                línea y todo sale con una sola confirmación.
-              </p>
+              <p>Busca o escanea un producto. Puedes agregar varios.</p>
             </div>
           ) : (
             <ul className="divide-y">

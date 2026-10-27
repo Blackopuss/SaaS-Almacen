@@ -35,13 +35,15 @@ export default async function EditarProductoPage({
   params,
 }: PageProps<"/inventario/[id]/editar">) {
   const access = await getModuleAccess();
+  const { id } = await params;
+  // Edit is reached from the product: back goes there.
   const back = (
     <Link
-      href="/inventario"
+      href={`/inventario/${encodeURIComponent(id)}`}
       className="inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <ChevronLeft aria-hidden="true" className="size-4" />
-      Inventario
+      Volver al producto
     </Link>
   );
   if (!access.can("inventory.product.update")) {
@@ -70,7 +72,6 @@ export default async function EditarProductoPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const { id } = await params;
   const [product, groups, presentations] = await Promise.all([
     getProduct(actor, id),
     listProductGroups(actor),
@@ -86,7 +87,7 @@ export default async function EditarProductoPage({
         {back}
         <PageHeader
           title={product.name}
-          description="Este producto está archivado. Reactívalo desde la lista de archivados para editarlo."
+          description="Está archivado. Reactívalo desde los archivados para editarlo."
         />
       </PageContainer>
     );
@@ -95,10 +96,7 @@ export default async function EditarProductoPage({
   return (
     <PageContainer>
       {back}
-      <PageHeader
-        title="Editar producto"
-        description="Cambia los datos de la ficha. Las existencias no se editan aquí: se mueven con entradas, salidas y ajustes."
-      />
+      <PageHeader title="Editar producto" description={product.name} />
       <ProductForm
         action={updateProductAction.bind(null, product.id)}
         initial={{
@@ -143,8 +141,8 @@ export default async function EditarProductoPage({
             Archivar
           </h2>
           <p className="text-sm text-muted-foreground">
-            Si ya no manejas este producto, archívalo: libera un lugar de tu
-            plan y conserva su historial.
+            Si ya no lo manejas. Libera un lugar de tu plan y su historial se
+            conserva.
           </p>
           <ArchiveProduct productId={product.id} name={product.name} />
         </section>

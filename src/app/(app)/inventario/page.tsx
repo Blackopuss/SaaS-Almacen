@@ -1,12 +1,11 @@
 import {
-  ArrowDownToLine,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
   Package,
-  Pencil,
   Plus,
   Search,
+  Upload,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Form from "next/form";
@@ -20,7 +19,6 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -77,7 +75,6 @@ export default async function InventarioPage({
   const showArchived = archivados === "1";
   const created = typeof creado === "string" ? creado.slice(0, 64) : "";
   const saved = typeof guardado === "string" ? guardado.slice(0, 64) : "";
-  const canEdit = access.allows("inventory.product.update");
   const actor = {
     organizationId: access.organization.id,
     userId: access.user.id,
@@ -125,7 +122,6 @@ export default async function InventarioPage({
     access.can("inventory.stock.read")
       ? await countLowStock(actor)
       : null;
-  const canEnter = access.allows("inventory.entry.create");
   const first = (list.page - 1) * list.pageSize + 1;
   const last = first + products.length - 1;
   const count = (n: number) => n.toLocaleString("es-MX");
@@ -141,13 +137,18 @@ export default async function InventarioPage({
     return query ? `/inventario?${query}` : "/inventario";
   };
   const canReactivate = access.allows("inventory.product.reactivate");
+  // The whole row opens the product: its card has every action (KISS),
+  // so the list carries no small per-row buttons.
   const row = (product: ProductSummary) => (
-    <li key={product.id} className="flex items-center gap-3 p-4 sm:px-5">
+    <li
+      key={product.id}
+      className="relative flex min-h-16 items-center gap-3 p-4 hover:bg-muted/50 sm:px-5"
+    >
       <div className="min-w-0 flex-1">
         <p className="font-medium">
           <Link
             href={`/inventario/${product.id}`}
-            className="rounded underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="rounded underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {product.name}
           </Link>
@@ -157,43 +158,21 @@ export default async function InventarioPage({
             .filter(Boolean)
             .join(" · ")}
         </p>
-        {/* On a phone the quantity goes under the name; beside it from sm up. */}
-        {totals && (
-          <p className="text-sm font-medium tabular-nums sm:hidden">
-            {formatStock(totals[product.id] ?? "0", product.unitCode)}
-          </p>
-        )}
       </div>
       {totals && (
-        <p className="hidden shrink-0 text-right text-sm font-medium tabular-nums sm:block">
+        <p className="shrink-0 text-right font-medium tabular-nums">
           {formatStock(totals[product.id] ?? "0", product.unitCode)}
         </p>
       )}
       {showArchived && canReactivate && (
-        <ReactivateProduct productId={product.id} name={product.name} />
+        <div className="relative z-10">
+          <ReactivateProduct productId={product.id} name={product.name} />
+        </div>
       )}
-      {!showArchived && canEnter && (
-        <Button asChild variant="ghost">
-          <Link
-            href={`/movimientos/entrada?producto=${product.id}`}
-            aria-label={`Registrar entrada de ${product.name}`}
-          >
-            <ArrowDownToLine aria-hidden="true" />
-            <span className="hidden sm:inline">Entrada</span>
-          </Link>
-        </Button>
-      )}
-      {!showArchived && canEdit && (
-        <Button asChild variant="ghost">
-          <Link
-            href={`/inventario/${product.id}/editar`}
-            aria-label={`Editar ${product.name}`}
-          >
-            <Pencil aria-hidden="true" />
-            <span className="hidden sm:inline">Editar</span>
-          </Link>
-        </Button>
-      )}
+      <ChevronRight
+        aria-hidden="true"
+        className="size-4 shrink-0 text-muted-foreground"
+      />
     </li>
   );
   // Shown only to who may add products, and only while the plan allows it.
@@ -205,14 +184,32 @@ export default async function InventarioPage({
       </Link>
     </Button>
   ) : undefined;
+  const canImport = access.allows("inventory.import.create");
+  const importButton =
+    canImport && !showArchived ? (
+      <Button asChild variant="outline">
+        <Link href="/inventario/importar">
+          <Upload aria-hidden="true" data-icon="inline-start" />
+          Importar Excel
+        </Link>
+      </Button>
+    ) : undefined;
+  const quietLink =
+    "inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
 
   return (
     <PageContainer>
       {moduleState === "read_only" && <ReadOnlyNotice module="Inventario" />}
       <PageHeader
-        title="Inventario"
-        description="Qué hay, cuánto y dónde está."
-        actions={addButton}
+        title={showArchived ? "Productos archivados" : "Inventario"}
+        actions={
+          !showArchived && (addButton || importButton) ? (
+            <>
+              {addButton}
+              {importButton}
+            </>
+          ) : undefined
+        }
       />
       {created && (
         <div
@@ -255,51 +252,24 @@ export default async function InventarioPage({
           </p>
         </div>
       )}
-      <p>
+      {lowCount !== null && lowCount > 0 && (
         <Link
-          href={showArchived ? "/inventario" : "/inventario?archivados=1"}
-          className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          href="/inventario/bajas"
+          className="flex min-h-11 items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm outline-none hover:bg-warning/15 focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          {showArchived ? "Ver productos activos" : "Ver productos archivados"}
+          <span className="flex-1">
+            {lowCount === 1
+              ? "1 producto se está acabando."
+              : `${lowCount.toLocaleString("es-MX")} productos se están acabando.`}
+          </span>
+          <span className="font-medium text-primary">Ver cuáles</span>
         </Link>
-        {!showArchived && access.allows("inventory.import.create") && (
-          <Link
-            href="/inventario/importar"
-            className="ml-4 inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            Importar desde Excel
-          </Link>
-        )}
-        {!showArchived && access.can("inventory.export.create") && (
-          <Link
-            href="/inventario/exportar"
-            className="ml-4 inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            Exportar a Excel
-          </Link>
-        )}
-        {lowCount !== null && (
-          <Link
-            href="/inventario/bajas"
-            className="ml-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            Existencias bajas
-            {lowCount > 0 && (
-              <Badge variant="warning">
-                {lowCount.toLocaleString("es-MX")}
-                <span className="sr-only">
-                  {lowCount === 1 ? " producto" : " productos"}
-                </span>
-              </Badge>
-            )}
-          </Link>
-        )}
-      </p>
+      )}
       {(list.total > 0 || narrowed) && (
         <Form
           action="/inventario"
           role="search"
-          className="flex max-w-3xl flex-wrap items-center gap-2"
+          className="flex flex-wrap items-center gap-2"
         >
           {showArchived && <input type="hidden" name="archivados" value="1" />}
           <label htmlFor="q" className="sr-only">
@@ -328,7 +298,7 @@ export default async function InventarioPage({
             Buscar
           </Button>
           {(filters.categories.length > 0 || filters.brands.length > 0) && (
-            <div className="flex w-full flex-wrap gap-2">
+            <div className="flex w-full flex-wrap gap-2 lg:w-auto">
               {filters.categories.length > 0 && (
                 <FilterSelect
                   id="categoria"
@@ -414,33 +384,29 @@ export default async function InventarioPage({
                 ? "Ningún producto coincide con esos filtros. Quita alguno o busca con menos palabras."
                 : showArchived
                   ? "Ningún producto archivado coincide. Revisa cómo está escrito o busca con menos palabras."
-                  : "Ningún producto coincide. Revisa cómo está escrito, busca con menos palabras o mira en los archivados."
+                  : "Revisa cómo está escrito o busca con menos palabras."
             }
           />
         ) : showArchived ? (
           <EmptyState
             icon={Package}
             title="No hay productos archivados"
-            description="Los productos que archives aparecerán aquí y podrás reactivarlos."
+            description="Aquí verás los productos que archives."
           />
         ) : (
           <EmptyState
             icon={Package}
             title="Todavía no hay productos"
             description={
-              access.allows("inventory.import.create")
+              canImport
                 ? "Sube tu Excel para traerlos todos de una vez, o agrega el primero a mano."
-                : "Agrega tu primer producto para empezar a controlar tu inventario."
+                : "Agrega tu primer producto para empezar."
             }
             action={
-              access.allows("inventory.import.create") ? (
+              canImport ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Button asChild>
-                    <Link href="/inventario/importar">
-                      Importar desde Excel
-                    </Link>
-                  </Button>
                   {addButton}
+                  {importButton}
                 </div>
               ) : (
                 addButton
@@ -496,6 +462,20 @@ export default async function InventarioPage({
           )}
         </section>
       )}
+      {/* Now-and-then options, out of the way of the daily list. */}
+      <p className="flex flex-wrap gap-x-6">
+        {!showArchived && access.can("inventory.export.create") && (
+          <Link href="/inventario/exportar" className={quietLink}>
+            Descargar en Excel
+          </Link>
+        )}
+        <Link
+          href={showArchived ? "/inventario" : "/inventario?archivados=1"}
+          className={quietLink}
+        >
+          {showArchived ? "Ver productos activos" : "Ver archivados"}
+        </Link>
+      </p>
     </PageContainer>
   );
 }

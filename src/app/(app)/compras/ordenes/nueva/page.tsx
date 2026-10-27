@@ -67,14 +67,17 @@ export default async function NuevaOrdenPage({
     typeof proveedor === "string" &&
     suppliers.items.some((supplier) => supplier.id === proveedor)
       ? proveedor
-      : "";
+      : // With a single supplier there is nothing to choose.
+        suppliers.items.length === 1
+        ? suppliers.items[0]!.id
+        : "";
 
   return (
     <PageContainer>
       {back}
       <PageHeader
         title="Nueva orden de compra"
-        description="Empieza por el proveedor. En el siguiente paso agregas los productos."
+        description="Después agregas los productos."
       />
       {suppliers.total === 0 ? (
         <EmptyState
