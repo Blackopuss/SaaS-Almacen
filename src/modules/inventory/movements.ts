@@ -667,6 +667,7 @@ export const MOVEMENT_TYPE_LABELS = {
   RECEIPT: "Recepción de compra",
   RETURN: "Devolución a proveedor",
   SALE: "Venta",
+  SALE_RETURN: "Devolución de venta",
 } as const;
 
 export type MovementType = keyof typeof MOVEMENT_TYPE_LABELS;
@@ -1773,10 +1774,12 @@ export async function reverseMovement(
         );
       }
       // Nor a sale (VEN-05): its ticket and payments would still stand.
-      if (original.type === "SALE") {
+      if (original.type === "SALE" || original.type === "SALE_RETURN") {
         return stop(
           "not_allowed",
-          "Esta salida es una venta: no se reversa desde Inventario. Se devuelve o se cancela desde Ventas.",
+          original.type === "SALE"
+            ? "Esta salida es una venta: no se reversa desde Inventario. Se devuelve o se cancela desde Ventas."
+            : "Esta entrada es una devolución de venta: no se reversa desde Inventario.",
         );
       }
       const already = await tx.stockMovement.findFirst({

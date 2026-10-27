@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CircleCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,7 +10,7 @@ import {
   PageHeader,
   QrCode,
 } from "@/components";
-import { getSaleTicket } from "@/modules/sales";
+import { getReturnableSale, getSaleTicket } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 import { PrintButton } from "../../../ticket/print-button";
@@ -23,7 +23,17 @@ export const metadata: Metadata = { title: "Ticket de venta" };
  * A sale's ticket (VEN-15): print it at 80 mm, or give the customer its
  * link — a QR to scan or the address to send.
  */
-export default async function VentaPage({ params }: PageProps<"/ventas/[id]">) {
+/** What to give back, said once the return is registered. */
+function given(refund: string, method: string) {
+  if (method === "CASH") return `Entrega ${refund} en efectivo al cliente.`;
+  if (method === "CARD") return `Se devolvieron ${refund} a la tarjeta.`;
+  return `Se devolvieron ${refund} por transferencia.`;
+}
+
+export default async function VentaPage({
+  params,
+  searchParams,
+}: PageProps<"/ventas/[id]">) {
   const access = await getModuleAccess();
   const back = (
     <Link
@@ -51,18 +61,77 @@ export default async function VentaPage({ params }: PageProps<"/ventas/[id]">) {
     );
   }
   const { id } = await params;
-  const ticket = await getSaleTicket(
-    { organizationId: access.organization.id, userId: access.user.id },
-    id,
-  );
-  if (!ticket) notFound();
+  const actor = {
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  };
+  const [ticket, returnable] = await Promise.all([
+    getSaleTicket(actor, id),
+    getReturnableSale(actor, id),
+  ]);
+  if (!ticket || !returnable) notFound();
+  const asked = (await searchParams).devolucion;
+  const registered = returnable.returns.find((r) => r.id === asked);
+  const somethingLeft =
+    !returnable.cancelled &&
+    returnable.lines.some((line) => line.returnable !== "0");
+  const occasional = somethingLeft
+    ? [
+        access.allows("sales.return.create") && {
+          href: `/ventas/${ticket.saleId}/devolver`,
+          label: "Devolver productos",
+        },
+        access.allows("sales.sale.cancel") && {
+          href: `/ventas/${ticket.saleId}/cancelar`,
+          label: "Cancelar venta",
+        },
+      ].filter((item) => item !== false)
+    : [];
   const link = `${(process.env.BETTER_AUTH_URL ?? "").replace(/\/$/, "")}${ticket.publicPath}`;
 
   return (
     <PageContainer>
       {back}
-      <div className="print:hidden">
+      <div className="space-y-2 print:hidden">
         <PageHeader title={`Venta ${ticket.number}`} />
+        {registered && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-xl border border-success/40 bg-success/10 p-4 text-sm"
+          >
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-success"
+            />
+            <p>
+              <span className="font-medium">
+                {registered.cancelsSale
+                  ? "Venta cancelada."
+                  : "Devolución registrada."}
+              </span>{" "}
+              {given(registered.refund, registered.refundMethod)} Lo que regresó
+              ya está en el inventario.
+            </p>
+          </div>
+        )}
+        {returnable.refunded !== "$0.00" && (
+          <p className="text-sm text-muted-foreground">
+            Se devolvieron {returnable.refunded} de {returnable.total}.
+          </p>
+        )}
+        {occasional.length > 0 && (
+          <p className="flex flex-wrap gap-x-6">
+            {occasional.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {label}
+              </Link>
+            ))}
+          </p>
+        )}
       </div>
       <div className="grid gap-6 md:grid-cols-[minmax(0,24rem)_1fr] md:items-start print:block">
         <TicketView ticket={ticket} />

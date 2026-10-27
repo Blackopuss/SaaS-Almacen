@@ -69,3 +69,15 @@ export {
   recordCashMovement,
 } from "./cash";
 export type { CashResult, CashSessionView } from "./cash";
+export {
+  cancelSale,
+  findReturnByKey,
+  getReturnableSale,
+  returnSale,
+} from "./returns";
+export type {
+  ReturnInput,
+  ReturnResult,
+  ReturnableLine,
+  ReturnableSale,
+} from "./returns";

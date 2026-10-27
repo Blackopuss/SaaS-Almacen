@@ -28,9 +28,11 @@ export type CashTotals = {
   cashSales: Decimal;
   cashIn: Decimal;
   cashOut: Decimal;
+  /** Cash handed back for returns from this register (VEN-19). */
+  cashRefunds: Decimal;
   card: Decimal;
   transfer: Decimal;
-  /** float + cash sales + in − out. */
+  /** float + cash sales + in − out − cash refunds. */
   expectedCash: Decimal;
 };
 
@@ -39,7 +41,7 @@ export async function cashTotals(
   client: Client,
   sessionId: string,
 ): Promise<CashTotals> {
-  const [session, payments, movements] = await Promise.all([
+  const [session, payments, movements, refunds] = await Promise.all([
     client.cashSession.findFirst({
       where: { id: sessionId },
       select: { openingFloat: true },
@@ -53,6 +55,10 @@ export async function cashTotals(
       by: ["direction"],
       where: { sessionId },
       _sum: { amount: true },
+    }),
+    client.saleReturn.aggregate({
+      where: { cashSessionId: sessionId, refundMethod: "CASH" },
+      _sum: { refund: true },
     }),
   ]);
   const paid = (method: string) =>
@@ -69,14 +75,20 @@ export async function cashTotals(
   const cashSales = paid("CASH");
   const cashIn = moved("IN");
   const cashOut = moved("OUT");
+  const cashRefunds = dec(refunds._sum.refund?.toString() ?? 0);
   return {
     float,
     cashSales,
     cashIn,
     cashOut,
+    cashRefunds,
     card: paid("CARD"),
     transfer: paid("TRANSFER"),
-    expectedCash: float.plus(cashSales).plus(cashIn).minus(cashOut),
+    expectedCash: float
+      .plus(cashSales)
+      .plus(cashIn)
+      .minus(cashOut)
+      .minus(cashRefunds),
   };
 }
 
@@ -93,6 +105,7 @@ export type CashSessionView = {
     cashSales: string;
     cashIn: string;
     cashOut: string;
+    cashRefunds: string;
     card: string;
     transfer: string;
     expectedCash: string;
@@ -152,6 +165,7 @@ async function viewOf(
       cashSales: money(totals.cashSales),
       cashIn: money(totals.cashIn),
       cashOut: money(totals.cashOut),
+      cashRefunds: money(totals.cashRefunds),
       card: money(totals.card),
       transfer: money(totals.transfer),
       expectedCash: money(totals.expectedCash),

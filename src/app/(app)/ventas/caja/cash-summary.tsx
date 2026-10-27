@@ -9,17 +9,16 @@ export function CashSummary({
   session: CashSessionView;
   timeZone: string;
 }) {
+  const out = (value: string) => (value === "$0.00" ? value : `-${value}`);
   const rows = [
     ["Fondo", session.totals.float],
     ["Ventas en efectivo", session.totals.cashSales],
     ["Dinero que entró", session.totals.cashIn],
-    [
-      "Dinero que salió",
-      session.totals.cashOut === "$0.00"
-        ? "$0.00"
-        : `-${session.totals.cashOut}`,
-    ],
-  ] as const;
+    ["Dinero que salió", out(session.totals.cashOut)],
+    ...(session.totals.cashRefunds === "$0.00"
+      ? []
+      : [["Devoluciones en efectivo", out(session.totals.cashRefunds)]]),
+  ];
   return (
     <section
       aria-label="Resumen de la caja"

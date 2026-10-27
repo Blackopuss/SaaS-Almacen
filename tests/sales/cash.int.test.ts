@@ -134,6 +134,7 @@ describe("cash register", () => {
       cashSales: "$100.00",
       cashIn: "$200.00",
       cashOut: "$50.00",
+      cashRefunds: "$0.00",
       card: "$50.00",
       transfer: "$0.00",
       expectedCash: "$750.00",

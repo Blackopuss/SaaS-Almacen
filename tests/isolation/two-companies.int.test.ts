@@ -492,9 +492,10 @@ beforeAll(async () => {
         cashSessionId,
       },
     });
+    const saleLineId = newId();
     await db.saleLine.create({
       data: {
-        id: newId(),
+        id: saleLineId,
         organizationId,
         saleId,
         lineNumber: 1,
@@ -518,6 +519,47 @@ beforeAll(async () => {
         amount: "120",
         received: "200",
         changeGiven: "80",
+      },
+    });
+    // A return of it (VEN-19): its stock entry, the return and its line.
+    const saleReturnMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: saleReturnMovementId,
+        organizationId,
+        type: "SALE_RETURN",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const saleReturnId = newId();
+    await db.saleReturn.create({
+      data: {
+        id: saleReturnId,
+        organizationId,
+        saleId,
+        movementId: saleReturnMovementId,
+        refundMethod: "CASH",
+        refund: "120",
+        cashSessionId,
+        reason: "No le quedó",
+        idempotencyKey: newId(),
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.saleReturnLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        returnId: saleReturnId,
+        lineNumber: 1,
+        saleLineId,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "1",
+        factor: "1",
+        baseQuantity: "1",
+        unitCode: "piece",
+        refund: "120",
       },
     });
     const exitImportId = newId();

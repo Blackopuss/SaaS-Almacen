@@ -64,6 +64,11 @@ export {
   type SaleExitLine,
   type SaleExitResult,
 } from "./sale-exit";
+export {
+  postSaleReturnEntry,
+  type SaleReturnEntryLine,
+  type SaleReturnEntryResult,
+} from "./sale-return-entry";
 export { reconcileStock, reconcileValue } from "./reconciliation";
 export type { StockDrift, ValueDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";

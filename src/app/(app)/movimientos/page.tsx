@@ -332,7 +332,10 @@ export default async function MovimientosPage({
                   allLabel="Tipo"
                   options={
                     access.moduleState("sales") === "none"
-                      ? TYPE_OPTIONS.filter((option) => option.id !== "SALE")
+                      ? TYPE_OPTIONS.filter(
+                          (option) =>
+                            option.id !== "SALE" && option.id !== "SALE_RETURN",
+                        )
                       : TYPE_OPTIONS
                   }
                 />
@@ -492,6 +495,7 @@ export default async function MovimientosPage({
                   movement.type !== "RECEIPT" &&
                   movement.type !== "RETURN" &&
                   movement.type !== "SALE" &&
+                  movement.type !== "SALE_RETURN" &&
                   !movement.reversedByMovementId && (
                     <div className="shrink-0">
                       <ReverseMovement

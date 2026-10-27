@@ -36,6 +36,25 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la caja se busca y se bloquea solo en esa empresa",
     coveredBy: "tests/sales/cash.int.test.ts",
   },
+  returnSaleAction: {
+    input:
+      "id de la venta, cantidades por línea, motivo, forma de reembolso y referencia",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la venta se busca y se bloquea solo en esa empresa",
+    coveredBy: "tests/sales/returns.int.test.ts",
+  },
+  cancelSaleAction: {
+    input: "id de la venta, motivo, forma de reembolso y referencia",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la venta se busca y se bloquea solo en esa empresa",
+    coveredBy: "tests/sales/returns.int.test.ts",
+  },
+  checkSaleReturnAction: {
+    input: "clave de confirmación",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo encuentra devoluciones de esa persona en esa empresa",
+    coveredBy: "tests/sales/returns.int.test.ts",
+  },
   authorizeDiscountAction: {
     input: "id de quien autoriza, su contraseña, porcentaje y motivo",
     identity:
