@@ -29,7 +29,7 @@ El fundador pidió valorar el inventario como SAP (ADR 0030): a costo, no a prec
 
 - Costo por ubicación, PEPS/UEPS o costo estándar.
 - Revaluar a mano el precio de un producto: el precio solo cambia con entradas con costo.
-- Recalcular el pasado: los movimientos anteriores a VAL quedan sin `unitCost`; los productos arrancan con su último costo de compra (VAL-06).
+- Recalcular el pasado: los movimientos anteriores a VAL quedan sin `unitCost`; los productos arrancan con su último costo de compra (VAL-06, migración `20261027140000_average_cost_from_last_purchase`: último costo ÷ contenido de la presentación con la que se compró, el más reciente si hay varios proveedores; nunca pisa una fila existente).
 
 ## Consecuencias
 
