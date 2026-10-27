@@ -84,6 +84,9 @@ class Rejected extends Error {
   }
 }
 
+export const NO_CASH_SESSION =
+  "Abre tu caja para cobrar: escribe con cuánto efectivo empiezas.";
+
 export const SALE_KEY_REUSED =
   "Esta confirmación ya se usó para otra venta. Empieza una venta nueva.";
 
@@ -253,6 +256,27 @@ async function save(
       };
     }
 
+    // VEN-16: without an open register of who charges, nobody charges.
+    // Locked so a close cannot happen in between: the sale lands in it.
+    const open = await tx.cashSession.findFirst({
+      where: { openedByUserId: userId, isOpen: true },
+      select: { id: true },
+    });
+    const [lockedSession] = open
+      ? await lockRows(tx, "cashSession", [open.id])
+      : [];
+    const cashSession = lockedSession
+      ? await tx.cashSession.findFirst({
+          where: { id: lockedSession, isOpen: true },
+          select: { id: true },
+        })
+      : null;
+    if (!cashSession) {
+      throw new Rejected(
+        failure({ reason: "not_allowed", formError: NO_CASH_SESSION }),
+      );
+    }
+
     const { priced, lineErrors } = await priceLines(tx, input.lines);
     if (Object.keys(lineErrors).length > 0) {
       throw new Rejected(failure({ lineErrors }));
@@ -394,6 +418,7 @@ async function save(
         number,
         customerId: input.customerId,
         movementId: exit.movementId,
+        cashSessionId: cashSession.id,
         pricesIncludeTax: rule.pricesIncludeTax,
         taxRate: rule.rate,
         discount: discountTotal.toFixed(2),

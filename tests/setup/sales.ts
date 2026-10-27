@@ -1,6 +1,7 @@
 import { newId } from "@/lib";
 import { hashPassword } from "@/platform/auth/password";
 import { moduleRegistry } from "@/modules/registry";
+import { openCashSession } from "@/modules/sales";
 import type { Role } from "@/platform/authorization";
 import { provisionCompany } from "@/platform/billing";
 import { invalidateEntitlements } from "@/platform/entitlements";
@@ -65,10 +66,17 @@ export async function salesCompany(
     },
   });
   invalidateEntitlements(created.organizationId);
-  return { organizationId: created.organizationId, userId: owner };
+  const actor = { organizationId: created.organizationId, userId: owner };
+  // Who sells has their register open (VEN-16), as at the counter.
+  await openCashSession(actor, { openingFloat: "0" });
+  return actor;
 }
 
-export async function salesMember(organizationId: string, role: Role) {
+export async function salesMember(
+  organizationId: string,
+  role: Role,
+  options: { openCash?: boolean } = {},
+) {
   const userId = await newPerson(role);
   const membership = await db.membership.create({
     data: { id: newId(), organizationId, userId },
@@ -76,6 +84,12 @@ export async function salesMember(organizationId: string, role: Role) {
   await db.membershipRole.create({
     data: { id: newId(), organizationId, membershipId: membership.id, role },
   });
+  if (
+    options.openCash !== false &&
+    (role === "cashier" || role === "cash_manager" || role === "administrator")
+  ) {
+    await openCashSession({ organizationId, userId }, { openingFloat: "0" });
+  }
   return { organizationId, userId };
 }
 

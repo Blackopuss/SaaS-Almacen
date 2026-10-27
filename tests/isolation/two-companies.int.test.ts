@@ -455,6 +455,26 @@ beforeAll(async () => {
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const cashSessionId = newId();
+    await db.cashSession.create({
+      data: {
+        id: cashSessionId,
+        organizationId,
+        openedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+        openingFloat: "500",
+      },
+    });
+    await db.cashMovement.create({
+      data: {
+        id: newId(),
+        organizationId,
+        sessionId: cashSessionId,
+        direction: "IN",
+        amount: "100",
+        reason: "Cambio del banco",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const saleId = newId();
     await db.sale.create({
       data: {
@@ -469,6 +489,7 @@ beforeAll(async () => {
         total: "120",
         idempotencyKey: newId(),
         soldByUserId: organizationId === orgA ? ids.ana : ids.beto,
+        cashSessionId,
       },
     });
     await db.saleLine.create({

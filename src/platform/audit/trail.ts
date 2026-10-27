@@ -45,6 +45,10 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "customer.created": "Registró un cliente",
   "sales.discount_authorized": "Autorizó un descuento",
   "sales.discount_given": "Dio un descuento en una venta",
+  "sales.cash_opened": "Abrió su caja",
+  "sales.cash_in": "Metió dinero a la caja",
+  "sales.cash_out": "Sacó dinero de la caja",
+  "sales.cash_closed": "Hizo el corte de una caja",
   "sales.settings_changed": "Cambió el IVA de sus ventas",
   "purchase_order.delivery_requested":
     "Pidió enviar una orden de compra por correo",
@@ -154,6 +158,11 @@ const FACT_LABELS: readonly (readonly [string, string])[] = [
   ["cambios", "Cambió"],
   ["venta", "Venta"],
   ["porcentaje", "Descuento"],
+  ["fondo", "Fondo"],
+  ["importe", "Importe"],
+  ["efectivo", "Efectivo"],
+  ["tarjeta", "Tarjeta"],
+  ["transferencia", "Transferencia"],
 ];
 
 const shown = (value: unknown): string | null =>

@@ -1,4 +1,6 @@
+import { Wallet } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   NoAccessState,
@@ -11,10 +13,12 @@ import { newId } from "@/lib";
 import {
   SALE_MAX_LINES,
   SALE_MAX_PAYMENTS,
+  getMyCashSession,
   listDiscountAuthorizers,
 } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
+import { OpenCashForm } from "./caja/cash-forms";
 import { SaleForm } from "./sale-form";
 
 export const metadata: Metadata = { title: "Ventas" };
@@ -46,14 +50,46 @@ export default async function VentasPage() {
     );
   }
 
-  const authorizers = await listDiscountAuthorizers({
+  const actor = {
     organizationId: access.organization.id,
     userId: access.user.id,
-  });
+  };
+  const operatesCash = access.allows("sales.cash.operate");
+  const [authorizers, cash] = await Promise.all([
+    listDiscountAuthorizers(actor),
+    operatesCash ? getMyCashSession(actor) : null,
+  ]);
+  const links = operatesCash && (
+    <div className="-mt-3 flex flex-wrap gap-x-5">
+      <Link
+        href="/ventas/caja"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <Wallet aria-hidden="true" className="size-4" />
+        Caja
+      </Link>
+    </div>
+  );
+  // VEN-16: nobody charges without their register open.
+  if (!cash) {
+    return (
+      <PageContainer>
+        <PageHeader title="Ventas" />
+        {operatesCash ? (
+          <OpenCashForm />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Para cobrar se necesita una caja abierta, y tu rol no abre caja.
+          </p>
+        )}
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
       <PageHeader title="Ventas" />
+      {links}
       <SaleForm
         authorizers={authorizers}
         maxLines={SALE_MAX_LINES}

@@ -18,6 +18,24 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  openCashAction: {
+    input: "efectivo con el que se abre la caja",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la caja se abre a nombre de esa persona en esa empresa",
+    coveredBy: "tests/sales/cash.int.test.ts",
+  },
+  cashMovementAction: {
+    input: "si entra o sale dinero, importe y motivo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo en la caja abierta de esa persona",
+    coveredBy: "tests/sales/cash.int.test.ts",
+  },
+  closeCashAction: {
+    input: "id de la caja y lo contado por forma de pago",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la caja se busca y se bloquea solo en esa empresa",
+    coveredBy: "tests/sales/cash.int.test.ts",
+  },
   authorizeDiscountAction: {
     input: "id de quien autoriza, su contraseña, porcentaje y motivo",
     identity:

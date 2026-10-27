@@ -166,6 +166,8 @@ model Organization {
   saleLines                  SaleLine[]
   salePayments               SalePayment[]
   saleDiscountAuthorizations SaleDiscountAuthorization[]
+  cashSessions               CashSession[]
+  cashMovements              CashMovement[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1904,6 +1906,10 @@ model Sale {
   /// Who allowed a discount above the seller's cap, used once.
   discountAuthorizationId String?                    @db.Char(36)
   discountAuthorization   SaleDiscountAuthorization? @relation(fields: [organizationId, discountAuthorizationId], references: [organizationId, id], onDelete: Restrict)
+  /// The cash register of who charged it (VEN-16); null for sales from
+  /// before registers existed.
+  cashSessionId           String?                    @db.Char(36)
+  cashSession             CashSession?               @relation(fields: [organizationId, cashSessionId], references: [organizationId, id], onDelete: Restrict)
   subtotal                Decimal                    @db.Decimal(14, 2)
   tax                     Decimal                    @db.Decimal(14, 2)
   total                   Decimal                    @db.Decimal(14, 2)
@@ -1923,6 +1929,7 @@ model Sale {
   @@unique([organizationId, idempotencyKey])
   @@unique([organizationId, discountAuthorizationId])
   @@index([organizationId, createdAt])
+  @@index([organizationId, cashSessionId])
   @@index([organizationId, soldByUserId, createdAt])
   @@index([organizationId, customerId, createdAt])
   @@map("sale")
@@ -2015,4 +2022,62 @@ model SaleDiscountAuthorization {
   @@unique([organizationId, id])
   @@index([organizationId, sellerUserId, createdAt])
   @@map("sale_discount_authorization")
+}
+
+/// A cash register shift (VEN-16): someone opens it with a float, charges
+/// into it, puts money in or takes it out (VEN-17), and a cash manager
+/// closes it counting what there is against what there should be (VEN-18).
+/// One open register per person; without one, nobody charges.
+model CashSession {
+  id               String         @id @db.Char(36)
+  organizationId   String         @db.Char(36)
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  openedByUserId   String         @db.Char(36)
+  /// Cash it starts with, to give change.
+  openingFloat     Decimal        @db.Decimal(14, 2)
+  openedAt         DateTime       @default(now()) @db.DateTime(3)
+  /// True while open, NULL once closed (never false): one open per person.
+  isOpen           Boolean?       @default(true)
+  closedAt         DateTime?      @db.DateTime(3)
+  closedByUserId   String?        @db.Char(36)
+  /// What should have been there at the close, by payment method.
+  expectedCash     Decimal?       @db.Decimal(14, 2)
+  expectedCard     Decimal?       @db.Decimal(14, 2)
+  expectedTransfer Decimal?       @db.Decimal(14, 2)
+  /// What was counted at the close.
+  countedCash      Decimal?       @db.Decimal(14, 2)
+  countedCard      Decimal?       @db.Decimal(14, 2)
+  countedTransfer  Decimal?       @db.Decimal(14, 2)
+  closeNote        String?        @db.VarChar(500)
+  sales            Sale[]
+  movements        CashMovement[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, openedByUserId, isOpen])
+  @@index([organizationId, openedAt])
+  @@map("cash_session")
+}
+
+enum CashMovementDirection {
+  IN
+  OUT
+}
+
+/// Money put into or taken out of a register, with its reason (VEN-17):
+/// change brought from the bank, a payment to a supplier from the drawer.
+model CashMovement {
+  id              String                @id @db.Char(36)
+  organizationId  String                @db.Char(36)
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sessionId       String                @db.Char(36)
+  session         CashSession           @relation(fields: [organizationId, sessionId], references: [organizationId, id], onDelete: Restrict)
+  direction       CashMovementDirection
+  amount          Decimal               @db.Decimal(14, 2)
+  reason          String                @db.VarChar(200)
+  createdByUserId String                @db.Char(36)
+  createdAt       DateTime              @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, sessionId, createdAt])
+  @@map("cash_movement")
 }

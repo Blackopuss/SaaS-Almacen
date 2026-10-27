@@ -28,7 +28,12 @@ export { SALE_MAX_LINES, quoteSale } from "./cart";
 export type { CartLineInput, CartQuote } from "./cart";
 export { findSaleProducts, getSaleProduct } from "./sale-product";
 export type { SaleProduct, SaleSearch } from "./sale-product";
-export { SALE_KEY_REUSED, findSaleByKey, registerSale } from "./sales";
+export {
+  NO_CASH_SESSION,
+  SALE_KEY_REUSED,
+  findSaleByKey,
+  registerSale,
+} from "./sales";
 export type { SaleInput, SaleResult } from "./sales";
 export {
   PAYMENT_METHODS,
@@ -55,3 +60,12 @@ export type {
 } from "./discount-authorization";
 export { getPublicTicket, getSaleTicket, ticketPath } from "./ticket";
 export type { Ticket } from "./ticket";
+export {
+  closeCashSession,
+  getCashSession,
+  getMyCashSession,
+  listCashSessions,
+  openCashSession,
+  recordCashMovement,
+} from "./cash";
+export type { CashResult, CashSessionView } from "./cash";
