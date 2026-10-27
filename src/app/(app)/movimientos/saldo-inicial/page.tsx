@@ -178,6 +178,7 @@ export default async function SaldoInicialPage({
         <EntryForm
           idempotencyKey={newId()}
           mode="initial"
+          askCost={access.can("inventory.cost.record")}
           productId={product.id}
           captures={captureOptions(product, presentations)}
           locations={pending.map((location) => ({

@@ -579,7 +579,8 @@ Decidido con el fundador (ADR 0030): el inventario se valora a costo, con costo 
 | --- | --- | --- | --- |
 | VAL-01 | Costo promedio: decisión y esquema | CMP-13 | ADR; costo promedio por producto en su unidad base con decimal exacto; costo unitario guardado en cada línea de entrada; migración solo de expansión |
 | VAL-02 | Recepciones de Compras actualizan el costo promedio | VAL-01 | 10 a $85 + 10 a $95 → $90 en la misma transacción que la recepción; una devolución sale al costo con que entró |
-| VAL-03 | Costo opcional en entrada manual, saldo inicial e importación | VAL-02 | Solo con permiso de registrar costos (titular, administrador, comprador); sin costo, la entrada se valora al promedio vigente |
+| VAL-03A | Costo opcional en entrada manual y saldo inicial | VAL-02 | Permisos `inventory.cost.read` y `inventory.cost.record` (titular, administrador, comprador); sin costo, la entrada se valora al promedio vigente; una salida sale al promedio |
+| VAL-03B | Costo opcional al importar productos con existencias | VAL-03A | Columna de costo en la plantilla; se exige `inventory.cost.record` al confirmar si alguna fila trae costo |
 | VAL-04 | Salidas, ajustes, conteos y reversas valoradas | VAL-02 | Cada salida guarda el costo del momento; la reconciliación compara también el valor |
 | VAL-05 | Valor del inventario en ficha, lista, Inicio y exportación | VAL-04 | Solo para quien puede ver costos; para los demás el dato no existe en la respuesta |
 | VAL-06 | Arranque desde el último costo de compra y prueba de extremo a extremo | VAL-05 | Los productos existentes empiezan con su último costo; entrada → salida → conteo concilia cantidad y valor |

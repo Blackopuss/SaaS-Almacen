@@ -4,7 +4,13 @@ import {
   type Presentation,
 } from "@/platform/catalog";
 
-export type CaptureOption = { value: string; label: string; hint: string };
+export type CaptureOption = {
+  value: string;
+  label: string;
+  hint: string;
+  /** «por cada caja de 500 piezas»: what a cost typed with it is for (VAL-03). */
+  costFor: string;
+};
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -32,11 +38,13 @@ export function captureOptions(
         decimals === 0
           ? `En ${unit.plural}, sin fracciones.`
           : `En ${unit.plural}, hasta ${decimals} ${decimals === 1 ? "decimal" : "decimales"}.`,
+      costFor: `por ${unit.name}`,
     },
     ...presentations.map((presentation) => ({
       value: `p:${presentation.id}`,
       label: presentation.label,
       hint: `${presentation.label}. Se capturan completas.`,
+      costFor: `por cada ${presentation.label.charAt(0).toLowerCase()}${presentation.label.slice(1)}`,
     })),
     ...unitsOfDimension(unit.dimension)
       .filter((other) => other.code !== unit.code)
@@ -44,6 +52,7 @@ export function captureOptions(
         value: `u:${other.code}`,
         label: capital(other.plural),
         hint: `En ${other.plural}; se guarda en ${unit.plural}.`,
+        costFor: `por ${other.name}`,
       })),
   ];
 }

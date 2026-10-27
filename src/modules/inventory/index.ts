@@ -1,6 +1,7 @@
 // Public API of the inventory module: Units, locations, stock movements and balances (INV).
 // Other modules and app/ may import only from this file.
 export { inventoryModule } from "./contract";
+export { COST_FORMAT_ERROR, parseCost } from "./average-cost";
 export {
   MOVEMENT_PAGE_SIZE,
   MOVEMENT_TYPE_LABELS,

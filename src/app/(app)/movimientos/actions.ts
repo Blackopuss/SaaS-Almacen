@@ -27,6 +27,8 @@ export type EntryFormState = {
     capture: string;
     reference: string;
     reason: string;
+    /** Cost of one captured unit, as typed (VAL-03); only some forms have it. */
+    unitCost?: string;
     /** Destination of a relocation (INV-23). */
     toLocationId?: string;
   };
@@ -106,6 +108,7 @@ async function receive(
     capture: text("capture") || "base",
     reference: text("reference"),
     reason: text("reason"),
+    unitCost: text("unitCost"),
   };
   let result;
   try {
@@ -117,6 +120,8 @@ async function receive(
         quantity: values.quantity,
         reference: values.reference,
         reason: values.reason,
+        // Only the forms that show the field send it (VAL-03).
+        unitCost: values.unitCost,
         // Created with the form and resent on every retry (INV-21).
         idempotencyKey: text("idempotencyKey"),
         ...captureFields(values.capture),

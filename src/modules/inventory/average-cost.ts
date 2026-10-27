@@ -23,6 +23,26 @@ import { Decimal, dec, type DecimalInput } from "@/lib";
 /** Decimals of prices and values. */
 export const COST_SCALE = 6;
 
+const MAX_COST = "9999999999.9999";
+
+/**
+ * A cost as people type it («250.50», «$1,250»): exact, up to 4 decimals;
+ * null when it is not one. Shared by Inventario and Compras.
+ */
+export function parseCost(text: string): string | null {
+  const value = text
+    .trim()
+    .replace(/^\$\s*/, "")
+    .replace(/,(?=\d{3}(\D|$))/g, "");
+  if (!/^\d{1,10}(\.\d{1,4})?$/.test(value)) return null;
+  const cost = dec(value);
+  return cost.greaterThan(MAX_COST) ? null : cost.toString();
+}
+
+/** What a person reads when a cost cannot be read. */
+export const COST_FORMAT_ERROR =
+  "Escribe el costo como 250.50, con hasta 4 decimales, o déjalo vacío.";
+
 export type CostState = {
   /** Price of one unit of the product. */
   averageCost: Decimal;

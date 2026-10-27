@@ -14,6 +14,9 @@ import {
 import { compareLocationNames, formatLocationPath } from "@/platform/locations";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
+import { COST_FORMAT_ERROR, parseCost } from "./average-cost";
+import { costPerUnit, lineCost, openCostBook } from "./valuation";
+
 /**
  * Stock movements (INV-16 on). A confirmation writes the movement, its
  * lines and the balances in one transaction: all of it exists or none.
@@ -83,6 +86,17 @@ const entrySchema = z.object({
     500,
     "La nota es demasiado larga (máximo 500 caracteres).",
   ),
+  /**
+   * What one captured unit cost (one box, one piece), before taxes, as
+   * typed (VAL-03). Only entries and initial balances take it, and only
+   * from who may record costs; empty = the average cost in force.
+   */
+  unitCost: z
+    .string()
+    .trim()
+    .max(30)
+    .optional()
+    .transform((value) => value || null),
   /**
    * Key of this confirmation (INV-21), created when the form is shown and
    * sent again on every retry: the same key never writes a second
@@ -256,6 +270,32 @@ async function post(
     };
   }
   const data = parsed.data;
+  // VAL-03: a cost moves the average; it is written only by who may.
+  let typedCost: string | null = null;
+  if (data.unitCost !== null) {
+    if (kind.direction === "OUT") {
+      return {
+        ok: false,
+        reason: "invalid",
+        fieldErrors: {
+          unitCost: "Una salida no lleva costo: sale al costo promedio.",
+        },
+      };
+    }
+    await assertModulePermission(
+      organizationId,
+      userId,
+      "inventory.cost.record",
+    );
+    typedCost = parseCost(data.unitCost);
+    if (typedCost === null) {
+      return {
+        ok: false,
+        reason: "invalid",
+        fieldErrors: { unitCost: COST_FORMAT_ERROR },
+      };
+    }
+  }
   if (data.presentationId && data.unitCode) {
     return {
       ok: false,
@@ -383,6 +423,17 @@ async function post(
         );
       }
 
+      // VAL-03: read before the balance changes, under the product's lock.
+      const costs = await openCostBook(tx, organizationId, [product.id]);
+      const unitCost =
+        kind.direction === "IN"
+          ? costs.entry(
+              product.id,
+              base,
+              costPerUnit(typedCost, conversion.factor),
+            )
+          : costs.exit(product.id, base);
+
       const movementId = newId();
       await tx.stockMovement.create({
         data: {
@@ -411,8 +462,10 @@ async function post(
           factor: conversion.factor.toString(),
           baseQuantity: base.toString(),
           unitCode,
+          unitCost: lineCost(unitCost),
         },
       });
+      await costs.save();
       if (kind.direction === "OUT") {
         // The condition repeats the check in the same statement that
         // changes the balance; the CHECK of the table is the last defense.

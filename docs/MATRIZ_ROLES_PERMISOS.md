@@ -109,6 +109,8 @@ Los permisos comerciales del titular autorizan su consentimiento o solicitud, no
 | `inventory.movement.read` | Ver historial y filtros por fecha, producto, usuario y tipo; INV-27. | Sí | Sí | Sí | Sí | Sí |
 | `inventory.minimum.read` | Consultar mínimos y productos con existencias bajas; INV-30. | Sí | Sí | Sí | Sí | Sí |
 | `inventory.minimum.update` | Configurar mínimo por producto; INV-30. | Sí | Sí | Sí | No | No |
+| `inventory.cost.read` | Consultar costo promedio, valor del inventario y costo de cada movimiento; VAL-05 (ADR 0031). Sin él el dato no existe en ninguna pantalla, exportación ni respuesta. | Sí | Sí | No | Sí | No |
+| `inventory.cost.record` | Capturar el costo de una entrada, saldo inicial o importación, que mueve el costo promedio; VAL-03 (ADR 0031). | Sí | Sí | No | Sí | No |
 | `inventory.dashboard.read` | Panel con existencias bajas, últimos movimientos y uso del cupo; INV-35. | Sí | Sí | Sí | Sí | Sí |
 
 Consultar equivalencias (INV-09) no concede permiso para confirmar el movimiento que las utiliza. La unidad base no cambia libremente después del primer movimiento. El catálogo global de unidades y la creación automática de instalación/General son tareas del sistema, no permisos para crear sucursales o editar unidades globales. No se propone borrado físico de productos o ubicaciones.

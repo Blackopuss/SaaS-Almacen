@@ -84,6 +84,7 @@ export function EntryForm({
   defaultLocationId,
   destinations,
   idempotencyKey,
+  askCost = false,
 }: {
   mode?: keyof typeof MODES;
   productId: string;
@@ -91,7 +92,7 @@ export function EntryForm({
    * Ways to count what arrives, built in the server: the product's unit
    * first ("base"), then its presentations and compatible units.
    */
-  captures: { value: string; label: string; hint: string }[];
+  captures: { value: string; label: string; hint: string; costFor?: string }[];
   /** Path of each location and what it holds today. */
   locations: { id: string; label: string }[];
   defaultLocationId: string;
@@ -103,6 +104,11 @@ export function EntryForm({
    * movement (INV-21).
    */
   idempotencyKey: string;
+  /**
+   * Shows the optional cost (VAL-03): only for entries and initial
+   * balances of who may record costs; the server checks it again.
+   */
+  askCost?: boolean;
 }) {
   const router = useRouter();
   /** What is happening when a confirmation got no answer. */
@@ -346,6 +352,26 @@ export function EntryForm({
           <p className="text-sm text-muted-foreground">{preview.error}</p>
         )}
       </div>
+      {askCost && (
+        <FormField
+          id="unitCost"
+          label="Costo (opcional)"
+          hint={`Lo que pagaste ${chosen?.costFor ?? ""}, sin IVA.`}
+          error={state.fieldErrors.unitCost}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="unitCost"
+              inputMode="decimal"
+              autoComplete="off"
+              defaultValue={state.values.unitCost ?? ""}
+              key={`cost-${state.values.unitCost ?? ""}-${answers}`}
+              maxLength={20}
+            />
+          )}
+        </FormField>
+      )}
       <FormField
         id="locationId"
         label={texts.location}
