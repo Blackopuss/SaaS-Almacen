@@ -57,9 +57,9 @@ describe("menu by role", () => {
     ]);
   });
 
-  it("Consulta sees every section it can read, but does not sell", () => {
+  it("Consulta sees every section it can read, Ventas for its history (VEN-22)", () => {
     expect(menuOf(member("viewer"))).toEqual(
-      NAV_ITEMS.map((item) => item.label).filter((label) => label !== "Ventas"),
+      NAV_ITEMS.map((item) => item.label),
     );
   });
 

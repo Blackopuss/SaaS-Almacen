@@ -1,6 +1,7 @@
-import { Wallet } from "lucide-react";
+import { History, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   NoAccessState,
@@ -29,13 +30,15 @@ export const metadata: Metadata = { title: "Ventas" };
  */
 export default async function VentasPage() {
   const access = await getModuleAccess();
-  if (!access.can("sales.sale.create")) {
+  if (!access.can("sales.sale.read")) {
     return (
       <PageContainer>
         <NoAccessState />
       </PageContainer>
     );
   }
+  // Who only looks at sales (Consulta) lands on their history.
+  if (!access.can("sales.sale.create")) redirect("/ventas/historial");
   const moduleState = access.moduleState("sales");
   if (moduleState !== "active") {
     return (
@@ -59,14 +62,19 @@ export default async function VentasPage() {
     listDiscountAuthorizers(actor),
     operatesCash ? getMyCashSession(actor) : null,
   ]);
-  const links = operatesCash && (
+  const linkClass =
+    "inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50";
+  const links = (
     <div className="-mt-3 flex flex-wrap gap-x-5">
-      <Link
-        href="/ventas/caja"
-        className="inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <Wallet aria-hidden="true" className="size-4" />
-        Caja
+      {operatesCash && (
+        <Link href="/ventas/caja" className={linkClass}>
+          <Wallet aria-hidden="true" className="size-4" />
+          Caja
+        </Link>
+      )}
+      <Link href="/ventas/historial" className={linkClass}>
+        <History aria-hidden="true" className="size-4" />
+        Historial de ventas
       </Link>
     </div>
   );
@@ -75,6 +83,7 @@ export default async function VentasPage() {
     return (
       <PageContainer>
         <PageHeader title="Ventas" />
+        {links}
         {operatesCash ? (
           <OpenCashForm />
         ) : (

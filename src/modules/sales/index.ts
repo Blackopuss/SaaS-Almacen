@@ -81,3 +81,5 @@ export type {
   ReturnableLine,
   ReturnableSale,
 } from "./returns";
+export { SALE_PAGE_SIZE, listSaleCashiers, listSales } from "./history";
+export type { SaleFilters, SalePage, SaleSummary } from "./history";

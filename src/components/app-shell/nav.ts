@@ -45,7 +45,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Ventas",
     icon: Store,
     module: "sales",
-    permission: "sales.sale.create",
+    // Consulta reads the history; the counter itself asks for sale.create.
+    permission: "sales.sale.read",
     mobile: true,
   },
   {
