@@ -13,6 +13,7 @@ import {
   formatMoney,
   parsePrice,
 } from "./pricing";
+import { readTaxRule } from "./settings";
 
 /**
  * Sale prices of a product (VEN-03, ADR 0030): one for its unit and, when
@@ -45,6 +46,8 @@ export type PriceRow = {
 
 export type ProductPrices = {
   productId: string;
+  /** The company writes its prices with VAT included (VEN-04). */
+  pricesIncludeTax: boolean;
   rows: PriceRow[];
 };
 
@@ -60,7 +63,7 @@ export async function getSalePrices(
   );
   const client = forOrganization(actor.organizationId);
   const id = String(productId).slice(0, 36);
-  const [product, withCosts] = await Promise.all([
+  const [product, withCosts, tax] = await Promise.all([
     client.product.findFirst({
       where: { id },
       select: {
@@ -82,6 +85,7 @@ export async function getSalePrices(
       },
     }),
     mayReadInventoryCosts(actor),
+    readTaxRule(client, actor.organizationId),
   ]);
   if (!product) return null;
   const cost = withCosts
@@ -130,8 +134,9 @@ export async function getSalePrices(
   };
   return {
     productId: product.id,
+    pricesIncludeTax: tax.pricesIncludeTax,
     rows: [
-      row(null, unit.name.charAt(0).toUpperCase() + unit.name.slice(1), "1"),
+      row(null, capitalized(unit.name), "1"),
       ...product.presentations
         .filter((presentation) => presentation.versions.length > 0)
         .map((presentation) => {
@@ -212,7 +217,8 @@ export async function setSalePrices(
           select: {
             id: true,
             sku: true,
-            presentations: { select: { id: true } },
+            unitCode: true,
+            presentations: { select: { id: true, name: true } },
             salePrices: {
               select: { id: true, presentationId: true, price: true },
             },
@@ -227,7 +233,11 @@ export async function setSalePrices(
         formError: "Este producto ya no existe.",
       };
     }
-    const presentations = new Set(product.presentations.map((p) => p.id));
+    const presentations = new Map(
+      product.presentations.map((p) => [p.id, p.name]),
+    );
+    const unitName = capitalized(getUnit(product.unitCode).name);
+    const name = (key: string) => (key ? presentations.get(key)! : unitName);
     const current = new Map(
       product.salePrices.map((row) => [row.presentationId ?? "", row]),
     );
@@ -239,7 +249,7 @@ export async function setSalePrices(
       if (price === null) {
         if (before) {
           await tx.salePrice.deleteMany({ where: { id: before.id } });
-          changes.push(`${key || "unidad"}: sin precio`);
+          changes.push(`${name(key)}: sin precio`);
         }
       } else if (!before) {
         await tx.salePrice.create({
@@ -252,14 +262,14 @@ export async function setSalePrices(
             updatedByUserId: actor.userId,
           },
         });
-        changes.push(`${key || "unidad"}: ${price}`);
+        changes.push(`${name(key)}: ${formatMoney(price)}`);
       } else if (before.price.toFixed(2) !== price) {
         await tx.salePrice.updateMany({
           where: { id: before.id },
           data: { price, updatedByUserId: actor.userId },
         });
         changes.push(
-          `${key || "unidad"}: ${before.price.toFixed(2)} → ${price}`,
+          `${name(key)}: ${formatMoney(before.price.toFixed(2))} → ${formatMoney(price)}`,
         );
       }
     }
@@ -278,3 +288,6 @@ export async function setSalePrices(
     return { ok: true as const, changed: changes.length };
   }, LOCKING_TRANSACTION);
 }
+
+const capitalized = (text: string) =>
+  text.charAt(0).toUpperCase() + text.slice(1);

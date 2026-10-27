@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  updateSalesSettingsAction: {
+    input: "modo de IVA (incluido o sumado) y tasa",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo el titular (assertOwnerAction) y solo para su empresa",
+    coveredBy: "tests/sales/settings.int.test.ts",
+  },
   setSalePricesAction: {
     input: "id de producto y precio de la unidad y de cada presentación",
     identity:

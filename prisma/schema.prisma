@@ -140,6 +140,7 @@ model Organization {
   stockMinimums           StockMinimum[]
   productCosts            ProductCost[]
   salePrices              SalePrice[]
+  salesSettings           SalesSettings?
   stockCounts             StockCount[]
   stockCountLines         StockCountLine[]
   stockCountCaptures      StockCountCapture[]
@@ -1825,4 +1826,20 @@ model SalePrice {
   @@unique([organizationId, id])
   @@unique([organizationId, productId, presentationId])
   @@map("sale_price")
+}
+
+/// How a company sells (VEN-04, ADR 0030): one row, only once the titular
+/// changes something; without it, VAT 16 % included.
+model SalesSettings {
+  id               String       @id @db.Char(36)
+  organizationId   String       @unique @db.Char(36)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  pricesIncludeTax Boolean      @default(true)
+  /// Percent, 0 to 100.
+  taxRate          Decimal      @default(16) @db.Decimal(5, 2)
+  updatedByUserId  String       @db.Char(36)
+  updatedAt        DateTime     @updatedAt @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@map("sales_settings")
 }

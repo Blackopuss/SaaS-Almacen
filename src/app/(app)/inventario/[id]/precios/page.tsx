@@ -67,7 +67,14 @@ export default async function PreciosPage({
   return (
     <PageContainer>
       {back}
-      <PageHeader title="Cambiar precios" description={product.name} />
+      <PageHeader
+        title="Cambiar precios"
+        description={`${product.name} · ${
+          prices.pricesIncludeTax
+            ? "con IVA incluido"
+            : "sin IVA: se suma al cobrar"
+        }`}
+      />
       <PricesForm
         productId={product.id}
         rows={prices.rows.map((row) => ({

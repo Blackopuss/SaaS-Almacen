@@ -93,9 +93,16 @@ describe("sale prices", () => {
     expect(prices?.rows[1]).toMatchObject({ price: null, sellsAt: "$750.00" });
 
     const trail = await listAuditTrail(actor.organizationId, { limit: 10 });
-    expect(
-      trail.filter((entry) => entry.action === "sales.prices_changed"),
-    ).toHaveLength(3);
+    const changes = trail.filter(
+      (entry) => entry.action === "sales.prices_changed",
+    );
+    expect(changes).toHaveLength(3);
+    // Newest first, with names people know, never ids.
+    expect(changes.map((entry) => entry.facts)).toEqual([
+      ["Clave: T-1", "Cambió: Caja: sin precio"],
+      ["Clave: T-1", "Cambió: Caja: $500.00"],
+      ["Clave: T-1", "Cambió: Pieza: $1.50"],
+    ]);
   });
 
   it("the cashier reads prices without margin and cannot change them", async () => {

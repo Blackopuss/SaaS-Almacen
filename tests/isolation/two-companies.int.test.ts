@@ -248,6 +248,14 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.salesSettings.create({
+      data: {
+        id: newId(),
+        organizationId,
+        pricesIncludeTax: organizationId === orgA,
+        updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const storedFileId = newId();
     await db.storedFile.create({
       data: {

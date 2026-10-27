@@ -5,7 +5,7 @@
 // cleaned afterwards — important now that several tables are append-only.
 //
 // Usage (with `npm run dev:test` running on http://localhost:3100):
-//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator|cashier|cash_manager]
+//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator|cashier|cash_manager|titular]
 // Prints the email to sign in with.
 import { existsSync } from "node:fs";
 
@@ -65,14 +65,19 @@ const membershipId = newId();
 await db.membership.create({
   data: { id: membershipId, organizationId, userId },
 });
-await db.membershipRole.create({
-  data: {
-    id: newId(),
-    organizationId,
-    membershipId,
-    role: process.argv[3] ?? "warehouse",
-  },
-});
+const role = process.argv[3] ?? "warehouse";
+if (role === "titular") {
+  // The account is the titular itself (no role), to check what only the
+  // titular sees.
+  await db.organization.update({
+    where: { id: organizationId },
+    data: { ownerUserId: userId },
+  });
+} else {
+  await db.membershipRole.create({
+    data: { id: newId(), organizationId, membershipId, role },
+  });
+}
 for (const grant of [
   { kind: "MODULE" as const, key: "inventory", value: null },
   { kind: "MODULE" as const, key: "purchasing", value: null },
