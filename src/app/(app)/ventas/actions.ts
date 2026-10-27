@@ -172,7 +172,12 @@ export type SaleFormState = {
   discountError?: string;
   formError?: string;
   /** The sale just charged; the screen shows it and starts a new one. */
-  done?: { number: number; total: string; change: string | null };
+  done?: {
+    saleId: string;
+    number: number;
+    total: string;
+    change: string | null;
+  };
   /** Key for the next sale (INV-21), created here after a success. */
   nextKey?: string;
 };
@@ -232,7 +237,12 @@ export async function registerSaleAction(
   return {
     lineErrors: {},
     paymentErrors: {},
-    done: { number: result.number, total: result.total, change: result.change },
+    done: {
+      saleId: result.saleId,
+      number: result.number,
+      total: result.total,
+      change: result.change,
+    },
     nextKey: newId(),
   };
 }
@@ -240,11 +250,10 @@ export async function registerSaleAction(
 /** After a lost answer: whether this person's sale with that key exists. */
 export async function checkSaleAction(
   key: string,
-): Promise<{ number: number } | null> {
+): Promise<{ saleId: string; number: number } | null> {
   const actor = await seller();
   if (!actor) return null;
-  const sale = await findSaleByKey(actor, String(key ?? ""));
-  return sale ? { number: sale.number } : null;
+  return findSaleByKey(actor, String(key ?? ""));
 }
 
 async function customerActor(

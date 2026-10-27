@@ -9,6 +9,7 @@ import {
   Trash2,
   WifiOff,
 } from "lucide-react";
+import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -318,14 +319,17 @@ export function SaleForm({
   }, [payload, paymentsPayload, sentDiscount]);
 
   /** After a lost answer: did this sale get registered? (INV-22) */
-  async function findOut(): Promise<number | null> {
+  async function findOut(): Promise<{
+    saleId: string;
+    number: number;
+  } | null> {
     setLost("checking");
     for (const wait of [0, 1500, 3000, 6000]) {
       if (wait > 0) await new Promise((done) => setTimeout(done, wait));
       try {
         const sale = await checkSaleAction(key);
         setLost(null);
-        return sale ? sale.number : null;
+        return sale;
       } catch {
         // Still unreachable: wait and ask again.
       }
@@ -357,10 +361,10 @@ export function SaleForm({
         next = await registerSaleAction(prev, formData);
       } catch (error) {
         unstable_rethrow(error);
-        const number = await findOut();
-        if (number !== null) {
+        const found = await findOut();
+        if (found !== null) {
           // It was charged: the answer got lost on the way back.
-          setCharged({ number, total: "", change: null });
+          setCharged({ ...found, total: "", change: null });
           startNext(undefined);
           return {
             ...EMPTY,
@@ -442,13 +446,18 @@ export function SaleForm({
                 </span>
               )}
             </p>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setCharged(null)}
-            >
-              Cerrar
-            </Button>
+            <div className="flex flex-wrap justify-end gap-1">
+              <Button asChild variant="outline">
+                <Link href={`/ventas/${charged.saleId}`}>Ver ticket</Link>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setCharged(null)}
+              >
+                Cerrar
+              </Button>
+            </div>
           </div>
         )}
         <section aria-labelledby="agregar-producto" className="space-y-2">

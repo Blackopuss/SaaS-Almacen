@@ -72,7 +72,7 @@ export function AppShell({
         Saltar al contenido
       </a>
 
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r bg-sidebar md:flex print:hidden">
         <Brand />
         <div className="-mt-2 px-3 pb-2">{switcher}</div>
         <nav aria-label="Principal" className="flex-1 px-3 pb-4">
@@ -93,7 +93,7 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md md:hidden print:hidden">
           <Warehouse aria-hidden="true" className="size-5 text-primary" />
           <span className="font-semibold">{current?.label ?? "Almacén"}</span>
           <ThemeToggle className="ml-auto" />
@@ -102,7 +102,7 @@ export function AppShell({
         <main
           id="contenido"
           tabIndex={-1}
-          className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
+          className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none md:pb-0 print:pb-0"
         >
           {children}
         </main>
@@ -110,7 +110,7 @@ export function AppShell({
 
       <nav
         aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden print:hidden"
       >
         <ul className="grid grid-cols-5">
           {primary.map((item) => (

@@ -53,3 +53,5 @@ export type {
   AuthorizeDiscountResult,
   DiscountAuthorizer,
 } from "./discount-authorization";
+export { getPublicTicket, getSaleTicket, ticketPath } from "./ticket";
+export type { Ticket } from "./ticket";
