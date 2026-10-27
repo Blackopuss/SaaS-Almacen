@@ -14,6 +14,8 @@ import { Decimal, dec, type DecimalInput } from "@/lib";
  * - An exit takes quantity × price out of the value and never moves the
  *   price. When nothing is left, the value goes to zero (the rounding
  *   residue disappears) and the price stays for the next entry.
+ * - A return to the supplier (or the reversal of an entry) leaves at the
+ *   cost it came in with (`valueExitAt`), so the price of what stays moves.
  *
  * Every amount is before taxes, per unit of the product, with six decimals.
  */
@@ -103,6 +105,44 @@ export function valueExit(
   return {
     state: { averageCost: state.averageCost, stockValue },
     unitCost: state.averageCost,
+  };
+}
+
+/**
+ * An exit at the cost something entered with, not at the average: a return
+ * to the supplier or the reversal of an entry takes back exactly what that
+ * entry added, so the average of what stays can move. Without a cost (or
+ * with no known cost yet) it is an ordinary exit.
+ */
+export function valueExitAt(
+  state: CostState | null,
+  onHand: DecimalInput,
+  quantity: DecimalInput,
+  unitCost: DecimalInput | null,
+): Valued {
+  if (unitCost === null || !state) return valueExit(state, onHand, quantity);
+  const before = dec(onHand);
+  const taken = dec(quantity);
+  assertMovement(before, taken);
+  if (taken.greaterThan(before)) {
+    throw new RangeError("An exit cannot take more than the stock.");
+  }
+  const cost = round(dec(unitCost));
+  if (cost.isNegative()) throw new RangeError("A cost cannot be negative.");
+  const left = before.minus(taken);
+  if (left.isZero()) {
+    return {
+      state: { averageCost: state.averageCost, stockValue: new Decimal(0) },
+      unitCost: cost,
+    };
+  }
+  const stockValue = Decimal.max(
+    0,
+    round(state.stockValue.minus(taken.times(cost))),
+  );
+  return {
+    state: { averageCost: round(stockValue.dividedBy(left)), stockValue },
+    unitCost: cost,
   };
 }
 

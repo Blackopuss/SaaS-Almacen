@@ -357,6 +357,8 @@ export async function receivePurchaseOrder(
                   presentationId: line.presentationId,
                 }
               : { kind: "base", quantity: quantity.toString() }) as Capture,
+            // VAL-02: values the inventory whoever receives.
+            unitCost: line.unitCost,
           })),
           reference: data.reference
             ? `${numberText} · ${data.reference}`

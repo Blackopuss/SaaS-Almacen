@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { dec } from "@/lib";
 
-import { valueEntry, valueExit, type CostState } from "./average-cost";
+import {
+  valueEntry,
+  valueExit,
+  valueExitAt,
+  type CostState,
+} from "./average-cost";
 
 // VAL-01 (ADR 0031): moving average price, kept as value + price.
 
@@ -102,5 +107,42 @@ describe("exits", () => {
       unitCost: null,
     });
     expect(() => valueExit(state("1", "5"), "5", "6")).toThrow(RangeError);
+  });
+});
+
+describe("exits at the cost they came in with", () => {
+  it("a return of the $95 entry leaves the $85 ones", () => {
+    // 10 at $85 + 10 at $95 = $1,800; give back the 10 at $95.
+    expect(plain(valueExitAt(state("90", "1800"), "20", "10", "95"))).toEqual({
+      averageCost: "85.000000",
+      stockValue: "850.000000",
+      unitCost: "95.000000",
+    });
+  });
+
+  it("returning everything leaves no value and keeps the price", () => {
+    expect(plain(valueExitAt(state("90", "1800"), "20", "20", "95"))).toEqual({
+      averageCost: "90.000000",
+      stockValue: "0.000000",
+      unitCost: "95.000000",
+    });
+  });
+
+  it("without a cost it is an ordinary exit", () => {
+    expect(plain(valueExitAt(state("90", "1800"), "20", "5", null))).toEqual({
+      averageCost: "90.000000",
+      stockValue: "1350.000000",
+      unitCost: "90.000000",
+    });
+    expect(plain(valueExitAt(null, "20", "5", "95")).unitCost).toBeNull();
+  });
+
+  it("never leaves a negative value", () => {
+    // The average fell after the entry; taking it back at $95 would go below zero.
+    expect(plain(valueExitAt(state("10", "100"), "10", "5", "95"))).toEqual({
+      averageCost: "0.000000",
+      stockValue: "0.000000",
+      unitCost: "95.000000",
+    });
   });
 });

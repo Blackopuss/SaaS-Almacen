@@ -5,6 +5,7 @@ import { resolveConversion, type Capture } from "@/platform/catalog";
 import { lockRows, type TenantDb } from "@/server";
 
 import { MAX_BALANCE, formatStock, type InventoryActor } from "./movements";
+import { costPerUnit, lineCost, openCostBook } from "./valuation";
 
 type Tx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 type Decimal = ReturnType<typeof dec>;
@@ -20,12 +21,25 @@ type Decimal = ReturnType<typeof dec>;
  * Like every movement, it takes the locks of its products and then of the
  * location (the caller may have taken them already: taking them again is
  * harmless) and converts each capture with the content in force now.
+ *
+ * Each line comes in at its cost (VAL-02, ADR 0031): the cost of one
+ * captured unit (one box, from the order line) ÷ the factor in force, and
+ * moves the product's average cost. The inventory is valued whoever
+ * receives: the cost was set by whoever could record it on the order.
  */
 export type ReceiptEntryInput = {
   /** Where it is put; null = the default location, «General». */
   locationId: string | null;
-  /** A line may go somewhere else than the rest (CMP-09). */
-  lines: { productId: string; capture: Capture; locationId?: string | null }[];
+  /**
+   * A line may go somewhere else than the rest (CMP-09). `unitCost`: cost
+   * of one captured unit (one box) before taxes; null when unknown.
+   */
+  lines: {
+    productId: string;
+    capture: Capture;
+    locationId?: string | null;
+    unitCost?: { toString(): string } | null;
+  }[];
   /** «OC-0007 · Remisión 4411»: what people see in the history. */
   reference: string | null;
   reason: string | null;
@@ -42,6 +56,8 @@ export type ReceiptEntryLine = {
   presentationVersionId: string | null;
   factor: Decimal;
   baseQuantity: Decimal;
+  /** Cost of one unit of the product it came in at (VAL-02); null if unknown. */
+  unitCost: Decimal | null;
   /** «3 cajas × 100 = 300 piezas», or «25 piezas». */
   text: string;
 };
@@ -163,6 +179,7 @@ export async function postReceiptEntry(
       presentationVersionId: conversion.presentation?.versionId ?? null,
       factor: conversion.factor,
       baseQuantity: base,
+      unitCost: costPerUnit(line.unitCost?.toString(), conversion.factor),
       text: conversion.presentation
         ? conversion.preview
         : formatStock(base.toString(), resolved.product.unitCode),
@@ -193,6 +210,20 @@ export async function postReceiptEntry(
     }
   }
 
+  // Read before any balance changes: the stock all locations had.
+  const costs = await openCostBook(
+    tx,
+    organizationId,
+    lines.map((line) => line.productId),
+  );
+  for (const line of lines) {
+    line.unitCost = costs.entry(
+      line.productId,
+      line.baseQuantity,
+      line.unitCost,
+    );
+  }
+
   const movementId = newId();
   await tx.stockMovement.create({
     data: {
@@ -219,8 +250,10 @@ export async function postReceiptEntry(
       factor: line.factor.toString(),
       baseQuantity: line.baseQuantity.toString(),
       unitCode: line.unitCode,
+      unitCost: lineCost(line.unitCost),
     })),
   });
+  await costs.save();
   for (const [slot, quantity] of added) {
     const row = current.get(slot);
     const [productId, locationId] = slot.split(" ") as [string, string];
