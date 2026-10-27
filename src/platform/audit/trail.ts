@@ -51,6 +51,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "sales.cash_closed": "Hizo el corte de una caja",
   "sales.returned": "Registró una devolución de venta",
   "sales.cancelled": "Canceló una venta",
+  "sales.report_exported": "Exportó un reporte de ventas a un archivo",
   "sales.settings_changed": "Cambió el IVA de sus ventas",
   "purchase_order.delivery_requested":
     "Pidió enviar una orden de compra por correo",

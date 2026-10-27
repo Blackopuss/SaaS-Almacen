@@ -26,6 +26,7 @@ const PROTECTED = [
   "/api/importaciones",
   "/api/exportaciones",
   "/api/compras",
+  "/api/ventas",
 ];
 
 /** The site people open: BETTER_AUTH_URL (required in production). */

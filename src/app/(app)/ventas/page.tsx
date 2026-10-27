@@ -1,4 +1,4 @@
-import { History, Wallet } from "lucide-react";
+import { FileBarChart, History, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -76,6 +76,12 @@ export default async function VentasPage() {
         <History aria-hidden="true" className="size-4" />
         Historial de ventas
       </Link>
+      {access.allows("sales.report.read") && (
+        <Link href="/ventas/reportes" className={linkClass}>
+          <FileBarChart aria-hidden="true" className="size-4" />
+          Reportes de ventas
+        </Link>
+      )}
     </div>
   );
   // VEN-16: nobody charges without their register open.

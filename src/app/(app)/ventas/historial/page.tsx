@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  FileBarChart,
   Filter,
   Receipt,
   Search,
@@ -106,6 +107,17 @@ export default async function HistorialVentasPage({
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Ventas" />}
       <PageHeader title="Historial de ventas" />
+      {access.allows("sales.report.read") && (
+        <p className="-mt-2 flex flex-wrap gap-x-6">
+          <Link
+            href="/ventas/reportes"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <FileBarChart aria-hidden="true" className="size-4" />
+            Reportes de ventas
+          </Link>
+        </p>
+      )}
       {(history.total > 0 || narrowed) && (
         <Form
           action="/ventas/historial"

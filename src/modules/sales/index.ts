@@ -83,3 +83,17 @@ export type {
 } from "./returns";
 export { SALE_PAGE_SIZE, listSaleCashiers, listSales } from "./history";
 export type { SaleFilters, SalePage, SaleSummary } from "./history";
+export {
+  SALES_REPORT_KINDS,
+  SALES_REPORT_MAX,
+  buildSalesReport,
+  getSalesReport,
+  isSalesReportKind,
+} from "./reports";
+export type {
+  ProductReportRow,
+  SalesReport,
+  SalesReportFile,
+  SalesReportKind,
+  SalesReportRow,
+} from "./reports";
