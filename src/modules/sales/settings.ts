@@ -6,6 +6,14 @@ import { assertOwnerAction } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
 import { forOrganization, type TenantDb } from "@/server";
 
+import {
+  DEFAULT_DISCOUNT_CAPS,
+  DISCOUNT_CAP_ROLES,
+  PERCENT_ERROR,
+  formatPercent,
+  parsePercent,
+  type DiscountCaps,
+} from "./discounts";
 import type { SalesActor } from "./prices";
 import {
   DEFAULT_TAX_RULE,
@@ -16,8 +24,9 @@ import {
 } from "./tax";
 
 /**
- * How a company sells (VEN-04, ADR 0030): whether its prices include VAT
- * and at what rate. Only the titular changes it; every sale reads it.
+ * How a company sells (VEN-04, VEN-14, ADR 0030): whether its prices
+ * include VAT and at what rate, and the largest discount each role gives
+ * without asking. Only the titular changes it; every sale reads it.
  */
 
 /** The company client or a transaction of it. */
@@ -40,13 +49,41 @@ export async function readTaxRule(
     : DEFAULT_TAX_RULE;
 }
 
+/** The discount cap of each role, in a sale's transaction or outside. */
+export async function readDiscountCaps(
+  client: Client,
+  organizationId: string,
+): Promise<DiscountCaps> {
+  const row = await client.salesSettings.findFirst({
+    where: { organizationId },
+    select: {
+      discountCapCashier: true,
+      discountCapCashManager: true,
+      discountCapAdministrator: true,
+    },
+  });
+  return row
+    ? {
+        cashier: row.discountCapCashier.toFixed(2),
+        cash_manager: row.discountCapCashManager.toFixed(2),
+        administrator: row.discountCapAdministrator.toFixed(2),
+      }
+    : DEFAULT_DISCOUNT_CAPS;
+}
+
+export type SalesSettings = TaxRule & { caps: DiscountCaps };
+
 /** The settings, for the titular's screen. */
-export async function getSalesSettings(actor: SalesActor): Promise<TaxRule> {
+export async function getSalesSettings(
+  actor: SalesActor,
+): Promise<SalesSettings> {
   await assertSettingsOwner(actor);
-  return readTaxRule(
-    forOrganization(actor.organizationId),
-    actor.organizationId,
-  );
+  const client = forOrganization(actor.organizationId);
+  const [rule, caps] = await Promise.all([
+    readTaxRule(client, actor.organizationId),
+    readDiscountCaps(client, actor.organizationId),
+  ]);
+  return { ...rule, caps };
 }
 
 export type SalesSettingsInput = {
@@ -54,14 +91,19 @@ export type SalesSettingsInput = {
   taxMode: string;
   /** As typed: «16». */
   taxRate: string;
+  /** Discount caps by role, as typed; absent = unchanged. */
+  caps?: Partial<Record<keyof DiscountCaps, string>>;
 };
+
+export type SalesSettingsField =
+  "taxMode" | "taxRate" | `cap.${keyof DiscountCaps}`;
 
 export type SalesSettingsResult =
   | { ok: true; changed: boolean }
   | {
       ok: false;
       reason: "invalid";
-      fieldErrors: Partial<Record<"taxMode" | "taxRate", string>>;
+      fieldErrors: Partial<Record<SalesSettingsField, string>>;
     };
 
 export async function updateSalesSettings(
@@ -69,39 +111,49 @@ export async function updateSalesSettings(
   input: SalesSettingsInput,
 ): Promise<SalesSettingsResult> {
   await assertSettingsOwner(actor);
-  const fieldErrors: Partial<Record<"taxMode" | "taxRate", string>> = {};
+  const fieldErrors: Partial<Record<SalesSettingsField, string>> = {};
   const mode = String(input.taxMode ?? "");
   if (mode !== "included" && mode !== "added") {
     fieldErrors.taxMode = "Elige si tus precios ya incluyen IVA o no.";
   }
   const rate = parseTaxRate(String(input.taxRate ?? "").slice(0, 16));
   if (rate === null) fieldErrors.taxRate = TAX_RATE_ERROR;
+  const typedCaps: Partial<DiscountCaps> = {};
+  for (const role of DISCOUNT_CAP_ROLES) {
+    const typed = input.caps?.[role];
+    if (typed === undefined) continue;
+    const cap = parsePercent(String(typed).slice(0, 16));
+    if (cap === null) fieldErrors[`cap.${role}`] = PERCENT_ERROR;
+    else typedCaps[role] = cap;
+  }
   if (rate === null || Object.keys(fieldErrors).length > 0) {
     return { ok: false, reason: "invalid", fieldErrors };
   }
-  const wanted: TaxRule = { pricesIncludeTax: mode === "included", rate };
+  const wantedRule: TaxRule = { pricesIncludeTax: mode === "included", rate };
 
   const save = () =>
     forOrganization(actor.organizationId).$transaction(async (tx) => {
       const current = await tx.salesSettings.findFirst({
         where: { organizationId: actor.organizationId },
-        select: { id: true, pricesIncludeTax: true, taxRate: true },
+        select: { id: true },
       });
-      const before = current
-        ? {
-            pricesIncludeTax: current.pricesIncludeTax,
-            rate: current.taxRate.toFixed(2),
-          }
-        : DEFAULT_TAX_RULE;
-      if (
-        before.pricesIncludeTax === wanted.pricesIncludeTax &&
-        before.rate === wanted.rate
-      ) {
+      const before: Settings = {
+        ...(await readTaxRule(tx, actor.organizationId)),
+        caps: await readDiscountCaps(tx, actor.organizationId),
+      };
+      const wanted: Settings = {
+        ...wantedRule,
+        caps: { ...before.caps, ...typedCaps },
+      };
+      if (describe(before) === describe(wanted)) {
         return { ok: true as const, changed: false };
       }
       const data = {
         pricesIncludeTax: wanted.pricesIncludeTax,
         taxRate: wanted.rate,
+        discountCapCashier: wanted.caps.cashier,
+        discountCapCashManager: wanted.caps.cash_manager,
+        discountCapAdministrator: wanted.caps.administrator,
         updatedByUserId: actor.userId,
       };
       if (current) {
@@ -137,8 +189,11 @@ export async function updateSalesSettings(
   }
 }
 
-const describe = (rule: TaxRule) =>
-  `IVA ${formatTaxRate(rule.rate)} ${rule.pricesIncludeTax ? "incluido" : "sumado"}`;
+type Settings = TaxRule & { caps: DiscountCaps };
+
+/** «IVA 16 % incluido · descuentos: Cajero 5 %, …», for the audit trail. */
+const describe = (settings: Settings) =>
+  `IVA ${formatTaxRate(settings.rate)} ${settings.pricesIncludeTax ? "incluido" : "sumado"} · descuentos: Cajero ${formatPercent(settings.caps.cashier)}, Encargado de caja ${formatPercent(settings.caps.cash_manager)}, Administrador ${formatPercent(settings.caps.administrator)}`;
 
 async function assertSettingsOwner(actor: SalesActor) {
   await assertOwnerAction(

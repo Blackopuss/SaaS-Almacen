@@ -46,6 +46,14 @@ export const RULES = {
   },
   // Invitation links opened or answered from one IP (USR-05).
   inviteTokenIp: { max: 30, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  // Passwords typed at the counter to allow a discount (VEN-14), per
+  // supervisor and per connection.
+  discountAuthorizer: { max: 5, windowSeconds: 15 * 60, blockSeconds: 15 * 60 },
+  discountAuthorizeIp: {
+    max: 20,
+    windowSeconds: 15 * 60,
+    blockSeconds: 15 * 60,
+  },
 } as const satisfies Record<string, ThrottleRule>;
 
 export type ThrottleKey = { key: string; rule: ThrottleRule };
@@ -101,6 +109,14 @@ export const throttleKeys = {
   inviteTokenIp: (ip: string): ThrottleKey => ({
     key: `invite:token:ip:${ip}`,
     rule: RULES.inviteTokenIp,
+  }),
+  discountAuthorizer: (userId: string): ThrottleKey => ({
+    key: `discount:authorizer:${userId}`,
+    rule: RULES.discountAuthorizer,
+  }),
+  discountAuthorizeIp: (ip: string): ThrottleKey => ({
+    key: `discount:ip:${ip}`,
+    rule: RULES.discountAuthorizeIp,
   }),
   totpUsed: (userId: string, code: string): ThrottleKey => ({
     key: `mfa:used:${userId}:${hash(code)}`,

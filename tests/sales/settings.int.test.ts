@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { ForbiddenError } from "@/lib";
 import {
+  DEFAULT_DISCOUNT_CAPS,
   getSalePrices,
   getSalesSettings,
   updateSalesSettings,
@@ -25,12 +26,13 @@ describe("sales settings", () => {
     expect(await getSalesSettings(actor)).toEqual({
       pricesIncludeTax: true,
       rate: "16.00",
+      caps: DEFAULT_DISCOUNT_CAPS,
     });
 
     expect(
       await updateSalesSettings(actor, { taxMode: "added", taxRate: "8" }),
     ).toEqual({ ok: true, changed: true });
-    expect(await getSalesSettings(actor)).toEqual({
+    expect(await getSalesSettings(actor)).toMatchObject({
       pricesIncludeTax: false,
       rate: "8.00",
     });
@@ -45,8 +47,8 @@ describe("sales settings", () => {
     );
     expect(changes).toHaveLength(1);
     expect(changes[0]?.facts).toEqual([
-      "Antes: IVA 16 % incluido",
-      "Ahora: IVA 8 % sumado",
+      "Antes: IVA 16 % incluido · descuentos: Cajero 5 %, Encargado de caja 20 %, Administrador 100 %",
+      "Ahora: IVA 8 % sumado · descuentos: Cajero 5 %, Encargado de caja 20 %, Administrador 100 %",
     ]);
   });
 
@@ -103,6 +105,7 @@ describe("sales settings", () => {
     expect(await getSalesSettings(actor)).toEqual({
       pricesIncludeTax: true,
       rate: "16.00",
+      caps: DEFAULT_DISCOUNT_CAPS,
     });
   });
 

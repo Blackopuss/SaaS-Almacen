@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 import { isAppError, newId } from "@/lib";
 import {
   SALE_MAX_LINES,
   SALE_MAX_PAYMENTS,
+  authorizeDiscount,
   findSaleByKey,
   findSaleProducts,
   getSaleProduct,
@@ -15,6 +17,7 @@ import {
   type SaleProduct,
   type SaleSearch,
 } from "@/modules/sales";
+import { clientIp } from "@/platform/auth";
 import { getModuleAccess } from "@/platform/billing";
 import {
   createCustomer,
@@ -95,19 +98,78 @@ function readPaymentFields(payments: unknown) {
 export async function quoteSaleAction(
   lines: unknown,
   payments?: unknown,
+  discountPercent?: unknown,
 ): Promise<CartQuote | { error: string }> {
   const actor = await seller();
   if (!actor) return { error: NOT_ALLOWED };
   return quoteSale(actor, {
     lines: readLines(lines).slice(0, SALE_MAX_LINES),
     payments: readPaymentFields(payments),
+    discountPercent:
+      typeof discountPercent === "string" ? discountPercent.slice(0, 16) : "",
   });
+}
+
+export type DiscountAuthorizationState =
+  | { status: "idle" }
+  | {
+      status: "allowed";
+      authorizationId: string;
+      summary: string;
+      percent: string;
+    }
+  | {
+      status: "refused";
+      fieldErrors: Partial<
+        Record<"authorizer" | "password" | "percent" | "reason", string>
+      >;
+      formError?: string;
+    };
+
+/**
+ * A supervisor allows, at the counter and with their password, a discount
+ * above the cashier's cap (VEN-14). The cashier comes from the session;
+ * the supervisor is checked against the company's members, and attempts
+ * are limited per supervisor and connection.
+ */
+export async function authorizeDiscountAction(input: {
+  authorizerUserId: string;
+  password: string;
+  percent: string;
+  reason: string;
+}): Promise<DiscountAuthorizationState> {
+  const actor = await seller();
+  if (!actor) {
+    return { status: "refused", fieldErrors: {}, formError: NOT_ALLOWED };
+  }
+  const text = (value: unknown, max: number) =>
+    typeof value === "string" ? value.slice(0, max) : "";
+  const result = await authorizeDiscount(actor, {
+    authorizerUserId: text(input?.authorizerUserId, 36),
+    password: text(input?.password, 1024),
+    percent: text(input?.percent, 16),
+    reason: text(input?.reason, 300),
+    ip: clientIp(await headers()),
+  });
+  return result.ok
+    ? {
+        status: "allowed",
+        authorizationId: result.authorizationId,
+        summary: result.summary,
+        percent: result.percent,
+      }
+    : {
+        status: "refused",
+        fieldErrors: result.fieldErrors,
+        formError: result.formError,
+      };
 }
 
 export type SaleFormState = {
   lineErrors: Record<number, string>;
   paymentErrors: Record<number, string>;
   customerError?: string;
+  discountError?: string;
   formError?: string;
   /** The sale just charged; the screen shows it and starts a new one. */
   done?: { number: number; total: string; change: string | null };
@@ -140,6 +202,13 @@ export async function registerSaleAction(
         lines: readLines(json("lines")),
         payments: readPaymentFields(json("payments")),
         customerId: String(formData.get("customerId") ?? "").slice(0, 36),
+        discount: {
+          percent: String(formData.get("discountPercent") ?? "").slice(0, 16),
+          reason: String(formData.get("discountReason") ?? "").slice(0, 300),
+          authorizationId: String(
+            formData.get("discountAuthorizationId") ?? "",
+          ).slice(0, 36),
+        },
         idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
       },
     );
@@ -154,6 +223,7 @@ export async function registerSaleAction(
       lineErrors: result.lineErrors,
       paymentErrors: result.paymentErrors,
       customerError: result.customerError,
+      discountError: result.discountError,
       formError: result.formError,
     };
   }

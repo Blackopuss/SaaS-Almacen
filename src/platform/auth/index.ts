@@ -24,6 +24,7 @@ export type {
 export { disableMfa, regenerateBackupCodes } from "./mfa-recovery";
 export { BACKUP_CODE_COUNT, normalizeBackupCode } from "./backup-codes";
 export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
+export { verifyAccountPassword } from "./account-password";
 export { requestPasswordReset, resetPassword } from "./recovery";
 export type {
   PasswordResetRequestResult,

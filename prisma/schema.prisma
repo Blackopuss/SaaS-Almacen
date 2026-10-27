@@ -108,63 +108,64 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id                      String                  @id @db.Char(36)
-  name                    String                  @db.VarChar(120)
-  timeZone                String                  @default("America/Mexico_City") @db.VarChar(64)
-  currency                String                  @default("MXN") @db.Char(3)
+  id                         String                      @id @db.Char(36)
+  name                       String                      @db.VarChar(120)
+  timeZone                   String                      @default("America/Mexico_City") @db.VarChar(64)
+  currency                   String                      @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId             String                  @db.Char(36)
-  owner                   User                    @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt               DateTime                @default(now()) @db.DateTime(3)
-  updatedAt               DateTime                @updatedAt @db.DateTime(3)
-  memberships             Membership[]
-  memberRoles             MembershipRole[]
-  sessions                Session[]
-  auditEvents             AuditEvent[]
-  ownershipTransfers      OwnershipTransfer[]
-  invitations             Invitation[]
-  subscriptions           Subscription[]
-  subscriptionItems       SubscriptionItem[]
-  entitlements            Entitlement[]
-  quotaUsages             QuotaUsage[]
-  products                Product[]
-  productCategories       ProductCategory[]
-  productBrands           ProductBrand[]
-  productPresentations    ProductPresentation[]
-  presentationVersions    PresentationVersion[]
-  facilities              Facility[]
-  locations               Location[]
-  stockMovements          StockMovement[]
-  stockMovementLines      StockMovementLine[]
-  stockBalances           StockBalance[]
-  stockMinimums           StockMinimum[]
-  productCosts            ProductCost[]
-  salePrices              SalePrice[]
-  salesSettings           SalesSettings?
-  stockCounts             StockCount[]
-  stockCountLines         StockCountLine[]
-  stockCountCaptures      StockCountCapture[]
-  jobs                    Job[]
-  storedFiles             StoredFile[]
-  productImports          ProductImport[]
-  productImportItems      ProductImportItem[]
-  exitImports             ExitImport[]
-  exitImportRows          ExitImportRow[]
-  contacts                Contact[]
-  productSuppliers        ProductSupplier[]
-  purchaseOrders          PurchaseOrder[]
-  purchaseOrderLines      PurchaseOrderLine[]
-  purchaseOrderDeliveries PurchaseOrderDelivery[]
-  purchaseReceipts        PurchaseReceipt[]
-  purchaseReceiptLines    PurchaseReceiptLine[]
-  purchaseReturns         PurchaseReturn[]
-  purchaseReturnLines     PurchaseReturnLine[]
-  manualPayments          ManualPayment[]
-  checkoutOrders          CheckoutOrder[]
-  supportAccesses         SupportAccess[]
-  sales                   Sale[]
-  saleLines               SaleLine[]
-  salePayments            SalePayment[]
+  ownerUserId                String                      @db.Char(36)
+  owner                      User                        @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt                  DateTime                    @default(now()) @db.DateTime(3)
+  updatedAt                  DateTime                    @updatedAt @db.DateTime(3)
+  memberships                Membership[]
+  memberRoles                MembershipRole[]
+  sessions                   Session[]
+  auditEvents                AuditEvent[]
+  ownershipTransfers         OwnershipTransfer[]
+  invitations                Invitation[]
+  subscriptions              Subscription[]
+  subscriptionItems          SubscriptionItem[]
+  entitlements               Entitlement[]
+  quotaUsages                QuotaUsage[]
+  products                   Product[]
+  productCategories          ProductCategory[]
+  productBrands              ProductBrand[]
+  productPresentations       ProductPresentation[]
+  presentationVersions       PresentationVersion[]
+  facilities                 Facility[]
+  locations                  Location[]
+  stockMovements             StockMovement[]
+  stockMovementLines         StockMovementLine[]
+  stockBalances              StockBalance[]
+  stockMinimums              StockMinimum[]
+  productCosts               ProductCost[]
+  salePrices                 SalePrice[]
+  salesSettings              SalesSettings?
+  stockCounts                StockCount[]
+  stockCountLines            StockCountLine[]
+  stockCountCaptures         StockCountCapture[]
+  jobs                       Job[]
+  storedFiles                StoredFile[]
+  productImports             ProductImport[]
+  productImportItems         ProductImportItem[]
+  exitImports                ExitImport[]
+  exitImportRows             ExitImportRow[]
+  contacts                   Contact[]
+  productSuppliers           ProductSupplier[]
+  purchaseOrders             PurchaseOrder[]
+  purchaseOrderLines         PurchaseOrderLine[]
+  purchaseOrderDeliveries    PurchaseOrderDelivery[]
+  purchaseReceipts           PurchaseReceipt[]
+  purchaseReceiptLines       PurchaseReceiptLine[]
+  purchaseReturns            PurchaseReturn[]
+  purchaseReturnLines        PurchaseReturnLine[]
+  manualPayments             ManualPayment[]
+  checkoutOrders             CheckoutOrder[]
+  supportAccesses            SupportAccess[]
+  sales                      Sale[]
+  saleLines                  SaleLine[]
+  salePayments               SalePayment[]
+  saleDiscountAuthorizations SaleDiscountAuthorization[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1842,14 +1843,19 @@ model SalePrice {
 /// How a company sells (VEN-04, ADR 0030): one row, only once the titular
 /// changes something; without it, VAT 16 % included.
 model SalesSettings {
-  id               String       @id @db.Char(36)
-  organizationId   String       @unique @db.Char(36)
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  pricesIncludeTax Boolean      @default(true)
+  id                       String       @id @db.Char(36)
+  organizationId           String       @unique @db.Char(36)
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  pricesIncludeTax         Boolean      @default(true)
   /// Percent, 0 to 100.
-  taxRate          Decimal      @default(16) @db.Decimal(5, 2)
-  updatedByUserId  String       @db.Char(36)
-  updatedAt        DateTime     @updatedAt @db.DateTime(3)
+  taxRate                  Decimal      @default(16) @db.Decimal(5, 2)
+  /// Largest discount, in percent, each role gives without asking (VEN-14).
+  /// The titular has no cap.
+  discountCapCashier       Decimal      @default(5) @db.Decimal(5, 2)
+  discountCapCashManager   Decimal      @default(20) @db.Decimal(5, 2)
+  discountCapAdministrator Decimal      @default(100) @db.Decimal(5, 2)
+  updatedByUserId          String       @db.Char(36)
+  updatedAt                DateTime     @updatedAt @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@map("sales_settings")
@@ -1875,40 +1881,47 @@ enum SalePaymentMethod {
 ///
 ///   subtotal + tax = total   (CHECK, exact decimals)
 model Sale {
-  id                String        @id @db.Char(36)
-  organizationId    String        @db.Char(36)
-  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                      String                     @id @db.Char(36)
+  organizationId          String                     @db.Char(36)
+  organization            Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive number of the company, for the ticket: 1, 2, 3…
-  number            Int
-  status            SaleStatus    @default(COMPLETED)
+  number                  Int
+  status                  SaleStatus                 @default(COMPLETED)
   /// Customer when known; null = público en general.
-  customerId        String?       @db.Char(36)
-  customer          Contact?      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  customerId              String?                    @db.Char(36)
+  customer                Contact?                   @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
   /// The exit of stock it made; one movement per sale.
-  movementId        String        @db.Char(36)
-  movement          StockMovement @relation(fields: [organizationId, movementId], references: [organizationId, id], onDelete: Restrict)
+  movementId              String                     @db.Char(36)
+  movement                StockMovement              @relation(fields: [organizationId, movementId], references: [organizationId, id], onDelete: Restrict)
   /// VAT rule when it was sold (VEN-04).
-  pricesIncludeTax  Boolean
-  taxRate           Decimal       @db.Decimal(5, 2)
+  pricesIncludeTax        Boolean
+  taxRate                 Decimal                    @db.Decimal(5, 2)
   /// Sum of what the discounts took off the lines.
-  discount          Decimal       @default(0) @db.Decimal(14, 2)
-  subtotal          Decimal       @db.Decimal(14, 2)
-  tax               Decimal       @db.Decimal(14, 2)
-  total             Decimal       @db.Decimal(14, 2)
+  discount                Decimal                    @default(0) @db.Decimal(14, 2)
+  /// Discount of the whole sale, in percent, and why (VEN-14).
+  discountPercent         Decimal                    @default(0) @db.Decimal(5, 2)
+  discountReason          String?                    @db.VarChar(200)
+  /// Who allowed a discount above the seller's cap, used once.
+  discountAuthorizationId String?                    @db.Char(36)
+  discountAuthorization   SaleDiscountAuthorization? @relation(fields: [organizationId, discountAuthorizationId], references: [organizationId, id], onDelete: Restrict)
+  subtotal                Decimal                    @db.Decimal(14, 2)
+  tax                     Decimal                    @db.Decimal(14, 2)
+  total                   Decimal                    @db.Decimal(14, 2)
   /// Sent with the confirmation so that repeating it sells once (VEN-10).
-  idempotencyKey    String        @db.VarChar(64)
-  soldByUserId      String        @db.Char(36)
-  createdAt         DateTime      @default(now()) @db.DateTime(3)
-  cancelledByUserId String?       @db.Char(36)
-  cancelledAt       DateTime?     @db.DateTime(3)
-  cancelReason      String?       @db.VarChar(500)
-  lines             SaleLine[]
-  payments          SalePayment[]
+  idempotencyKey          String                     @db.VarChar(64)
+  soldByUserId            String                     @db.Char(36)
+  createdAt               DateTime                   @default(now()) @db.DateTime(3)
+  cancelledByUserId       String?                    @db.Char(36)
+  cancelledAt             DateTime?                  @db.DateTime(3)
+  cancelReason            String?                    @db.VarChar(500)
+  lines                   SaleLine[]
+  payments                SalePayment[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
   @@unique([organizationId, movementId])
   @@unique([organizationId, idempotencyKey])
+  @@unique([organizationId, discountAuthorizationId])
   @@index([organizationId, createdAt])
   @@index([organizationId, soldByUserId, createdAt])
   @@index([organizationId, customerId, createdAt])
@@ -1979,4 +1992,27 @@ model SalePayment {
   @@unique([organizationId, saleId, lineNumber])
   @@index([organizationId, method, createdAt])
   @@map("sale_payment")
+}
+
+/// A discount above the seller's cap, allowed at the counter by someone
+/// with a cap large enough who typed their password there (VEN-14). It is
+/// for one seller, up to its percent, for a few minutes, and for one sale.
+model SaleDiscountAuthorization {
+  id               String       @id @db.Char(36)
+  organizationId   String       @db.Char(36)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sellerUserId     String       @db.Char(36)
+  authorizerUserId String       @db.Char(36)
+  /// Largest percent it allows.
+  percent          Decimal      @db.Decimal(5, 2)
+  /// The authorizer may also sell below cost.
+  belowCost        Boolean
+  reason           String       @db.VarChar(200)
+  expiresAt        DateTime     @db.DateTime(3)
+  createdAt        DateTime     @default(now()) @db.DateTime(3)
+  sale             Sale?
+
+  @@unique([organizationId, id])
+  @@index([organizationId, sellerUserId, createdAt])
+  @@map("sale_discount_authorization")
 }

@@ -8,7 +8,11 @@ import {
   ReadOnlyNotice,
 } from "@/components";
 import { newId } from "@/lib";
-import { SALE_MAX_LINES, SALE_MAX_PAYMENTS } from "@/modules/sales";
+import {
+  SALE_MAX_LINES,
+  SALE_MAX_PAYMENTS,
+  listDiscountAuthorizers,
+} from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 import { SaleForm } from "./sale-form";
@@ -42,10 +46,16 @@ export default async function VentasPage() {
     );
   }
 
+  const authorizers = await listDiscountAuthorizers({
+    organizationId: access.organization.id,
+    userId: access.user.id,
+  });
+
   return (
     <PageContainer>
       <PageHeader title="Ventas" />
       <SaleForm
+        authorizers={authorizers}
         maxLines={SALE_MAX_LINES}
         maxPayments={SALE_MAX_PAYMENTS}
         idempotencyKey={newId()}

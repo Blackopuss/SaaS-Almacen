@@ -26,32 +26,46 @@ const MODES = [
   },
 ] as const;
 
-/** How the company charges VAT (VEN-04). */
+const CAP_FIELDS = [
+  { role: "cashier", label: "Cajero" },
+  { role: "cash_manager", label: "Encargado de caja" },
+  { role: "administrator", label: "Administrador" },
+] as const;
+
+/** How the company charges VAT (VEN-04) and the discount caps (VEN-14). */
 export function SalesSettingsForm({
   taxMode,
   taxRate,
+  caps,
 }: {
   taxMode: "included" | "added";
   /** «16». */
   taxRate: string;
+  /** «5», by role. */
+  caps: Record<(typeof CAP_FIELDS)[number]["role"], string>;
 }) {
   const [state, formAction, pending] = useActionState<
     SalesSettingsFormState,
     FormData
   >(updateSalesSettingsAction, {
     fieldErrors: {},
-    values: { taxMode, taxRate },
+    values: { taxMode, taxRate, ...caps },
     answers: 0,
   });
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (state.saved) toast.success("Guardado.");
+    const cap = CAP_FIELDS.find(
+      (field) => state.fieldErrors[`cap.${field.role}`],
+    );
     const first = state.fieldErrors.taxMode
       ? "input[name=taxMode]"
       : state.fieldErrors.taxRate
         ? "#taxRate"
-        : null;
+        : cap
+          ? `#cap-${cap.role}`
+          : null;
     if (first) formRef.current?.querySelector<HTMLElement>(first)?.focus();
   }, [state]);
 
@@ -133,6 +147,37 @@ export function SalesSettingsForm({
           />
         )}
       </FormField>
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">
+          Descuento máximo sin pedir autorización
+        </legend>
+        <p className="text-sm text-muted-foreground">
+          Arriba de su tope, alguien con tope mayor lo autoriza con su
+          contraseña. Tú no tienes tope.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {CAP_FIELDS.map((field) => (
+            <FormField
+              key={field.role}
+              id={`cap-${field.role}`}
+              label={`${field.label} (%)`}
+              error={state.fieldErrors[`cap.${field.role}`]}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  name={`cap.${field.role}`}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  maxLength={8}
+                  defaultValue={state.values[field.role]}
+                  key={`${field.role}-${state.answers}`}
+                />
+              )}
+            </FormField>
+          ))}
+        </div>
+      </fieldset>
       <Button type="submit" disabled={pending}>
         {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
         Guardar

@@ -43,6 +43,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "purchasing.report_exported": "Exportó un reporte de compras a un archivo",
   "sales.prices_changed": "Cambió precios de venta",
   "customer.created": "Registró un cliente",
+  "sales.discount_authorized": "Autorizó un descuento",
+  "sales.discount_given": "Dio un descuento en una venta",
   "sales.settings_changed": "Cambió el IVA de sus ventas",
   "purchase_order.delivery_requested":
     "Pidió enviar una orden de compra por correo",
@@ -150,6 +152,8 @@ const FACT_LABELS: readonly (readonly [string, string])[] = [
   ["lugaresApartados", "Lugares apartados del plan"],
   ["lugaresDevueltos", "Lugares devueltos al plan"],
   ["cambios", "Cambió"],
+  ["venta", "Venta"],
+  ["porcentaje", "Descuento"],
 ];
 
 const shown = (value: unknown): string | null =>

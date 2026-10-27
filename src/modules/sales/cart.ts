@@ -2,12 +2,15 @@ import "server-only";
 
 import { Decimal, dec } from "@/lib";
 import { formatStock } from "@/modules/inventory";
+import { loadSubject } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
 import { resolveConversion, type Capture } from "@/platform/catalog";
 import { forOrganization, type TenantDb } from "@/server";
 
 import { SALE_MAX_PAYMENTS, paymentNote, type PaymentInput } from "./payments";
+import { parsePercent } from "./discounts";
 import { effectivePrice, formatMoney } from "./pricing";
+import { checkDiscount } from "./sale-discount";
 import type { SalesActor } from "./prices";
 import { readTaxRule } from "./settings";
 import { formatTaxRate, saleTotals } from "./tax";
@@ -169,6 +172,18 @@ export type CartQuote = {
   pricesIncludeTax: boolean;
   /** «Cambio: $95.50», «Faltan $4.50»; null when there is nothing to say. */
   paymentNote: string | null;
+  /** The discount asked for (VEN-14), when there is one. */
+  discount: {
+    /** «-$50.45». */
+    amount: string;
+    /** «5 %»: what the seller gives without asking. */
+    cap: string;
+    needsAuthorization: boolean;
+    /** Some product ends below its cost and the seller may not do that. */
+    belowCost: boolean;
+  } | null;
+  /** The discount typed is not a percent. */
+  discountError?: string;
 };
 
 /**
@@ -182,6 +197,8 @@ export async function quoteSale(
     lines: readonly CartLineInput[];
     /** As typed so far, to say the change or what is missing. */
     payments?: readonly PaymentInput[];
+    /** Discount of the whole sale, as typed: «10». */
+    discountPercent?: string;
   },
 ): Promise<CartQuote> {
   await assertModulePermission(
@@ -241,8 +258,24 @@ export async function quoteSale(
     }
   });
 
+  const sellable = priced.flatMap((line) => (line ? [line] : []));
+  const typed = String(input.discountPercent ?? "")
+    .trim()
+    .slice(0, 16);
+  const percent = typed === "" ? null : parsePercent(typed);
+  const check =
+    percent !== null && Number(percent) > 0 && sellable.length > 0
+      ? await checkDiscount(client, {
+          organizationId: actor.organizationId,
+          seller: await loadSubject(actor.organizationId, actor.userId),
+          percent,
+          lines: sellable,
+        })
+      : null;
+  const taken = check?.discounts ?? sellable.map(() => dec(0));
+  const off = taken.reduce((sum, d) => sum.plus(d), dec(0));
   const totals = saleTotals(
-    priced.flatMap((line) => (line ? [line.amount] : [])),
+    sellable.map((line, index) => line.amount.minus(taken[index]!)),
     rule,
   );
   return {
@@ -262,5 +295,16 @@ export async function quoteSale(
       (input.payments ?? []).slice(0, SALE_MAX_PAYMENTS),
       totals.total,
     ),
+    discount: check
+      ? {
+          amount: `-${formatMoney(off)}`,
+          cap: check.cap,
+          needsAuthorization: check.needsAuthorization,
+          belowCost: check.belowCost && !check.mayGoBelowCost,
+        }
+      : null,
+    ...(typed !== "" && percent === null
+      ? { discountError: "Escribe el descuento como un número del 0 al 100." }
+      : {}),
   };
 }

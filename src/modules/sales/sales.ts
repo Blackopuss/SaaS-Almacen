@@ -2,13 +2,17 @@ import "server-only";
 
 import { dec, newId } from "@/lib";
 import { postSaleExit } from "@/modules/inventory";
+import { recordAuditEvent } from "@/platform/audit";
+import { loadSubject, type Subject } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
 import { SALE_MAX_LINES, priceLines, type CartLineInput } from "./cart";
+import { PERCENT_ERROR, formatPercent, parsePercent } from "./discounts";
 import { SALE_MAX_PAYMENTS, readPayments, type PaymentInput } from "./payments";
 import { formatMoney } from "./pricing";
 import type { SalesActor } from "./prices";
+import { checkDiscount } from "./sale-discount";
 import { readTaxRule } from "./settings";
 import { saleTotals } from "./tax";
 
@@ -26,6 +30,14 @@ export type SaleInput = {
   /** Null or empty = público en general. */
   customerId?: string | null;
   payments: PaymentInput[];
+  /** Discount of the whole sale (VEN-14); absent or 0 = none. */
+  discount?: {
+    /** As typed: «10». */
+    percent?: string;
+    reason?: string;
+    /** From `authorizeDiscount`, when it is above the seller's cap. */
+    authorizationId?: string;
+  };
   /** Created with the screen; the same on every retry (INV-21). */
   idempotencyKey: string;
 };
@@ -50,6 +62,8 @@ export type SaleResult =
       /** Problem of each payment, by its position. */
       paymentErrors: Record<number, string>;
       customerError?: string;
+      /** The discount: its percent, reason or authorization. */
+      discountError?: string;
       formError?: string;
     };
 
@@ -115,6 +129,27 @@ export async function registerSale(
     locationId: text(line?.locationId, 36) || null,
   }));
   const customerId = text(input?.customerId, 36) || null;
+  const typedPercent = text(input?.discount?.percent, 16).trim();
+  const percent = typedPercent === "" ? "0.00" : parsePercent(typedPercent);
+  if (percent === null) return failure({ discountError: PERCENT_ERROR });
+  const discount = {
+    percent,
+    reason: text(input?.discount?.reason, 300).trim(),
+    authorizationId: text(input?.discount?.authorizationId, 36) || null,
+  };
+  if (
+    percent !== "0.00" &&
+    (discount.reason.length < 3 ||
+      discount.reason.length > 200 ||
+      /[\u0000-\u001f]/.test(discount.reason))
+  ) {
+    return failure({
+      discountError: "Escribe el motivo del descuento (de 3 a 200 caracteres).",
+    });
+  }
+  // The seller's roles, read before the transaction (MOD-08): their cap
+  // and whether they may sell below cost.
+  const seller = await loadSubject(organizationId, userId);
   // One more than the limit, so it can say the list is too long.
   const payments = (Array.isArray(input?.payments) ? input.payments : []).slice(
     0,
@@ -126,7 +161,14 @@ export async function registerSale(
   // it runs again, where it reads the number — or finds itself — anew.
   for (let attempt = 1; ; attempt++) {
     try {
-      return await save(actor, { lines, customerId, payments, key });
+      return await save(actor, {
+        lines,
+        customerId,
+        payments,
+        key,
+        discount,
+        seller,
+      });
     } catch (error) {
       if (error instanceof Rejected) return error.result;
       if ((error as { code?: string }).code === "P2002" && attempt < 4) {
@@ -144,6 +186,12 @@ async function save(
     customerId: string | null;
     payments: PaymentInput[];
     key: string;
+    discount: {
+      percent: string;
+      reason: string;
+      authorizationId: string | null;
+    };
+    seller: Subject;
   },
 ): Promise<SaleResult> {
   const { organizationId, userId } = actor;
@@ -226,11 +274,77 @@ async function save(
       }
     }
 
+    // VEN-14: the discount comes off each line; above the seller's cap
+    // it needs an authorization for them, unused and in time, and below
+    // cost it needs a permission — theirs or the authorizer's.
+    const discounted = dec(input.discount.percent).greaterThan(0);
+    let discounts = sold.map(() => dec(0));
+    let authorization: {
+      id: string;
+      authorizerUserId: string;
+      belowCost: boolean;
+    } | null = null;
+    if (discounted) {
+      const check = await checkDiscount(tx, {
+        organizationId,
+        seller: input.seller,
+        percent: input.discount.percent,
+        lines: sold,
+      });
+      discounts = check.discounts;
+      if (input.discount.authorizationId) {
+        const found = await tx.saleDiscountAuthorization.findFirst({
+          where: {
+            id: input.discount.authorizationId,
+            sellerUserId: userId,
+            expiresAt: { gt: new Date() },
+            percent: { gte: input.discount.percent },
+          },
+          select: { id: true, authorizerUserId: true, belowCost: true },
+        });
+        const used = found
+          ? await tx.sale.findFirst({
+              where: { discountAuthorizationId: found.id },
+              select: { id: true },
+            })
+          : null;
+        if (!found || used) {
+          throw new Rejected(
+            failure({
+              discountError:
+                "La autorización ya no sirve: venció, ya se usó o es por menos. Pídela de nuevo.",
+            }),
+          );
+        }
+        authorization = found;
+      }
+      if (check.needsAuthorization && !authorization) {
+        throw new Rejected(
+          failure({
+            reason: "not_allowed",
+            discountError: `Tu tope de descuento es ${check.cap}. Pide que lo autorice un encargado.`,
+          }),
+        );
+      }
+      if (
+        check.belowCost &&
+        !check.mayGoBelowCost &&
+        !authorization?.belowCost
+      ) {
+        throw new Rejected(
+          failure({
+            reason: "not_allowed",
+            discountError:
+              "Con este descuento hay productos por debajo de su costo: necesita la autorización de un administrador o del titular.",
+          }),
+        );
+      }
+    }
+    const net = sold.map((line, index) => line.amount.minus(discounts[index]!));
+    const discountTotal = discounts.reduce((sum, d) => sum.plus(d), dec(0));
+
     const rule = await readTaxRule(tx, organizationId);
-    const totals = saleTotals(
-      sold.map((line) => line.amount),
-      rule,
-    );
+    const totals = saleTotals(net, rule);
     const paid = readPayments(input.payments, totals.total);
     if (!paid.ok) {
       throw new Rejected(
@@ -282,6 +396,12 @@ async function save(
         movementId: exit.movementId,
         pricesIncludeTax: rule.pricesIncludeTax,
         taxRate: rule.rate,
+        discount: discountTotal.toFixed(2),
+        discountPercent: input.discount.percent,
+        discountReason: discounted ? input.discount.reason : null,
+        discountAuthorizationId: discounted
+          ? (authorization?.id ?? null)
+          : null,
         subtotal: totals.subtotal.toFixed(2),
         tax: totals.tax.toFixed(2),
         total: totals.total.toFixed(2),
@@ -304,7 +424,8 @@ async function save(
         baseQuantity: line.baseQuantity.toString(),
         unitCode: line.unitCode,
         unitPrice: line.unitPrice.toFixed(2),
-        amount: line.amount.toFixed(2),
+        discount: discounts[index]!.toFixed(2),
+        amount: net[index]!.toFixed(2),
         unitCost: exit.unitCosts[index] ?? null,
       })),
     });
@@ -321,6 +442,22 @@ async function save(
         reference: payment.reference,
       })),
     });
+    if (discounted) {
+      await recordAuditEvent(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: "sales.discount_given",
+        target: { type: "sale", id: saleId },
+        reason: input.discount.reason,
+        metadata: {
+          venta: String(number),
+          porcentaje: formatPercent(input.discount.percent),
+          ...(authorization
+            ? { authorizerUserId: authorization.authorizerUserId }
+            : {}),
+        },
+      });
+    }
     // Exact cash gives no change to announce.
     const change = paid.payments.find(
       (payment) => payment.change !== null && !payment.change.isZero(),

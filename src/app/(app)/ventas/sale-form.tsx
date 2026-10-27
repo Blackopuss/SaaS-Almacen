@@ -26,6 +26,7 @@ import {
   type SaleFormState,
 } from "./actions";
 import { CustomerPicker } from "./customer-picker";
+import { DiscountPanel, type Authorization } from "./discount-panel";
 import {
   PaymentPanel,
   type Method,
@@ -60,6 +61,7 @@ export function SaleForm({
   canCreateCustomer,
   canPickCustomer,
   idempotencyKey,
+  authorizers,
 }: {
   maxLines: number;
   maxPayments: number;
@@ -67,6 +69,8 @@ export function SaleForm({
   canPickCustomer: boolean;
   /** Key of the first sale (INV-21); the server gives the next ones. */
   idempotencyKey: string;
+  /** Who may allow a discount above this cashier's cap (VEN-14). */
+  authorizers: { userId: string; name: string; cap: string }[];
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const nextKey = useRef(1);
@@ -98,6 +102,19 @@ export function SaleForm({
   /** The last sale charged, shown while the next one starts. */
   const [charged, setCharged] = useState<SaleFormState["done"] | null>(null);
   const [lost, setLost] = useState<"checking" | "unknown" | null>(null);
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [authorization, setAuthorization] = useState<Authorization | null>(
+    null,
+  );
+  // An authorization covers up to its percent; asking for more needs
+  // another one. The server checks it again when charging.
+  const allowed =
+    authorization && Number(discountPercent) <= Number(authorization.percent)
+      ? authorization
+      : null;
+  const sentDiscount = discountOpen ? discountPercent : "";
   /** The payments the last answer is about: its errors are for those. */
   const [answeredPayments, setAnsweredPayments] = useState("");
 
@@ -279,6 +296,7 @@ export function SaleForm({
         const answer = await quoteSaleAction(
           JSON.parse(payload),
           JSON.parse(paymentsPayload),
+          sentDiscount,
         );
         if (ticket !== asked.current) return;
         if ("error" in answer) {
@@ -297,7 +315,7 @@ export function SaleForm({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [payload, paymentsPayload]);
+  }, [payload, paymentsPayload, sentDiscount]);
 
   /** After a lost answer: did this sale get registered? (INV-22) */
   async function findOut(): Promise<number | null> {
@@ -323,6 +341,10 @@ export function SaleForm({
     setSingle({ received: "", reference: "" });
     setLineErrors({});
     setNotice(null);
+    setDiscountOpen(false);
+    setDiscountPercent("");
+    setDiscountReason("");
+    setAuthorization(null);
     if (nextKey) setKey(nextKey);
     searchRef.current?.focus();
   }
@@ -377,7 +399,11 @@ export function SaleForm({
     !fresh ||
     lines.length === 0 ||
     quote.lines.some((line) => line.error) ||
-    Object.keys(lineErrors).length > 0;
+    Object.keys(lineErrors).length > 0 ||
+    (discountOpen &&
+      quote.discount !== null &&
+      (quote.discount.needsAuthorization || quote.discount.belowCost) &&
+      allowed === null);
   // Payment errors: by position for one payment, by row key for several;
   // only while the payments are the ones that were sent.
   const paymentErrors: Record<string, string> =
@@ -698,6 +724,12 @@ export function SaleForm({
                 <dd>{quote.subtotal}</dd>
               </div>
             )}
+            {quote?.discount && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Descuento</dt>
+                <dd>{quote.discount.amount}</dd>
+              </div>
+            )}
             {quote && (
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">{quote.taxLabel}</dt>
@@ -736,6 +768,51 @@ export function SaleForm({
             />
             <input type="hidden" name="payments" value={paymentsPayload} />
             <input type="hidden" name="customerId" value={customer?.id ?? ""} />
+            <input type="hidden" name="discountPercent" value={sentDiscount} />
+            <input
+              type="hidden"
+              name="discountReason"
+              value={discountOpen ? discountReason : ""}
+            />
+            <input
+              type="hidden"
+              name="discountAuthorizationId"
+              value={discountOpen ? (allowed?.authorizationId ?? "") : ""}
+            />
+            {discountOpen ? (
+              <div className="space-y-2">
+                <DiscountPanel
+                  percent={discountPercent}
+                  reason={discountReason}
+                  onPercent={setDiscountPercent}
+                  onReason={setDiscountReason}
+                  discount={quote?.discount ?? null}
+                  authorizers={authorizers}
+                  authorization={allowed}
+                  onAuthorization={setAuthorization}
+                  error={state.discountError ?? quote?.discountError}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setDiscountOpen(false);
+                    setDiscountPercent("");
+                    setDiscountReason("");
+                  }}
+                >
+                  Quitar descuento
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDiscountOpen(true)}
+              >
+                Aplicar descuento
+              </Button>
+            )}
             <PaymentPanel
               mode={mode}
               onMode={setMode}

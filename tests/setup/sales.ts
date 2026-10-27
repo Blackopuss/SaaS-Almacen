@@ -1,4 +1,5 @@
 import { newId } from "@/lib";
+import { hashPassword } from "@/platform/auth/password";
 import { moduleRegistry } from "@/modules/registry";
 import type { Role } from "@/platform/authorization";
 import { provisionCompany } from "@/platform/billing";
@@ -76,4 +77,17 @@ export async function salesMember(organizationId: string, role: Role) {
     data: { id: newId(), organizationId, membershipId: membership.id, role },
   });
   return { organizationId, userId };
+}
+
+/** Gives a test person a password, to type it where one is asked. */
+export async function withPassword(userId: string, password: string) {
+  await db.account.create({
+    data: {
+      id: newId(),
+      userId,
+      providerId: "credential",
+      accountId: userId,
+      password: await hashPassword(password),
+    },
+  });
 }

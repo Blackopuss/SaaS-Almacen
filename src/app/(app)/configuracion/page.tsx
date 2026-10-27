@@ -75,7 +75,7 @@ export default async function ConfiguracionPage() {
               href="/configuracion/ventas"
               icon={Receipt}
               title="Ventas"
-              description="IVA de tus precios."
+              description="IVA y descuentos."
             />
           )}
           {access.can("platform.plan.read") && (

@@ -85,6 +85,7 @@ describe("cart", () => {
       taxLabel: "IVA incluido (16 %)",
       pricesIncludeTax: true,
       paymentNote: null,
+      discount: null,
     });
   });
 

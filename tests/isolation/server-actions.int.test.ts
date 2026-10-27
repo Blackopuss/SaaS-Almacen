@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  authorizeDiscountAction: {
+    input: "id de quien autoriza, su contraseña, porcentaje y motivo",
+    identity:
+      "sesión y empresa activa (getModuleAccess) para quien cobra; quien autoriza se busca entre los miembros activos de esa empresa y su contraseña se verifica con límite de intentos",
+    coveredBy: "tests/sales/discounts.int.test.ts",
+  },
   registerSaleAction: {
     input:
       "líneas (id de producto, presentación, cantidad tecleada, ubicación), id de cliente, pagos tecleados y clave de confirmación",

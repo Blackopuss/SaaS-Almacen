@@ -11,7 +11,12 @@ export type {
 } from "./prices";
 export { effectivePrice, formatMoney, parsePrice } from "./pricing";
 export { getSalesSettings, updateSalesSettings } from "./settings";
-export type { SalesSettingsInput, SalesSettingsResult } from "./settings";
+export type {
+  SalesSettings,
+  SalesSettingsField,
+  SalesSettingsInput,
+  SalesSettingsResult,
+} from "./settings";
 export {
   DEFAULT_TAX_RULE,
   formatTaxRate,
@@ -33,3 +38,18 @@ export {
   readPayments,
 } from "./payments";
 export type { PaymentInput, PaymentMethod } from "./payments";
+export {
+  DEFAULT_DISCOUNT_CAPS,
+  formatPercent,
+  parsePercent,
+} from "./discounts";
+export type { DiscountCaps } from "./discounts";
+export {
+  AUTHORIZATION_MINUTES,
+  authorizeDiscount,
+  listDiscountAuthorizers,
+} from "./discount-authorization";
+export type {
+  AuthorizeDiscountResult,
+  DiscountAuthorizer,
+} from "./discount-authorization";

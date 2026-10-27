@@ -16,7 +16,10 @@ import { SalesSettingsForm } from "./sales-settings-form";
 
 export const metadata: Metadata = { title: "Ventas" };
 
-/** How the company sells (VEN-04): only the titular, with Ventas. */
+/** «16.00» → «16», «12.50» → «12.5». */
+const plain = (value: string) => value.replace(/\.?0+$/, "");
+
+/** How the company sells (VEN-04, VEN-14): only the titular, with Ventas. */
 export default async function VentasConfigPage() {
   const access = await getModuleAccess();
   const back = (
@@ -60,7 +63,12 @@ export default async function VentasConfigPage() {
       <PageHeader title="Ventas" />
       <SalesSettingsForm
         taxMode={settings.pricesIncludeTax ? "included" : "added"}
-        taxRate={settings.rate.replace(/\.?0+$/, "")}
+        taxRate={plain(settings.rate)}
+        caps={{
+          cashier: plain(settings.caps.cashier),
+          cash_manager: plain(settings.caps.cash_manager),
+          administrator: plain(settings.caps.administrator),
+        }}
       />
     </PageContainer>
   );

@@ -256,6 +256,18 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.saleDiscountAuthorization.create({
+      data: {
+        id: newId(),
+        organizationId,
+        sellerUserId: organizationId === orgA ? ids.ana : ids.beto,
+        authorizerUserId: organizationId === orgA ? ids.ana : ids.beto,
+        percent: "10",
+        belowCost: false,
+        reason: "Compra grande",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
     const storedFileId = newId();
     await db.storedFile.create({
       data: {
