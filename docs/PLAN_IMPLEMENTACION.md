@@ -1,6 +1,6 @@
 # Plan de implementación — SaaS de inventario modular
 
-Versión 0.6 · 2 de octubre de 2026 · Modelo modular acordado: Inventario como base por capacidad, Compras en el primer lanzamiento, después Ventas (punto de venta, cotizaciones) y CRM; varios usuarios con roles. Plan revisado en conjunto por Claude y Codex en 224 pasos de unas 3 horas.
+Versión 0.7 · 27 de octubre de 2026 (Ventas adelantada, ADR 0030) · Modelo modular acordado: Inventario como base por capacidad, Compras en el primer lanzamiento, después Ventas (punto de venta, cotizaciones) y CRM; varios usuarios con roles. Plan revisado en conjunto por Claude y Codex en 224 pasos de unas 3 horas.
 
 Ejecución de la primera fase: [definición, reglas, investigación y riesgos](FASE_01_DEFINICION.md). Prototipo navegable: [instrucciones y validación](../prototype/README.md). Entregables internos preparados; entrevistas, validación con ferreterías y decisiones comerciales siguen pendientes.
 
@@ -326,7 +326,7 @@ Distinguir dos necesidades: **emitir el comprobante fiscal por la suscripción q
 
 **Tamaño de paso:** unas 3 horas efectivas, incluida su prueba. El equipo es el fundador apoyado por IA (Claude y Codex), a medio tiempo, así que se avanza aproximadamente **un paso por día**. Si un paso excede ese tiempo, se divide en A/B y se conserva su criterio de cierre. Un paso solo se cierra con evidencia: una prueba que pasa, una demostración o un documento revisado. Una pantalla sin reglas, permisos o persistencia no cuenta como terminada.
 
-**Orden:** FUN → BAS → PLT → USR → MOD → INV → IMP → CMP → PIL → BIL → VEN → COT → CRM. Los prerrequisitos indican lo que no puede saltarse. Dentro de una fase, los pasos van en orden salvo indicación.
+**Orden:** FUN → BAS → PLT → USR → MOD → INV → IMP → CMP → PIL → VAL → VEN + COT → PAG → BIL → CRM. Desde v0.7 Ventas se adelanta a los pilotos por decisión del fundador (ADR 0030); los pilotos (PIL-13..17) siguen pendientes. Los prerrequisitos indican lo que no puede saltarse. Dentro de una fase, los pasos van en orden salvo indicación.
 
 | Fase | Pasos | Resultado |
 | --- | ---: | --- |
@@ -340,10 +340,12 @@ Distinguir dos necesidades: **emitir el comprobante fiscal por la suscripción q
 | CMP — Compras | 19 | Órdenes y recepciones conectadas a inventario |
 | PIL — Piloto y lanzamiento limitado | 19 | Primeros clientes pagando; lanzamiento limitado con cobro asistido |
 | BIL — Cobro automático y apertura | 18 | Contratación y pago en línea sin intervención manual |
+| VAL — Valor del inventario | 6 | Costo promedio y valor a costo |
 | VEN — Ventas: punto de venta | 28 | Mostrador y caja |
 | COT — Ventas: cotizaciones y pedidos | 12 | Cotizar, pedir y surtir |
+| PAG — Ventas a plazos | 9 | Enganche, mensualidades y cartera |
 | CRM | 18 | Seguimiento comercial |
-| **Total** | **224** | |
+| **Total** | **239** | |
 
 **Estimación:** 148 pasos hasta el lanzamiento limitado de Inventario + Compras (PIL-17), es decir, unas 440 horas o unos 7 meses a medio tiempo. Agregar 25–35% de reserva y 1–2 semanas de observación por piloto. El primer piloto empieza en PIL-13, alrededor del paso 143. BIL agrega 18 pasos y puede hacerse antes o en paralelo con Ventas, según la carga de cobro manual. Ventas, Cotizaciones y CRM suman 58 pasos más. Es una referencia para reestimar al cerrar cada fase, no una promesa de fecha.
 
@@ -569,14 +571,27 @@ Se ejecuta cuando la carga administrativa o los impagos lo justifiquen; unos die
 | BIL-15B | Regresión integral con cobro automático | BIL-15 | Permisos, aislamiento, jobs, derechos y ciclo de cobro completo pasan |
 | BIL-16 | Apertura general con contratación en línea | BIL-15B | Alta y pago sin intervención manual; monitoreo de cobro activo |
 
+### VAL — Valor del inventario (6)
+
+Decidido con el fundador (ADR 0030): el inventario se valora a costo, con costo promedio por producto (precio medio variable de SAP), antes de Ventas.
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| VAL-01 | Costo promedio: decisión y esquema | CMP-13 | ADR; costo promedio por producto en su unidad base con decimal exacto; costo unitario guardado en cada línea de entrada; migración solo de expansión |
+| VAL-02 | Recepciones de Compras actualizan el costo promedio | VAL-01 | 10 a $85 + 10 a $95 → $90 en la misma transacción que la recepción; una devolución sale al costo con que entró |
+| VAL-03 | Costo opcional en entrada manual, saldo inicial e importación | VAL-02 | Solo con permiso de registrar costos (titular, administrador, comprador); sin costo, la entrada se valora al promedio vigente |
+| VAL-04 | Salidas, ajustes, conteos y reversas valoradas | VAL-02 | Cada salida guarda el costo del momento; la reconciliación compara también el valor |
+| VAL-05 | Valor del inventario en ficha, lista, Inicio y exportación | VAL-04 | Solo para quien puede ver costos; para los demás el dato no existe en la respuesta |
+| VAL-06 | Arranque desde el último costo de compra y prueba de extremo a extremo | VAL-05 | Los productos existentes empiezan con su último costo; entrada → salida → conteo concilia cantidad y valor |
+
 ### VEN — Ventas: punto de venta (28)
 
 | ID | Paso | Requiere | Listo cuando |
 | --- | --- | --- | --- |
-| VEN-01 | Definición con los pilotos | PIL-17 | Flujo de mostrador, métodos de pago, ticket y devoluciones; crédito/fiado y CFDI excluidos o reestimados |
-| VEN-02 | Registrar el módulo Ventas y el rol Cajero | VEN-01, MOD-02 | Contrato con dependencias y permisos |
-| VEN-03 | Precio de venta por producto y presentación | VEN-02 | Precio por pieza y por caja independientes |
-| VEN-04 | Cálculo de impuestos | VEN-03 | IVA incluido o desglosado con redondeo definido y pruebas |
+| VEN-01 | Definición con el fundador (revisar con los pilotos) | CMP-18 | ADR 0030: mostrador y cotizaciones a la vez, un precio por producto, IVA configurable, descuentos por rol, ventas a plazos (PAG); CFDI excluido |
+| VEN-02 | Registrar el módulo Ventas y los roles Cajero y Vendedor | VEN-01, VAL-06, MOD-02 | Contrato con dependencias y permisos; matriz de roles actualizada |
+| VEN-03 | Precio de venta por producto | VEN-02 | Un precio en la unidad base; la presentación vale contenido × precio; ganancia visible solo para quien ve costos |
+| VEN-04 | Cálculo de impuestos configurable por empresa | VEN-03 | Precios con IVA incluido (se desglosa) o sin IVA (se suma); redondeo definido y pruebas |
 | VEN-05 | Esquema de venta, líneas y pagos | VEN-04 | Migración con relaciones por empresa |
 | VEN-06 | Pantalla POS: búsqueda, lector y carrito | VEN-05, INV-29 | Agregar por código en menos de 2 segundos |
 | VEN-07 | Carrito con presentaciones y decimales | VEN-06 | 2.75 m de cable y 1 caja calculados correctamente |
@@ -586,7 +601,7 @@ Se ejecuta cuando la carga administrativa o los impagos lo justifiquen; unos die
 | VEN-11 | Pago en efectivo con cambio | VEN-09 | Cambio calculado y registrado |
 | VEN-12 | Pago con tarjeta (terminal externa) y transferencia | VEN-11 | Referencia capturada; sin procesar tarjetas en la aplicación |
 | VEN-13 | Pagos mixtos | VEN-12 | La suma debe igualar el total |
-| VEN-14 | Descuentos con permiso | VEN-09, USR-02 | Límite por rol; auditado |
+| VEN-14 | Descuentos con tope por rol y autorización | VEN-09, USR-02 | El titular fija el tope de cada rol; arriba del tope autoriza alguien con tope suficiente; bajo el costo solo con permiso propio; motivo y bitácora |
 | VEN-15 | Ticket no fiscal | VEN-11 | Impresión de 80 mm y enlace o correo |
 | VEN-16 | Apertura de caja con fondo | VEN-11 | Sin caja abierta no se cobra |
 | VEN-17 | Ingresos y egresos de caja | VEN-16 | Con motivo y auditados |
@@ -618,6 +633,22 @@ Se ejecuta cuando la carga administrativa o los impagos lo justifiquen; unos die
 | COT-10 | Permisos del Vendedor | COT-09 | Vendedor no abre caja ni ajusta inventario |
 | COT-11 | Reportes de cotizaciones | COT-10 | Tasa de conversión y pendientes |
 | COT-12 | Pruebas de extremo a extremo | COT-11 | Cotizar → pedir → surtir parcial → cobrar concilia |
+
+### PAG — Ventas a plazos (9)
+
+Pactadas desde la cotización (ADR 0030): enganche que cubre al menos el costo, el resto en mensualidades; interés opcional por empresa; la mercancía sale al pagar el enganche.
+
+| ID | Paso | Requiere | Listo cuando |
+| --- | --- | --- | --- |
+| PAG-01 | Configuración de ventas a plazos por empresa | VEN-04 | Plazos permitidos en meses, interés opcional por plazo (0 % por omisión) |
+| PAG-02 | Calendario de pagos | PAG-01 | Enganche + mensualidades con decimal exacto; el redondeo cae en el último pago; pruebas con y sin interés |
+| PAG-03 | Cotización con plan de pagos | PAG-02, COT-02 | Contado contra plazos; enganche mínimo = costo promedio × cantidad, validado en el servidor; PDF con calendario |
+| PAG-04 | Venta a plazos: cobrar el enganche | PAG-03, COT-05, VEN-13 | Salida de inventario y cuenta por cobrar en la misma transacción; cliente obligatorio |
+| PAG-05 | Abonos en caja | PAG-04 | Se aplican a la mensualidad más antigua; recibo; sin duplicados; entran al corte de caja |
+| PAG-06 | Estado de cuenta del cliente | PAG-05 | Saldo, pagos hechos y próximos; PDF y correo |
+| PAG-07 | Vencidos y recordatorios | PAG-06, IMP-01 | Lista de vencidos; aviso por correo vía worker, opcional por empresa |
+| PAG-08 | Liquidar antes, cancelar y devolver en ventas a plazos | PAG-05, VEN-19 | Reglas escritas y probadas; nunca saldo negativo |
+| PAG-09 | Reporte de cartera y prueba de extremo a extremo | PAG-08 | Por cobrar, vencido y cobrado por periodo; un ciclo completo concilia caja, inventario y cartera |
 
 ### CRM (18)
 
@@ -688,4 +719,5 @@ Confirmados: Inventario como base obligatoria, módulos con precio por nivel de 
 - v0.4: capacidad de productos por plan confirmada y referencia de 1,000 productos para el primer cliente. Se proponen niveles 100/500/1,000/3,000/10,000, definición de cupos, cambios de capacidad sin pérdida de datos y validación concurrente/importaciones. Se precisan las jornadas existentes de límites/cobro/carga y se mantienen 64 como estimación, a revalidar en D06.
 - v0.5: único tipo de usuario confirmado e inicio de fase 1 autorizado. Se sustituyen roles diferenciados por autorización de cuenta/empresa y se preparan definición, guion de entrevistas, hipótesis comerciales, reglas, riesgos y prototipo navegable. No se simulan entrevistas ni validaciones externas; la fase sigue abierta hasta completarlas.
 - v0.6: modelo modular acordado con el fundador y revisado en tres rondas entre Claude y Codex. Inventario como base obligatoria por capacidad; módulos Compras, Ventas (punto de venta, luego cotizaciones/pedidos) y CRM con precio por nivel; usuarios incluidos y adicionales; roles predefinidos que reemplazan el perfil único. Primer lanzamiento: Inventario + Compras con cobro asistido; cobro automático cuando lo justifique la carga. El plan pasa de 64 jornadas a 224 pasos de unas 3 horas (148 hasta el lanzamiento limitado), con dependencias validadas automáticamente.
+- v0.7 (2026-10-27): Ventas se adelanta a los pilotos por decisión del fundador (ADR 0030): primero el valor del inventario a costo promedio (fase VAL, 6 pasos), luego mostrador y cotizaciones a la vez, y ventas a plazos (fase PAG, 9 pasos). Un precio por producto, IVA configurable por empresa y descuentos con tope por rol. Total: 239 pasos.
 - v0.6.1 (2026-10-26): producción en una EC2 (BAS-09..11 cerrados). A pedido del fundador se adelantó la compra del plan en línea (ADR 0028: Stripe, PayPal, Mercado Pago y códigos de descuento; pago por adelantado de 1, 3, 6 o 12 meses, sin cobro recurrente), que cubre parte de BIL-03, BIL-05 y BIL-06A/B; el resto de BIL (recurrencia, prorrateo, cambios de nivel, reembolsos en el sistema, CFDI) sigue igual. También PIL-04, PIL-09 y PIL-11 (mecanismos) y la revisión independiente de CMP.
