@@ -6,6 +6,7 @@ import { assertModulePermission } from "@/platform/billing";
 import { resolveConversion, type Capture } from "@/platform/catalog";
 import { forOrganization, type TenantDb } from "@/server";
 
+import { SALE_MAX_PAYMENTS, paymentNote, type PaymentInput } from "./payments";
 import { effectivePrice, formatMoney } from "./pricing";
 import type { SalesActor } from "./prices";
 import { readTaxRule } from "./settings";
@@ -166,6 +167,8 @@ export type CartQuote = {
   /** «IVA incluido (16 %)» or «IVA (16 %)». */
   taxLabel: string;
   pricesIncludeTax: boolean;
+  /** «Cambio: $95.50», «Faltan $4.50»; null when there is nothing to say. */
+  paymentNote: string | null;
 };
 
 /**
@@ -175,7 +178,11 @@ export type CartQuote = {
  */
 export async function quoteSale(
   actor: SalesActor,
-  input: { lines: readonly CartLineInput[] },
+  input: {
+    lines: readonly CartLineInput[];
+    /** As typed so far, to say the change or what is missing. */
+    payments?: readonly PaymentInput[];
+  },
 ): Promise<CartQuote> {
   await assertModulePermission(
     actor.organizationId,
@@ -251,5 +258,9 @@ export async function quoteSale(
       ? `IVA incluido (${formatTaxRate(rule.rate)})`
       : `IVA (${formatTaxRate(rule.rate)})`,
     pricesIncludeTax: rule.pricesIncludeTax,
+    paymentNote: paymentNote(
+      (input.payments ?? []).slice(0, SALE_MAX_PAYMENTS),
+      totals.total,
+    ),
   };
 }

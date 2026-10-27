@@ -2,24 +2,36 @@
 
 import {
   CircleAlert,
+  CircleCheck,
   Loader2,
   PackageSearch,
   Search,
   Trash2,
+  WifiOff,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { unstable_rethrow } from "next/navigation";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 
 import {
+  checkSaleAction,
   findSaleProductsAction,
   loadSaleProductAction,
   quoteSaleAction,
+  registerSaleAction,
   type SaleCustomer,
+  type SaleFormState,
 } from "./actions";
 import { CustomerPicker } from "./customer-picker";
+import {
+  PaymentPanel,
+  type Method,
+  type PayMode,
+  type PaymentRow,
+} from "./payment-panel";
 import type { CartQuote, SaleProduct, SaleSearch } from "@/modules/sales";
 
 type Line = {
@@ -34,19 +46,27 @@ type Line = {
 
 type Candidate = SaleSearch["candidates"][number];
 
+const EMPTY: SaleFormState = { lineErrors: {}, paymentErrors: {} };
+
 /**
- * The counter (VEN-06): products are added one after another — typed or
- * scanned — and the cart shows what each line costs and what the sale
- * adds up to. Every amount comes from the server.
+ * The counter (VEN-06..13): products are added one after another — typed
+ * or scanned — the cart shows what each line costs and what the sale adds
+ * up to, and it is charged in cash, card, transfer or several. Every
+ * amount comes from the server.
  */
 export function SaleForm({
   maxLines,
+  maxPayments,
   canCreateCustomer,
   canPickCustomer,
+  idempotencyKey,
 }: {
   maxLines: number;
+  maxPayments: number;
   canCreateCustomer: boolean;
   canPickCustomer: boolean;
+  /** Key of the first sale (INV-21); the server gives the next ones. */
+  idempotencyKey: string;
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const nextKey = useRef(1);
@@ -58,6 +78,28 @@ export function SaleForm({
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [customer, setCustomer] = useState<SaleCustomer | null>(null);
+  const [key, setKey] = useState(idempotencyKey);
+  const [mode, setMode] = useState<PayMode>("CASH");
+  const [single, setSingle] = useState({ received: "", reference: "" });
+  const nextPayment = useRef(1);
+  const newRow = (method: Method): PaymentRow => ({
+    key: `p${nextPayment.current++}`,
+    method,
+    amount: "",
+    received: "",
+    reference: "",
+  });
+  const [rows, setRows] = useState<PaymentRow[]>(() => [
+    { key: "p-cash", method: "CASH", amount: "", received: "", reference: "" },
+    { key: "p-card", method: "CARD", amount: "", received: "", reference: "" },
+  ]);
+  /** Problems the server found, by line key: lines may move after. */
+  const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
+  /** The last sale charged, shown while the next one starts. */
+  const [charged, setCharged] = useState<SaleFormState["done"] | null>(null);
+  const [lost, setLost] = useState<"checking" | "unknown" | null>(null);
+  /** The payments the last answer is about: its errors are for those. */
+  const [answeredPayments, setAnsweredPayments] = useState("");
 
   // A reader types faster than the server answers (INV-29): answers change
   // the list as of the last change, not the one that started the search.
@@ -185,18 +227,39 @@ export function SaleForm({
     }
   }
 
-  function change(key: string, patch: Partial<Line>) {
+  function change(lineKey: string, patch: Partial<Line>) {
     commit(
       current().map((line) =>
-        line.key === key ? { ...line, ...patch } : line,
+        line.key === lineKey ? { ...line, ...patch } : line,
       ),
     );
+    if (lineErrors[lineKey]) setLineErrors(without(lineErrors, lineKey));
   }
 
-  function remove(key: string) {
-    commit(current().filter((line) => line.key !== key));
+  function remove(lineKey: string) {
+    commit(current().filter((line) => line.key !== lineKey));
+    setLineErrors(without(lineErrors, lineKey));
     searchRef.current?.focus();
   }
+
+  // What the form sends: one payment as chosen, or the rows of «Varias».
+  const sentPayments =
+    mode === "MIXED"
+      ? rows.map(({ method, amount, received, reference }) => ({
+          method,
+          amount,
+          received: method === "CASH" ? received : "",
+          reference: method === "CASH" ? "" : reference,
+        }))
+      : [
+          {
+            method: mode,
+            amount: "",
+            received: mode === "CASH" ? single.received : "",
+            reference: mode === "CASH" ? "" : single.reference,
+          },
+        ];
+  const paymentsPayload = JSON.stringify(sentPayments);
 
   // Prices and totals come from the server, a moment after the last change;
   // an answer to an older cart is ignored.
@@ -213,7 +276,10 @@ export function SaleForm({
     const ticket = ++asked.current;
     const timer = setTimeout(async () => {
       try {
-        const answer = await quoteSaleAction(JSON.parse(payload));
+        const answer = await quoteSaleAction(
+          JSON.parse(payload),
+          JSON.parse(paymentsPayload),
+        );
         if (ticket !== asked.current) return;
         if ("error" in answer) {
           setQuote(null);
@@ -231,14 +297,134 @@ export function SaleForm({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [payload]);
+  }, [payload, paymentsPayload]);
+
+  /** After a lost answer: did this sale get registered? (INV-22) */
+  async function findOut(): Promise<number | null> {
+    setLost("checking");
+    for (const wait of [0, 1500, 3000, 6000]) {
+      if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+      try {
+        const sale = await checkSaleAction(key);
+        setLost(null);
+        return sale ? sale.number : null;
+      } catch {
+        // Still unreachable: wait and ask again.
+      }
+    }
+    setLost("unknown");
+    return null;
+  }
+
+  function startNext(nextKey: string | undefined) {
+    commit([]);
+    setCustomer(null);
+    setMode("CASH");
+    setSingle({ received: "", reference: "" });
+    setLineErrors({});
+    setNotice(null);
+    if (nextKey) setKey(nextKey);
+    searchRef.current?.focus();
+  }
+
+  const [state, formAction, pending] = useActionState(
+    async (prev: SaleFormState, formData: FormData) => {
+      let next: SaleFormState;
+      setAnsweredPayments(String(formData.get("payments") ?? ""));
+      try {
+        next = await registerSaleAction(prev, formData);
+      } catch (error) {
+        unstable_rethrow(error);
+        const number = await findOut();
+        if (number !== null) {
+          // It was charged: the answer got lost on the way back.
+          setCharged({ number, total: "", change: null });
+          startNext(undefined);
+          return {
+            ...EMPTY,
+            formError:
+              "Se perdió la conexión, pero la venta sí quedó cobrada. Recarga la página antes de cobrar otra.",
+          };
+        }
+        return {
+          ...EMPTY,
+          formError:
+            "Se perdió la conexión y la venta no se registró. Puedes cobrarla de nuevo: no se duplicará.",
+        };
+      }
+      if (next.done) {
+        setCharged(next.done);
+        startNext(next.nextKey);
+        return next;
+      }
+      // Errors come by position in what was sent; lines keep them by key.
+      const sent = JSON.parse(String(formData.get("keys") ?? "[]")) as string[];
+      setLineErrors(
+        Object.fromEntries(
+          Object.entries(next.lineErrors).flatMap(([index, error]) => {
+            const lineKey = sent[Number(index)];
+            return lineKey ? [[lineKey, error]] : [];
+          }),
+        ),
+      );
+      return next;
+    },
+    EMPTY,
+  );
 
   const fresh = quote !== null && quote.lines.length === lines.length;
+  const blocked =
+    !fresh ||
+    lines.length === 0 ||
+    quote.lines.some((line) => line.error) ||
+    Object.keys(lineErrors).length > 0;
+  // Payment errors: by position for one payment, by row key for several;
+  // only while the payments are the ones that were sent.
+  const paymentErrors: Record<string, string> =
+    answeredPayments !== paymentsPayload
+      ? {}
+      : mode === "MIXED"
+        ? Object.fromEntries(
+            Object.entries(state.paymentErrors).flatMap(([index, error]) => {
+              const row = rows[Number(index)];
+              return row ? [[row.key, error]] : [];
+            }),
+          )
+        : Object.fromEntries(Object.entries(state.paymentErrors));
   const units = lines.length === 1 ? "1 producto" : `${lines.length} productos`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
       <div className="min-w-0 space-y-6">
+        {charged && (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-xl border border-success/40 bg-success/10 p-4"
+          >
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 size-5 shrink-0 text-success"
+            />
+            <p className="min-w-0 flex-1">
+              <span className="block font-medium">
+                Venta {charged.number} cobrada
+                {charged.total ? ` · ${charged.total}` : ""}
+              </span>
+              {charged.change && (
+                <span className="block text-2xl font-semibold tabular-nums">
+                  Cambio: {charged.change}
+                </span>
+              )}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCharged(null)}
+            >
+              Cerrar
+            </Button>
+          </div>
+        )}
         <section aria-labelledby="agregar-producto" className="space-y-2">
           <h2 id="agregar-producto" className="sr-only">
             Agregar producto
@@ -339,7 +525,7 @@ export function SaleForm({
             <ul className="divide-y">
               {lines.map((line, index) => {
                 const priced = fresh ? quote.lines[index] : undefined;
-                const error = priced?.error;
+                const error = lineErrors[line.key] ?? priced?.error;
                 const errorId = `${line.key}-error`;
                 const capture = line.product.captures.find(
                   (option) => option.value === line.capture,
@@ -486,6 +672,11 @@ export function SaleForm({
               onChange={setCustomer}
               canCreate={canCreateCustomer}
             />
+            {state.customerError && (
+              <p role="alert" className="text-sm text-destructive">
+                {state.customerError}
+              </p>
+            )}
           </section>
         )}
         <section
@@ -523,8 +714,96 @@ export function SaleForm({
               </dd>
             </div>
           </dl>
+          {quote?.paymentNote && (
+            <p
+              className="text-right text-lg font-semibold tabular-nums"
+              aria-live="polite"
+            >
+              {quote.paymentNote}
+            </p>
+          )}
+          <form
+            action={formAction}
+            noValidate
+            className="space-y-4 border-t pt-4"
+          >
+            <input type="hidden" name="idempotencyKey" value={key} />
+            <input type="hidden" name="lines" value={payload} />
+            <input
+              type="hidden"
+              name="keys"
+              value={JSON.stringify(lines.map((line) => line.key))}
+            />
+            <input type="hidden" name="payments" value={paymentsPayload} />
+            <input type="hidden" name="customerId" value={customer?.id ?? ""} />
+            <PaymentPanel
+              mode={mode}
+              onMode={setMode}
+              single={single}
+              onSingle={setSingle}
+              rows={rows}
+              onRows={setRows}
+              errors={paymentErrors}
+              maxPayments={maxPayments}
+              newRow={newRow}
+            />
+            {lost && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm"
+              >
+                {lost === "checking" ? (
+                  <Loader2
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 animate-spin"
+                  />
+                ) : (
+                  <WifiOff
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-warning"
+                  />
+                )}
+                <p>
+                  {lost === "checking"
+                    ? "Se perdió la conexión al cobrar. Estamos revisando si la venta quedó registrada; no cierres esta pantalla."
+                    : "Seguimos sin conexión: no sabemos si la venta quedó registrada. Cuando vuelva tu internet, revisa antes de cobrar otra vez."}
+                </p>
+              </div>
+            )}
+            {(state.formError || Object.keys(lineErrors).length > 0) && (
+              <p
+                role="alert"
+                className="flex items-start gap-2 text-sm text-destructive"
+              >
+                <CircleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                />
+                {state.formError ?? "No se cobró: corrige las líneas marcadas."}
+              </p>
+            )}
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={pending || blocked || lost !== null}
+            >
+              {pending && (
+                <Loader2 aria-hidden="true" className="animate-spin" />
+              )}
+              {pending
+                ? "Cobrando…"
+                : fresh && lines.length > 0
+                  ? `Cobrar ${quote.total}`
+                  : "Cobrar"}
+            </Button>
+          </form>
         </section>
       </div>
     </div>
   );
 }
+
+/** The errors of every line but one. */
+const without = (errors: Record<string, string>, key: string) =>
+  Object.fromEntries(Object.entries(errors).filter(([k]) => k !== key));

@@ -23,3 +23,13 @@ export { SALE_MAX_LINES, quoteSale } from "./cart";
 export type { CartLineInput, CartQuote } from "./cart";
 export { findSaleProducts, getSaleProduct } from "./sale-product";
 export type { SaleProduct, SaleSearch } from "./sale-product";
+export { SALE_KEY_REUSED, findSaleByKey, registerSale } from "./sales";
+export type { SaleInput, SaleResult } from "./sales";
+export {
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  SALE_MAX_PAYMENTS,
+  paymentNote,
+  readPayments,
+} from "./payments";
+export type { PaymentInput, PaymentMethod } from "./payments";

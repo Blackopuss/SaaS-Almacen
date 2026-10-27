@@ -18,6 +18,19 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  registerSaleAction: {
+    input:
+      "líneas (id de producto, presentación, cantidad tecleada, ubicación), id de cliente, pagos tecleados y clave de confirmación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); productos, ubicaciones y cliente se buscan solo en esa empresa; precios, IVA y cambio los calcula el servidor",
+    coveredBy: "tests/sales/sale.int.test.ts",
+  },
+  checkSaleAction: {
+    input: "clave de confirmación",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo encuentra ventas de esa persona en esa empresa",
+    coveredBy: "tests/sales/sale.int.test.ts",
+  },
   findCustomersAction: {
     input: "texto buscado (nombre, teléfono o RFC)",
     identity:
