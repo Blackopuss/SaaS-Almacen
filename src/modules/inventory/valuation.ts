@@ -35,6 +35,8 @@ export type CostBook = {
     quantity: DecimalInput,
     unitCost: DecimalInput | null,
   ): Decimal | null;
+  /** Average cost in force, changing nothing (relocations). */
+  price(productId: string): Decimal | null;
   save(): Promise<void>;
 };
 
@@ -120,6 +122,9 @@ export async function openCostBook(
         valueExitAt(page.state, page.onHand, quantity, unitCost),
         dec(quantity).negated(),
       );
+    },
+    price(productId) {
+      return pageOf(productId).state?.averageCost ?? null;
     },
     async save() {
       for (const [productId, page] of pages) {

@@ -2,10 +2,18 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { ForbiddenError, newId } from "@/lib";
 import {
+  applyCount,
+  captureCount,
+  openCount,
   reconcileStock,
+  reconcileValue,
+  registerAdjustment,
   registerEntry,
   registerExit,
   registerInitialBalance,
+  registerQuickExit,
+  registerTransfer,
+  reverseMovement,
   type InventoryActor,
 } from "@/modules/inventory";
 import { moduleRegistry } from "@/modules/registry";
@@ -13,6 +21,7 @@ import type { Role } from "@/platform/authorization";
 import { provisionCompany } from "@/platform/billing";
 import { createPresentation, createProduct } from "@/platform/catalog";
 import { invalidateEntitlements } from "@/platform/entitlements";
+import { createLocation } from "@/platform/locations";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
@@ -217,5 +226,157 @@ describe("costs typed in entries", () => {
     });
     expect(await lineCosts(martillo)).toEqual(["IN -"]);
     expect(await costOf(martillo)).toBeNull();
+  });
+});
+
+// VAL-04: every movement keeps the value; the reconciliation checks it.
+describe("every movement is valued", () => {
+  const REASON = "Revisión de valor";
+  const ok = <T extends { ok: boolean }>(result: T) => {
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    return result as Extract<T, { ok: true }>;
+  };
+
+  it("relocations, adjustments, quick exits and counts", async () => {
+    const actor = await company();
+    const martillo = await product(actor);
+    const clavo = await product(actor);
+    const estante = await createLocation(actor, {
+      kind: "SHELF",
+      name: "Estante 1",
+    });
+    if (!estante.ok) throw new Error("location setup failed");
+    ok(
+      await registerEntry(actor, {
+        productId: martillo,
+        quantity: "10",
+        unitCost: "80",
+      }),
+    );
+    ok(
+      await registerEntry(actor, {
+        productId: clavo,
+        quantity: "100",
+        unitCost: "0.5",
+      }),
+    );
+    const general = await db.location.findFirstOrThrow({
+      where: { organizationId: actor.organizationId, isDefault: true },
+    });
+    // Moving it to another place keeps its value.
+    ok(
+      await registerTransfer(actor, {
+        productId: martillo,
+        quantity: "4",
+        locationId: general.id,
+        toLocationId: estante.locationId,
+      }),
+    );
+    expect(await costOf(martillo)).toBe("80.00 / 800.00");
+    // Two missing in General: they go at the average.
+    ok(
+      await registerAdjustment(actor, {
+        productId: martillo,
+        quantity: "4",
+        reason: REASON,
+      }),
+    );
+    expect(await costOf(martillo)).toBe("80.00 / 640.00");
+    ok(
+      await registerQuickExit(actor, {
+        lines: [
+          { productId: martillo, quantity: "1" },
+          { productId: clavo, quantity: "30" },
+        ],
+        reason: "Venta",
+      }),
+    );
+    expect(await costOf(martillo)).toBe("80.00 / 560.00");
+    expect(await costOf(clavo)).toBe("0.50 / 35.00");
+    // A count finds 3 more nails in General: they come in at the average.
+    const opened = await openCount(actor, { locationId: general.id });
+    if (!opened.ok) throw new Error("count setup failed");
+    ok(
+      await captureCount(actor, {
+        countId: opened.countId,
+        productId: clavo,
+        quantity: "73",
+      }),
+    );
+    ok(await applyCount(actor, { countId: opened.countId, reason: REASON }));
+    expect(await costOf(clavo)).toBe("0.50 / 36.50");
+    expect(await lineCosts(martillo)).toEqual([
+      "IN 80.00",
+      "OUT 80.00",
+      "IN 80.00",
+      "OUT 80.00",
+      "OUT 80.00",
+    ]);
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+    expect(await reconcileValue(actor.organizationId)).toEqual([]);
+  });
+
+  it("a reversal undoes at the cost it was done with", async () => {
+    const actor = await company();
+    const martillo = await product(actor);
+    ok(
+      await registerEntry(actor, {
+        productId: martillo,
+        quantity: "10",
+        unitCost: "85",
+      }),
+    );
+    const second = ok(
+      await registerEntry(actor, {
+        productId: martillo,
+        quantity: "10",
+        unitCost: "95",
+      }),
+    );
+    expect(await costOf(martillo)).toBe("90.00 / 1800.00");
+    ok(
+      await reverseMovement(actor, {
+        movementId: second.movementId,
+        reason: REASON,
+      }),
+    );
+    // The ten at $95 leave: back to $85.
+    expect(await costOf(martillo)).toBe("85.00 / 850.00");
+    const exit = ok(
+      await registerExit(actor, { productId: martillo, quantity: "5" }),
+    );
+    ok(
+      await reverseMovement(actor, {
+        movementId: exit.movementId,
+        reason: REASON,
+      }),
+    );
+    expect(await costOf(martillo)).toBe("85.00 / 850.00");
+    expect(await reconcileValue(actor.organizationId)).toEqual([]);
+  });
+
+  it("the reconciliation names a value that was changed by hand", async () => {
+    const actor = await company();
+    const martillo = await product(actor);
+    ok(
+      await registerEntry(actor, {
+        productId: martillo,
+        quantity: "10",
+        unitCost: "10",
+      }),
+    );
+    await db.productCost.updateMany({
+      where: { productId: martillo },
+      data: { stockValue: "120" },
+    });
+    expect(await reconcileValue(actor.organizationId)).toEqual([
+      {
+        productId: martillo,
+        quantity: "10",
+        averageCost: "10",
+        stockValue: "120",
+        expected: "100",
+      },
+    ]);
   });
 });

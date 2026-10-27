@@ -51,8 +51,8 @@ export {
   type ReturnExitLine,
   type ReturnExitResult,
 } from "./return-exit";
-export { reconcileStock } from "./reconciliation";
-export type { StockDrift } from "./reconciliation";
+export { reconcileStock, reconcileValue } from "./reconciliation";
+export type { StockDrift, ValueDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";
 export type { ProductStock } from "./product-stock";
 export {

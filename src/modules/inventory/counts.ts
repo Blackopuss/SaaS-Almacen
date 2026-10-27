@@ -19,6 +19,7 @@ import {
   type InventoryActor,
   type MovementType,
 } from "./movements";
+import { lineCost, openCostBook } from "./valuation";
 
 /**
  * Physical counts: capture (INV-31). A count belongs to one location.
@@ -1155,6 +1156,18 @@ export async function applyCount(
 
           let movementId: string | null = null;
           if (adjustments.length > 0) {
+            // VAL-04: what appears or goes missing is valued at the average,
+            // read before any balance changes, under the products' locks.
+            const costs = await openCostBook(
+              tx,
+              organizationId,
+              adjustments.map((adjustment) => adjustment.productId),
+            );
+            const unitCosts = adjustments.map((adjustment) =>
+              adjustment.direction === "IN"
+                ? costs.entry(adjustment.productId, adjustment.amount, null)
+                : costs.exit(adjustment.productId, adjustment.amount),
+            );
             movementId = newId();
             await tx.stockMovement.create({
               data: {
@@ -1184,8 +1197,10 @@ export async function applyCount(
                 factor: "1",
                 baseQuantity: adjustment.amount,
                 unitCode: adjustment.unitCode,
+                unitCost: lineCost(unitCosts[index]!),
               })),
             });
+            await costs.save();
             for (const adjustment of adjustments) {
               if (adjustment.direction === "OUT") {
                 const changed = await tx.stockBalance.updateMany({
