@@ -93,6 +93,7 @@ describe("validateImportRows", () => {
           inPresentation: true,
           locationId: "a3",
           locationPath: "Zona A › Estante 3",
+          unitCost: null,
         },
         minimum: "200",
       },

@@ -64,6 +64,7 @@ const OPERATION: Partial<Record<Permission, string>> = {
   "inventory.presentation.update": "cambiar el contenido de presentaciones",
   "inventory.minimum.update": "poner mínimos",
   "inventory.opening.create": "registrar existencias iniciales",
+  "inventory.cost.record": "registrar costos",
 };
 
 export async function confirmImport(
@@ -193,6 +194,7 @@ export async function confirmImport(
                       captured: line.stock.captured,
                       inPresentation: line.stock.inPresentation,
                       locationId: line.stock.locationId,
+                      unitCost: line.stock.unitCost,
                     },
                   ]
                 : [],

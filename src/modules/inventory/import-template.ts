@@ -90,6 +90,13 @@ export const IMPORT_COLUMNS = [
     example: "Caja",
   },
   {
+    key: "unitCost",
+    header: "Costo unitario",
+    required: false,
+    help: "Lo que te costó cada unidad del producto (pieza, metro, kilogramo), sin IVA. Solo junto con una existencia inicial; vacío si no lo sabes. Se usa si quien confirma puede registrar costos.",
+    example: "0.85",
+  },
+  {
     key: "location",
     header: "Ubicación",
     required: false,
@@ -123,6 +130,7 @@ const EXAMPLES: ExampleRow[] = [
     presentationContent: "100",
     initialStock: "3",
     initialStockIn: "Caja",
+    unitCost: "0.85",
     minimum: "200",
   },
   {

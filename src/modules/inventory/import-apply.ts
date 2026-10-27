@@ -52,6 +52,8 @@ export type ImportItemData = {
     captured: string;
     inPresentation: boolean;
     locationId: string;
+    /** Cost of one unit of the product (VAL-03B); absent in older imports. */
+    unitCost?: string | null;
   }[];
 };
 

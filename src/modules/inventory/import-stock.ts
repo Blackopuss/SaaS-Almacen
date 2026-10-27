@@ -4,6 +4,8 @@ import { dec, newId } from "@/lib";
 import { parseQuantity } from "@/platform/catalog";
 import type { TenantDb } from "@/server";
 
+import { lineCost, openCostBook } from "./valuation";
+
 /**
  * Initial stock that comes in the file of an import (IMP-09). Each row
  * with stock becomes an `INITIAL` movement with its line and its balance,
@@ -31,6 +33,8 @@ export type ImportedStockLine = {
   /** Written in the presentation of the row, not in the unit. */
   inPresentation: boolean;
   locationId: string;
+  /** Cost of one unit of the product, before taxes (VAL-03B). */
+  unitCost?: string | null;
 };
 
 /** Largest quantity a movement line keeps, captured or in the unit. */
@@ -132,9 +136,12 @@ export async function postImportedStock(
 ): Promise<{ movements: number }> {
   const { organizationId, userId } = actor;
   const { product, presentation } = input;
+  // VAL-03B: read before any balance changes, under the product's lock.
+  const costs = await openCostBook(tx, organizationId, [product.id]);
   let number = 0;
   for (const line of input.lines) {
     number++;
+    const unitCost = costs.entry(product.id, line.base, line.unitCost ?? null);
     const inPresentation = line.inPresentation && presentation !== null;
     const movementId = newId();
     await tx.stockMovement.create({
@@ -166,6 +173,7 @@ export async function postImportedStock(
         factor: inPresentation ? presentation.content : "1",
         baseQuantity: line.base,
         unitCode: product.unitCode,
+        unitCost: lineCost(unitCost),
       },
     });
     const added = await tx.stockBalance.updateMany({
@@ -184,5 +192,6 @@ export async function postImportedStock(
       });
     }
   }
+  await costs.save();
   return { movements: number };
 }

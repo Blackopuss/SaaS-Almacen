@@ -167,8 +167,9 @@ describe("suggestMapping", () => {
       presentationContent: 8,
       initialStock: 9,
       initialStockIn: 10,
-      location: 11,
-      minimum: 12,
+      unitCost: 11,
+      location: 12,
+      minimum: 13,
     });
   });
 
