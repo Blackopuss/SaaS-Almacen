@@ -18,6 +18,12 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  setSalePricesAction: {
+    input: "id de producto y precio de la unidad y de cada presentación",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el producto y sus presentaciones se buscan solo en esa empresa",
+    coveredBy: "tests/sales/prices.int.test.ts",
+  },
   receivePurchaseOrderAction: {
     input: "id de orden, id de ubicación, remisión y clave de confirmación",
     identity:

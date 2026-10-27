@@ -239,6 +239,15 @@ beforeAll(async () => {
         stockValue: "850",
       },
     });
+    await db.salePrice.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        price: "120",
+        updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const storedFileId = newId();
     await db.storedFile.create({
       data: {

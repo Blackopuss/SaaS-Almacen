@@ -1,11 +1,11 @@
 // Company for manual browser checks WITHOUT touching development data:
-// creates, in almacen_test, a company with Inventario + Compras and an
+// creates, in almacen_test, a company with Inventario, Compras and Ventas and an
 // account with the role you ask for (no MFA needed unless administrator).
 // The test database is emptied by every `npm test`, so nothing has to be
 // cleaned afterwards — important now that several tables are append-only.
 //
 // Usage (with `npm run dev:test` running on http://localhost:3100):
-//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator]
+//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator|cashier|cash_manager]
 // Prints the email to sign in with.
 import { existsSync } from "node:fs";
 
@@ -76,6 +76,8 @@ await db.membershipRole.create({
 for (const grant of [
   { kind: "MODULE" as const, key: "inventory", value: null },
   { kind: "MODULE" as const, key: "purchasing", value: null },
+  // Ventas cannot be contracted yet (VEN-02); only here and in tests.
+  { kind: "MODULE" as const, key: "sales", value: null },
   { kind: "LIMIT" as const, key: "active_products", value: 100 },
   { kind: "LIMIT" as const, key: "users", value: 5 },
 ]) {
