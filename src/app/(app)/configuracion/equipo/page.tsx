@@ -5,6 +5,7 @@ import Link from "next/link";
 import { NoAccessState, PageContainer, PageHeader } from "@/components";
 import {
   ROLE_LABELS,
+  ROLE_MODULE,
   assignableRoles,
   checkTeamChange,
   getAccess,
@@ -12,6 +13,8 @@ import {
   listPendingInvitations,
   listTeamMembers,
 } from "@/platform/authorization";
+
+import { getModuleAccess } from "@/platform/billing";
 
 import { InviteDialog } from "./invite-dialog";
 import { InvitationsPanel } from "./invitations-panel";
@@ -60,7 +63,12 @@ export default async function EquipoPage() {
     isOwner: access.organization.isOwner,
     roles: access.roles,
   };
-  const offered = assignableRoles(me);
+  // Cajero and Encargado de caja only once Ventas is contracted (VEN-02).
+  const modules = await getModuleAccess();
+  const offered = assignableRoles(me).filter((role) => {
+    const needs = ROLE_MODULE[role];
+    return !needs || modules.moduleState(needs) !== "none";
+  });
   const roleOptions = offered.map((role) => ({
     id: role,
     label: ROLE_LABELS[role],

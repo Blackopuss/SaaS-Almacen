@@ -72,7 +72,21 @@ describe("menu by role", () => {
     expect(menuOf(member("warehouse", "buyer"))).toEqual(
       NAV_ITEMS.map((item) => item.label),
     );
-    expect(ROLES.length).toBe(4);
+    expect(ROLES.length).toBe(6);
+  });
+
+  it("Cajero and Encargado de caja see the products they sell (VEN-02)", () => {
+    expect(menuOf(member("cashier"))).toEqual([
+      "Inicio",
+      "Inventario",
+      "Configuración",
+    ]);
+    expect(menuOf(member("cash_manager"))).toEqual([
+      "Inicio",
+      "Inventario",
+      "Movimientos",
+      "Configuración",
+    ]);
   });
 });
 

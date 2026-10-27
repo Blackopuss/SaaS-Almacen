@@ -225,8 +225,8 @@ El fundador cambió la decisión anterior: ahora habrá **varios usuarios con ro
 | Almacén | Catálogo, movimientos, conteos y ubicaciones | Lanzamiento |
 | Comprador | Proveedores, órdenes y recepciones; consultar inventario | Lanzamiento |
 | Consulta | Solo lectura | Lanzamiento |
-| Cajero | Punto de venta y su caja | Con Ventas |
-| Vendedor | Cotizaciones, pedidos y CRM propio | Con Ventas/CRM |
+| Cajero | Punto de venta y su caja; también cotiza y hace pedidos | Con Ventas |
+| Encargado de caja | Todo lo del Cajero más descuentos grandes, corte, cancelaciones y devoluciones (ADR 0030) | Con Ventas |
 
 Cada módulo declara sus permisos en su contrato. Un rol solo otorga permisos de módulos contratados y vigentes.
 
@@ -590,7 +590,7 @@ Decidido con el fundador (ADR 0030): el inventario se valora a costo, con costo 
 | ID | Paso | Requiere | Listo cuando |
 | --- | --- | --- | --- |
 | VEN-01 | Definición con el fundador (revisar con los pilotos) | CMP-18 | ADR 0030: mostrador y cotizaciones a la vez, precio propio por presentación, IVA configurable, descuentos por rol, ventas a plazos (PAG); CFDI excluido |
-| VEN-02 | Registrar el módulo Ventas y los roles Cajero y Vendedor | VEN-01, VAL-06, MOD-02 | Contrato con dependencias y permisos; matriz de roles actualizada |
+| VEN-02 | Registrar el módulo Ventas y los roles Cajero y Encargado de caja | VEN-01, VAL-06, MOD-02 | Contrato con dependencias y permisos; matriz de roles actualizada; los roles de Ventas se ofrecen solo con el módulo contratado |
 | VEN-03 | Precio de venta por producto y presentación | VEN-02 | Precio de la unidad y de cada presentación independientes (caja de 500 en $500, pieza a $1.50); sin precio propio, la presentación vale contenido × precio; ganancia visible solo para quien ve costos |
 | VEN-04 | Cálculo de impuestos configurable por empresa | VEN-03 | Precios con IVA incluido (se desglosa) o sin IVA (se suma); redondeo definido y pruebas |
 | VEN-05 | Esquema de venta, líneas y pagos | VEN-04 | Migración con relaciones por empresa |
@@ -631,7 +631,7 @@ Decidido con el fundador (ADR 0030): el inventario se valora a costo, con costo 
 | COT-07 | Surtido parcial → salida | COT-06 | Salida transaccional por lo surtido |
 | COT-08 | Cobrar un pedido en POS | COT-07, VEN-13 | Pago vinculado al pedido |
 | COT-09 | Cancelar pedido | COT-07 | Libera la reserva; surtidos requieren devolución |
-| COT-10 | Permisos del Vendedor | COT-09 | Vendedor no abre caja ni ajusta inventario |
+| COT-10 | Permisos de cotizar | COT-09 | El Cajero cotiza y cobra (no hay rol Vendedor, ADR 0030); desde Ventas nadie ajusta inventario |
 | COT-11 | Reportes de cotizaciones | COT-10 | Tasa de conversión y pendientes |
 | COT-12 | Pruebas de extremo a extremo | COT-11 | Cotizar → pedir → surtir parcial → cobrar concilia |
 

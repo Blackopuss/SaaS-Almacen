@@ -26,13 +26,22 @@ describe("installed modules", () => {
     ]);
   });
 
-  it("Ventas and CRM are not available and own no permissions yet", () => {
+  it("Ventas and CRM cannot be contracted yet; Ventas owns its permissions", () => {
     for (const id of ["sales", "crm"]) {
       expect(moduleRegistry.get(id)).toMatchObject({
         availability: "unavailable",
-        permissions: [],
       });
     }
+    expect(moduleRegistry.get("crm")?.permissions).toEqual([]);
+    // VEN-02: the `sales.*` entries of the approved matrix, and nothing else.
+    const sales = moduleRegistry.get("sales")?.permissions ?? [];
+    expect(sales.length).toBeGreaterThan(10);
+    expect(sales.every((permission) => permission.startsWith("sales."))).toBe(
+      true,
+    );
+    expect(moduleRegistry.dependenciesOf("sales").map((m) => m.id)).toEqual([
+      "inventory",
+    ]);
   });
 
   it("Compras needs Inventario; removing Inventario would break Compras", () => {

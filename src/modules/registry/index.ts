@@ -2,9 +2,10 @@
 // of the product, checked together when the application starts.
 import { inventoryModule } from "@/modules/inventory";
 import { purchasingModule } from "@/modules/purchasing";
+import { salesModule } from "@/modules/sales";
 import { createModuleRegistry } from "@/platform/billing";
 
-import { crmModule, salesModule } from "./announced";
+import { crmModule } from "./announced";
 
 export { moduleOpenWork } from "./open-work";
 

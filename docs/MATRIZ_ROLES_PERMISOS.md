@@ -1,6 +1,6 @@
-# Matriz de roles × permisos — Inventario y Compras
+# Matriz de roles × permisos — Inventario, Compras y Ventas
 
-**Estado: Aprobada por el fundador el 2026-10-03 (FUN-07).** Fuente de verdad del catálogo en código (USR-01); `src/platform/authorization` se prueba contra estas tablas.  
+**Estado: Aprobada por el fundador el 2026-10-03 (FUN-07); ampliada con Ventas el 2026-10-27 (ADR 0030).** Fuente de verdad del catálogo en código (USR-01); `src/platform/authorization` se prueba contra estas tablas.  
 **Fecha: 2026-10-03**
 
 Este documento propone permisos y su asignación para el lanzamiento. No constituye aprobación, implementación ni cierre de FUN-07. Su criterio «Listo cuando» exige una tabla aprobada por el fundador; FUN-05 también es prerrequisito y esta propuesta no acredita entrevistas ni su validación.
@@ -24,10 +24,12 @@ Los cinco perfiles provienen del plan. Los identificadores, la granularidad y la
 | Almacén | `warehouse` | Administra catálogo, ubicaciones, movimientos y conteos de Inventario, sin operar Compras. |
 | Comprador | `buyer` | Administra proveedores, órdenes, recepciones y devoluciones de Compras, y consulta Inventario. |
 | Consulta | `viewer` | Consulta información operativa y, según esta propuesta, la exporta, sin modificar datos de negocio. |
+| Cajero | `cashier` | Ventas (2026-10-27): cobra en mostrador, cotiza y hace pedidos, abre su caja; descuentos hasta su tope. Consulta productos, precios y existencias; no ve costos. |
+| Encargado de caja | `cash_manager` | Ventas (2026-10-27): todo lo del Cajero más autorizar descuentos arriba del tope del cajero, corte de caja, cancelaciones y devoluciones. |
 
 **El titular es la persona referenciada por `Organization.ownerUserId`; no es un rol combinable ni un valor aceptable en `MembershipRole` o en una invitación.** La columna Titular permite comparar sus facultades con las de los roles, pero no propone un quinto rol asignable. La condición de titular se comprueba en servidor para la empresa activa, además de la membresía vigente.
 
-Cajero y Vendedor pertenecen a fases posteriores de Ventas/CRM y no se habilitan en este lanzamiento. «Personal de plataforma» ya aparece en MOD-09: es una autoridad interna separada, no un rol de los clientes ni una combinación que pueda asignar su equipo. No se proponen roles nuevos ni roles personalizables.
+Cajero y Encargado de caja se agregaron con Ventas (ADR 0030, 2026-10-27): no hay rol Vendedor; el Cajero también cotiza. «Personal de plataforma» ya aparece en MOD-09: es una autoridad interna separada, no un rol de los clientes ni una combinación que pueda asignar su equipo. No se proponen roles nuevos ni roles personalizables.
 
 ## Reglas de autorización de la propuesta
 
@@ -44,24 +46,24 @@ Cajero y Vendedor pertenecen a fases posteriores de Ventas/CRM y no se habilitan
 
 ## Catálogo de permisos y matriz
 
-Cada fila es a la vez una entrada del catálogo y su asignación propuesta: identificador estable en inglés con tres segmentos `modulo.recurso.accion`, alcance, paso de origen y columnas **Sí/No**. Las abreviaturas de columnas son **T** = Titular, **A** = Administrador, **AL** = Almacén, **CO** = Comprador y **CN** = Consulta. Todos los «Sí» están sujetos a las reglas anteriores.
+Cada fila es a la vez una entrada del catálogo y su asignación propuesta: identificador estable en inglés con tres segmentos `modulo.recurso.accion`, alcance, paso de origen y columnas **Sí/No**. Las abreviaturas de columnas son **T** = Titular, **A** = Administrador, **AL** = Almacén, **CO** = Comprador, **CN** = Consulta, **CJ** = Cajero y **EC** = Encargado de caja. Todos los «Sí» están sujetos a las reglas anteriores.
 
 Los prefijos describen la capacidad funcional, no la ubicación física del servicio. Por ejemplo, `inventory.product.create` puede implementarse en `platform/catalog`, y los proveedores de Compras en `platform/contacts`, conservando el catálogo y los contactos compartidos que exige el plan.
 
 ### Plataforma — empresa y equipo
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `platform.organization.read` | Ver nombre y configuración operativa básica de la empresa activa; sección 4 y ADR 0005. | Sí | Sí | Sí | Sí | Sí |
-| `platform.organization.update` | Editar configuración del negocio; excluye titularidad, cobro y derechos contratados; sección 4. | Sí | Sí | No | No | No |
-| `platform.team.read` | Listar miembros, estado, roles e invitaciones; USR-08. | Sí | Sí | No | No | No |
-| `platform.team.invite` | Invitar por correo con roles permitidos y cupo disponible; USR-04, MOD-08. | Sí | Sí | No | No | No |
-| `platform.invitation.resend` | Reenviar una invitación que el actor puede gestionar; USR-08. | Sí | Sí | No | No | No |
-| `platform.invitation.cancel` | Cancelar una invitación que el actor puede gestionar y liberar su cupo; USR-08. | Sí | Sí | No | No | No |
-| `platform.team.assign_roles` | Asignar o combinar roles respetando destinatario y límites del actor; USR-06, USR-03B. | Sí | Sí | No | No | No |
-| `platform.team.disable` | Desactivar miembro permitido, revocar sesiones y conservar autoría; USR-07, USR-03B. | Sí | Sí | No | No | No |
-| `platform.ownership.transfer` | Transferir titularidad mediante flujo exclusivo y atómico; USR-03B. | Sí | No | No | No | No |
-| `platform.audit.read` | Consultar bitácora de empresa, equipo y operaciones sensibles, sin secretos; USR-11, PLT-14 y sección 5; pregunta 7. | Sí | Sí | No | No | No |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `platform.organization.read` | Ver nombre y configuración operativa básica de la empresa activa; sección 4 y ADR 0005. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `platform.organization.update` | Editar configuración del negocio; excluye titularidad, cobro y derechos contratados; sección 4. | Sí | Sí | No | No | No | No | No |
+| `platform.team.read` | Listar miembros, estado, roles e invitaciones; USR-08. | Sí | Sí | No | No | No | No | No |
+| `platform.team.invite` | Invitar por correo con roles permitidos y cupo disponible; USR-04, MOD-08. | Sí | Sí | No | No | No | No | No |
+| `platform.invitation.resend` | Reenviar una invitación que el actor puede gestionar; USR-08. | Sí | Sí | No | No | No | No | No |
+| `platform.invitation.cancel` | Cancelar una invitación que el actor puede gestionar y liberar su cupo; USR-08. | Sí | Sí | No | No | No | No | No |
+| `platform.team.assign_roles` | Asignar o combinar roles respetando destinatario y límites del actor; USR-06, USR-03B. | Sí | Sí | No | No | No | No | No |
+| `platform.team.disable` | Desactivar miembro permitido, revocar sesiones y conservar autoría; USR-07, USR-03B. | Sí | Sí | No | No | No | No | No |
+| `platform.ownership.transfer` | Transferir titularidad mediante flujo exclusivo y atómico; USR-03B. | Sí | No | No | No | No | No | No |
+| `platform.audit.read` | Consultar bitácora de empresa, equipo y operaciones sensibles, sin secretos; USR-11, PLT-14 y sección 5; pregunta 7. | Sí | Sí | No | No | No | No | No |
 
 Aceptar una invitación (USR-05) no exige un rol previo en esa empresa ni concede `platform.team.invite`: exige cuenta autenticada correspondiente al correo invitado, token vigente de un solo uso, empresa y roles válidos y cupo reservado. Al aceptar se revalida que la invitación no se haya cancelado ni convertido en una vía de escalamiento. Perfil, contraseña, MFA y sesiones propias siguen los controles de identidad de PLT; no otorgan acceso al equipo ni a sesiones ajenas.
 
@@ -69,20 +71,20 @@ La lectura de auditoría no evita permisos sobre información comercial: ocultar
 
 ### Plataforma — módulos, plan y suscripción
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `platform.module.read` | Consultar módulos disponibles y derechos efectivos para navegación; MOD-01/02/04/05. | Sí | Sí | Sí | Sí | Sí |
-| `platform.capacity.read` | Consultar uso y límites de productos/usuarios, sin datos de pago; MOD-07/08/10, INV-35. | Sí | Sí | Sí | Sí | Sí |
-| `platform.plan.read` | Consultar «Mi plan»: nivel, condiciones contratadas, módulos y vigencia; MOD-03/10. | Sí | Sí | No | No | No |
-| `platform.plan.change` | Solicitar cambio de capacidad o usuarios adicionales, mostrando total y fecha efectivos; sección 4, USR-03A. | Sí | No | No | No | No |
-| `platform.module.activate` | Contratar/solicitar activación de módulo disponible con sus dependencias; MOD-02/06, USR-03A. | Sí | No | No | No | No |
-| `platform.module.deactivate` | Solicitar baja de módulo con advertencias de pendientes y conservación de historia; MOD-06, CMP-17. | Sí | No | No | No | No |
-| `platform.subscription.create` | Contratar la suscripción y consentir sus condiciones; USR-03A, sección 4. | Sí | No | No | No | No |
-| `platform.subscription.cancel` | Cancelar la suscripción conforme a sus condiciones; USR-03A, MOD-11. | Sí | No | No | No | No |
-| `platform.billing.read` | Consultar información de pago y comprobantes de la suscripción; sección 4; alcance propuesto solo para titular. | Sí | No | No | No | No |
-| `platform.billing.manage` | Cambiar método de pago y gestionar su autorización; no permite alterar derechos efectivos directamente; USR-03A. | Sí | No | No | No | No |
-| `platform.support.grant` | Permitir o quitar el acceso temporal de soporte, solo lectura y registrado en la bitácora; PIL-12. | Sí | No | No | No | No |
-| `platform.provisioning.manage` | Asignar nivel, módulos y vigencia desde consola interna con MFA y auditoría; MOD-09. Exclusivo de personal de plataforma. | No | No | No | No | No |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `platform.module.read` | Consultar módulos disponibles y derechos efectivos para navegación; MOD-01/02/04/05. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `platform.capacity.read` | Consultar uso y límites de productos/usuarios, sin datos de pago; MOD-07/08/10, INV-35. | Sí | Sí | Sí | Sí | Sí | No | No |
+| `platform.plan.read` | Consultar «Mi plan»: nivel, condiciones contratadas, módulos y vigencia; MOD-03/10. | Sí | Sí | No | No | No | No | No |
+| `platform.plan.change` | Solicitar cambio de capacidad o usuarios adicionales, mostrando total y fecha efectivos; sección 4, USR-03A. | Sí | No | No | No | No | No | No |
+| `platform.module.activate` | Contratar/solicitar activación de módulo disponible con sus dependencias; MOD-02/06, USR-03A. | Sí | No | No | No | No | No | No |
+| `platform.module.deactivate` | Solicitar baja de módulo con advertencias de pendientes y conservación de historia; MOD-06, CMP-17. | Sí | No | No | No | No | No | No |
+| `platform.subscription.create` | Contratar la suscripción y consentir sus condiciones; USR-03A, sección 4. | Sí | No | No | No | No | No | No |
+| `platform.subscription.cancel` | Cancelar la suscripción conforme a sus condiciones; USR-03A, MOD-11. | Sí | No | No | No | No | No | No |
+| `platform.billing.read` | Consultar información de pago y comprobantes de la suscripción; sección 4; alcance propuesto solo para titular. | Sí | No | No | No | No | No | No |
+| `platform.billing.manage` | Cambiar método de pago y gestionar su autorización; no permite alterar derechos efectivos directamente; USR-03A. | Sí | No | No | No | No | No | No |
+| `platform.support.grant` | Permitir o quitar el acceso temporal de soporte, solo lectura y registrado en la bitácora; PIL-12. | Sí | No | No | No | No | No | No |
+| `platform.provisioning.manage` | Asignar nivel, módulos y vigencia desde consola interna con MFA y auditoría; MOD-09. Exclusivo de personal de plataforma. | No | No | No | No | No | No | No |
 
 «Administrador no cobra» significa aquí que no contrata, cancela, altera conceptos con costo ni administra métodos de pago de la suscripción. No se introduce cobro de ventas ni caja: pertenecen a Ventas. La salida rápida «por venta» de INV-28 no cobra ni emite ticket.
 
@@ -90,50 +92,50 @@ Los permisos comerciales del titular autorizan su consentimiento o solicitud, no
 
 ### Inventario — catálogo, unidades, ubicaciones y consulta
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `inventory.product.read` | Lista, búsqueda, filtros, ficha, atributos y archivados; INV-01/10/11/12/26/29. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.product.create` | Alta y eventual duplicación por el mismo servicio con cupo; INV-02, MOD-07. | Sí | Sí | Sí | No | No |
-| `inventory.product.update` | Editar ficha, categoría, marca, códigos, precisión e incremento válidos; nunca saldo; INV-03/06. | Sí | Sí | Sí | No | No |
-| `inventory.product.archive` | Archivar sin stock ni operaciones pendientes, sin borrar historial; INV-04/19B, CMP-11. | Sí | Sí | Sí | No | No |
-| `inventory.product.reactivate` | Reactivar producto archivado consumiendo cupo; INV-04, MOD-07. | Sí | Sí | Sí | No | No |
-| `inventory.unit.read` | Consultar catálogo de unidades/dimensiones sembrado por el sistema; INV-05. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.presentation.read` | Ver presentaciones, factores, versiones y equivalencias autorizadas; INV-07/08/09. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.presentation.create` | Crear presentación por producto con factor directo válido; INV-07. | Sí | Sí | Sí | No | No |
-| `inventory.presentation.update` | Cambiar presentación/factor mediante nueva versión, sin reescribir el pasado; INV-08. | Sí | Sí | Sí | No | No |
-| `inventory.location.read` | Consultar instalación, General y jerarquía de ubicaciones; INV-13/14/26. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.location.create` | Crear zonas, pasillos y estantes de la instalación; INV-14. | Sí | Sí | Sí | No | No |
-| `inventory.location.update` | Editar nombres y jerarquía sin ciclos ni relaciones ajenas; INV-14. | Sí | Sí | Sí | No | No |
-| `inventory.location.archive` | Archivar ubicación sin stock ni pendientes, conservando referencias; sección 3, INV-14. | Sí | Sí | Sí | No | No |
-| `inventory.stock.read` | Consultar existencias totales y por ubicación, con equivalencias; INV-15/26. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.movement.read` | Ver historial y filtros por fecha, producto, usuario y tipo; INV-27. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.minimum.read` | Consultar mínimos y productos con existencias bajas; INV-30. | Sí | Sí | Sí | Sí | Sí |
-| `inventory.minimum.update` | Configurar mínimo por producto; INV-30. | Sí | Sí | Sí | No | No |
-| `inventory.cost.read` | Consultar costo promedio, valor del inventario y costo de cada movimiento; VAL-05 (ADR 0031). Sin él el dato no existe en ninguna pantalla, exportación ni respuesta. | Sí | Sí | No | Sí | No |
-| `inventory.cost.record` | Capturar el costo de una entrada, saldo inicial o importación, que mueve el costo promedio; VAL-03 (ADR 0031). | Sí | Sí | No | Sí | No |
-| `inventory.dashboard.read` | Panel con existencias bajas, últimos movimientos y uso del cupo; INV-35. | Sí | Sí | Sí | Sí | Sí |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `inventory.product.read` | Lista, búsqueda, filtros, ficha, atributos y archivados; INV-01/10/11/12/26/29. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `inventory.product.create` | Alta y eventual duplicación por el mismo servicio con cupo; INV-02, MOD-07. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.product.update` | Editar ficha, categoría, marca, códigos, precisión e incremento válidos; nunca saldo; INV-03/06. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.product.archive` | Archivar sin stock ni operaciones pendientes, sin borrar historial; INV-04/19B, CMP-11. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.product.reactivate` | Reactivar producto archivado consumiendo cupo; INV-04, MOD-07. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.unit.read` | Consultar catálogo de unidades/dimensiones sembrado por el sistema; INV-05. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `inventory.presentation.read` | Ver presentaciones, factores, versiones y equivalencias autorizadas; INV-07/08/09. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `inventory.presentation.create` | Crear presentación por producto con factor directo válido; INV-07. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.presentation.update` | Cambiar presentación/factor mediante nueva versión, sin reescribir el pasado; INV-08. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.location.read` | Consultar instalación, General y jerarquía de ubicaciones; INV-13/14/26. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `inventory.location.create` | Crear zonas, pasillos y estantes de la instalación; INV-14. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.location.update` | Editar nombres y jerarquía sin ciclos ni relaciones ajenas; INV-14. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.location.archive` | Archivar ubicación sin stock ni pendientes, conservando referencias; sección 3, INV-14. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.stock.read` | Consultar existencias totales y por ubicación, con equivalencias; INV-15/26. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `inventory.movement.read` | Ver historial y filtros por fecha, producto, usuario y tipo; INV-27. | Sí | Sí | Sí | Sí | Sí | No | Sí |
+| `inventory.minimum.read` | Consultar mínimos y productos con existencias bajas; INV-30. | Sí | Sí | Sí | Sí | Sí | No | No |
+| `inventory.minimum.update` | Configurar mínimo por producto; INV-30. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.cost.read` | Consultar costo promedio, valor del inventario y costo de cada movimiento; VAL-05 (ADR 0031). Sin él el dato no existe en ninguna pantalla, exportación ni respuesta. | Sí | Sí | No | Sí | No | No | No |
+| `inventory.cost.record` | Capturar el costo de una entrada, saldo inicial o importación, que mueve el costo promedio; VAL-03 (ADR 0031). | Sí | Sí | No | Sí | No | No | No |
+| `inventory.dashboard.read` | Panel con existencias bajas, últimos movimientos y uso del cupo; INV-35. | Sí | Sí | Sí | Sí | Sí | No | No |
 
 Consultar equivalencias (INV-09) no concede permiso para confirmar el movimiento que las utiliza. La unidad base no cambia libremente después del primer movimiento. El catálogo global de unidades y la creación automática de instalación/General son tareas del sistema, no permisos para crear sucursales o editar unidades globales. No se propone borrado físico de productos o ubicaciones.
 
 ### Inventario — movimientos, conteos, importar y exportar
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `inventory.entry.create` | Entrada manual en unidad base o presentación; INV-16/17/29. | Sí | Sí | Sí | No | No |
-| `inventory.opening.create` | Registrar saldo inicial guiado como movimiento; INV-18. | Sí | Sí | Sí | No | No |
-| `inventory.exit.create` | Salida manual y salida rápida multilínea con motivo/referencia, sin cobro; INV-19/28/29. | Sí | Sí | Sí | No | No |
-| `inventory.transfer.create` | Reubicar entre ubicaciones de la misma instalación y empresa, atómicamente; INV-23. | Sí | Sí | Sí | No | No |
-| `inventory.adjustment.create` | Ajustar con motivo obligatorio y auditoría; INV-24; pregunta 1. | Sí | Sí | Sí | No | No |
-| `inventory.movement.reverse` | Reversar movimiento de Inventario con motivo y valores originales, sin editarlo; INV-25; pregunta 1. | Sí | Sí | Sí | No | No |
-| `inventory.count.read` | Consultar sesiones de conteo, capturas y diferencias; INV-31/32. | Sí | Sí | Sí | No | Sí |
-| `inventory.count.create` | Abrir conteo con alcance y referencia temporal; INV-31. | Sí | Sí | Sí | No | No |
-| `inventory.count.update` | Capturar/corregir cantidades del conteo abierto y previsualizar diferencias; INV-31/32. | Sí | Sí | Sí | No | No |
-| `inventory.count.apply` | Aplicar ajustes del conteo con motivo, movimientos posteriores e idempotencia; exige también `inventory.adjustment.create`; INV-33; pregunta 1. | Sí | Sí | Sí | No | No |
-| `inventory.import.create` | Descargar plantilla, subir CSV/XLSX, mapear, validar y previsualizar productos/saldos/salidas; IMP-02/03/04/05/06/09/10. | Sí | Sí | Sí | No | No |
-| `inventory.import.read` | Consultar archivo, errores, progreso, resultado parcial y fecha de actualización de una importación autorizada; IMP-02/05/08/10. | Sí | Sí | Sí | No | No |
-| `inventory.import.confirm` | Confirmar importación y reservas; exige además cada permiso de la operación importada; IMP-07/08/09/10. | Sí | Sí | Sí | No | No |
-| `inventory.import.cancel` | Cancelar trabajo y liberar solo reservas no consumidas, sin revertir lo ya aplicado; IMP-08B. | Sí | Sí | Sí | No | No |
-| `inventory.export.create` | Generar/descargar exportación segura de catálogo, existencias e historial legibles por el actor; IMP-11, sección 4; pregunta 5. | Sí | Sí | Sí | Sí | Sí |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `inventory.entry.create` | Entrada manual en unidad base o presentación; INV-16/17/29. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.opening.create` | Registrar saldo inicial guiado como movimiento; INV-18. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.exit.create` | Salida manual y salida rápida multilínea con motivo/referencia, sin cobro; INV-19/28/29. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.transfer.create` | Reubicar entre ubicaciones de la misma instalación y empresa, atómicamente; INV-23. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.adjustment.create` | Ajustar con motivo obligatorio y auditoría; INV-24; pregunta 1. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.movement.reverse` | Reversar movimiento de Inventario con motivo y valores originales, sin editarlo; INV-25; pregunta 1. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.count.read` | Consultar sesiones de conteo, capturas y diferencias; INV-31/32. | Sí | Sí | Sí | No | Sí | No | No |
+| `inventory.count.create` | Abrir conteo con alcance y referencia temporal; INV-31. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.count.update` | Capturar/corregir cantidades del conteo abierto y previsualizar diferencias; INV-31/32. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.count.apply` | Aplicar ajustes del conteo con motivo, movimientos posteriores e idempotencia; exige también `inventory.adjustment.create`; INV-33; pregunta 1. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.import.create` | Descargar plantilla, subir CSV/XLSX, mapear, validar y previsualizar productos/saldos/salidas; IMP-02/03/04/05/06/09/10. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.import.read` | Consultar archivo, errores, progreso, resultado parcial y fecha de actualización de una importación autorizada; IMP-02/05/08/10. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.import.confirm` | Confirmar importación y reservas; exige además cada permiso de la operación importada; IMP-07/08/09/10. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.import.cancel` | Cancelar trabajo y liberar solo reservas no consumidas, sin revertir lo ya aplicado; IMP-08B. | Sí | Sí | Sí | No | No | No | No |
+| `inventory.export.create` | Generar/descargar exportación segura de catálogo, existencias e historial legibles por el actor; IMP-11, sección 4; pregunta 5. | Sí | Sí | Sí | Sí | Sí | No | No |
 
 Importar no permite eludir controles manuales: productos nuevos requieren `inventory.product.create`; actualizaciones, `inventory.product.update`; reactivaciones, `inventory.product.reactivate`; presentaciones nuevas o modificadas, su permiso correspondiente; saldos iniciales, `inventory.opening.create`; salidas diarias, `inventory.exit.create`. Validar todo antes de confirmar y otra vez al ejecutar lo pertinente. Archivo, ejecución, lectura y cancelación de un job permanecen dentro de la empresa y de las operaciones autorizadas al actor.
 
@@ -141,41 +143,64 @@ Los conteos aplicados son inmutables; `inventory.count.update` no los reabre. La
 
 ### Compras — proveedores y costos
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `purchasing.supplier.read` | Buscar y consultar contactos en su faceta de proveedor; CMP-01/02. | Sí | Sí | No | Sí | Sí |
-| `purchasing.supplier.create` | Crear proveedor con validación y advertencia de duplicados; CMP-02. | Sí | Sí | No | Sí | No |
-| `purchasing.supplier.update` | Editar datos compartidos necesarios del proveedor; no concede futuras operaciones de clientes/CRM; CMP-01/02. | Sí | Sí | No | Sí | No |
-| `purchasing.product_supplier.read` | Ver relación producto-proveedor, código y presentación de compra; CMP-03. | Sí | Sí | No | Sí | Sí |
-| `purchasing.product_supplier.create` | Vincular producto existente con proveedor de la empresa; CMP-03. | Sí | Sí | No | Sí | No |
-| `purchasing.product_supplier.update` | Editar código o presentación de compra del vínculo; no cambia el factor del catálogo; CMP-03. | Sí | Sí | No | Sí | No |
-| `purchasing.cost.read` | Consultar costos e importes de compras y último costo; CMP-03/13; pregunta 4 (fundador: privados de Compras). | Sí | Sí | No | Sí | No |
-| `purchasing.cost.record` | Capturar costo dentro de orden/recepción autorizada; actualizar último costo al registrar compra, sin valuación contable; CMP-04/13. | Sí | Sí | No | Sí | No |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `purchasing.supplier.read` | Buscar y consultar contactos en su faceta de proveedor; CMP-01/02. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.supplier.create` | Crear proveedor con validación y advertencia de duplicados; CMP-02. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.supplier.update` | Editar datos compartidos necesarios del proveedor; no concede futuras operaciones de clientes/CRM; CMP-01/02. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.product_supplier.read` | Ver relación producto-proveedor, código y presentación de compra; CMP-03. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.product_supplier.create` | Vincular producto existente con proveedor de la empresa; CMP-03. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.product_supplier.update` | Editar código o presentación de compra del vínculo; no cambia el factor del catálogo; CMP-03. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.cost.read` | Consultar costos e importes de compras y último costo; CMP-03/13; pregunta 4 (fundador: privados de Compras). | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.cost.record` | Capturar costo dentro de orden/recepción autorizada; actualizar último costo al registrar compra, sin valuación contable; CMP-04/13. | Sí | Sí | No | Sí | No | No | No |
 
 Los costos no se filtran indirectamente por ficha de producto, historial, panel, exportación o respuesta de API a quien no tenga `purchasing.cost.read`. Decisión del fundador (pregunta 4): los precios son privados de Compras; Consulta no los ve en ninguna pantalla, PDF, reporte ni exportación. `purchasing.cost.record` exige también el permiso para crear/editar la orden o confirmar la recepción; no ofrece edición libre del costo histórico ni de documentos recibidos. Archivar proveedores no tiene un paso explícito en CMP y no se habilita implícitamente con edición.
 
 ### Compras — órdenes, recepciones, devoluciones y reportes
 
-| Permiso | Alcance y referencia | T | A | AL | CO | CN |
-| --- | --- | --- | --- | --- | --- | --- |
-| `purchasing.order.read` | Consultar órdenes, líneas, estados y pendientes; CMP-04/05/11. Sin `purchasing.cost.read` se ocultan precios e importes. | Sí | Sí | No | Sí | Sí |
-| `purchasing.order.create` | Crear borrador y líneas con presentación/versiones; CMP-04. | Sí | Sí | No | Sí | No |
-| `purchasing.order.update` | Editar borrador; documentos enviados/recibidos no se reescriben libremente; CMP-04/05. | Sí | Sí | No | Sí | No |
-| `purchasing.order.submit` | Confirmar transición válida de borrador a enviada; no implica aprobación por otra persona; CMP-05; pregunta 3. | Sí | Sí | No | Sí | No |
-| `purchasing.order.export` | Generar y descargar PDF de orden autorizada, sujeto a lectura de sus datos; CMP-06A. El PDF lleva precios, por eso Consulta no lo descarga (pregunta 4). | Sí | Sí | No | Sí | No |
-| `purchasing.order.send` | Enviar por correo y reintentar entrega con destinatario validado; exige orden en estado válido y `purchasing.order.submit` si cambia a enviada; CMP-06B. | Sí | Sí | No | Sí | No |
-| `purchasing.order.cancel` | Cancelar conforme a transición válida, sin borrar recepciones ni historia; CMP-05. | Sí | Sí | No | Sí | No |
-| `purchasing.order.close` | Cerrar con faltante registrado, sin inventar recepción del remanente; CMP-11. | Sí | Sí | No | Sí | No |
-| `purchasing.receipt.read` | Consultar recepciones, líneas, ubicación y pendientes; CMP-07/08/09. | Sí | Sí | No | Sí | Sí |
-| `purchasing.receipt.create` | Confirmar recepción total/parcial y entrada atómica en destino con factor vigente visible; CMP-07/08/09/10; pregunta 2. | Sí | Sí | No | Sí | No |
-| `purchasing.return.read` | Consultar devoluciones ligadas a recepción; CMP-12. | Sí | Sí | No | Sí | Sí |
-| `purchasing.return.create` | Devolver al proveedor con límite acumulado por recepción y salida atómica; CMP-12. | Sí | Sí | No | Sí | No |
-| `purchasing.suggestion.read` | Consultar sugerencias desde mínimos y proveedores; CMP-14. | Sí | Sí | No | Sí | Sí |
-| `purchasing.suggestion.generate` | Generar borradores por proveedor desde sugerencias; exige `purchasing.order.create`; CMP-14. | Sí | Sí | No | Sí | No |
-| `purchasing.report.read` | Consultar pendientes y compras por proveedor; los costos e importes solo con `purchasing.cost.read`; CMP-15. | Sí | Sí | No | Sí | Sí |
-| `purchasing.report.export` | Exportar reportes de Compras que se pueden leer, sin costos para quien no los ve; CMP-15; preguntas 4 y 5. | Sí | Sí | No | Sí | Sí |
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `purchasing.order.read` | Consultar órdenes, líneas, estados y pendientes; CMP-04/05/11. Sin `purchasing.cost.read` se ocultan precios e importes. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.order.create` | Crear borrador y líneas con presentación/versiones; CMP-04. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.update` | Editar borrador; documentos enviados/recibidos no se reescriben libremente; CMP-04/05. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.submit` | Confirmar transición válida de borrador a enviada; no implica aprobación por otra persona; CMP-05; pregunta 3. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.export` | Generar y descargar PDF de orden autorizada, sujeto a lectura de sus datos; CMP-06A. El PDF lleva precios, por eso Consulta no lo descarga (pregunta 4). | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.send` | Enviar por correo y reintentar entrega con destinatario validado; exige orden en estado válido y `purchasing.order.submit` si cambia a enviada; CMP-06B. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.cancel` | Cancelar conforme a transición válida, sin borrar recepciones ni historia; CMP-05. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.order.close` | Cerrar con faltante registrado, sin inventar recepción del remanente; CMP-11. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.receipt.read` | Consultar recepciones, líneas, ubicación y pendientes; CMP-07/08/09. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.receipt.create` | Confirmar recepción total/parcial y entrada atómica en destino con factor vigente visible; CMP-07/08/09/10; pregunta 2. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.return.read` | Consultar devoluciones ligadas a recepción; CMP-12. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.return.create` | Devolver al proveedor con límite acumulado por recepción y salida atómica; CMP-12. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.suggestion.read` | Consultar sugerencias desde mínimos y proveedores; CMP-14. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.suggestion.generate` | Generar borradores por proveedor desde sugerencias; exige `purchasing.order.create`; CMP-14. | Sí | Sí | No | Sí | No | No | No |
+| `purchasing.report.read` | Consultar pendientes y compras por proveedor; los costos e importes solo con `purchasing.cost.read`; CMP-15. | Sí | Sí | No | Sí | Sí | No | No |
+| `purchasing.report.export` | Exportar reportes de Compras que se pueden leer, sin costos para quien no los ve; CMP-15; preguntas 4 y 5. | Sí | Sí | No | Sí | Sí | No | No |
 
 No se propone una aprobación separada de órdenes ni un permiso activo `purchasing.order.approve`: CMP-05 solo define borrador → enviada → parcial → recibida o cancelada. Ese identificador sería una **sugerencia de ampliación**, denegada mientras no se apruebe el flujo de la pregunta 3. No se introducen pagos a proveedores, cuentas por pagar, importación masiva de órdenes ni un módulo de contabilidad.
+
+### Ventas — precios, mostrador, caja, cotizaciones y plazos
+
+Agregada el 2026-10-27 con el fundador (ADR 0030). Ganancia y costos se ven solo con `inventory.cost.read`: el Cajero y el Encargado de caja ven precios, no costos.
+
+| Permiso | Alcance y referencia | T | A | AL | CO | CN | CJ | EC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `sales.price.read` | Consultar precios de venta de productos y presentaciones; VEN-03. | Sí | Sí | Sí | Sí | Sí | Sí | Sí |
+| `sales.price.update` | Capturar o cambiar precios de venta; VEN-03. | Sí | Sí | No | No | No | No | No |
+| `sales.settings.update` | Configurar Ventas: IVA incluido o sumado, plazos e interés, y tope de descuento de cada rol; VEN-04, VEN-14, PAG-01. Solo el titular (ADR 0030). | Sí | No | No | No | No | No | No |
+| `sales.sale.create` | Cobrar una venta de mostrador, un enganche o un abono; sale de inventario en la misma transacción; VEN-09..13, PAG-04/05. | Sí | Sí | No | No | No | Sí | Sí |
+| `sales.sale.read` | Consultar ventas, tickets e historial; VEN-15, VEN-22. | Sí | Sí | No | No | Sí | Sí | Sí |
+| `sales.sale.cancel` | Cancelar una venta con permiso, motivo y reversa; VEN-21. | Sí | Sí | No | No | No | No | Sí |
+| `sales.return.create` | Devolución total o parcial que reingresa a inventario y registra el reembolso; VEN-19/20. | Sí | Sí | No | No | No | No | Sí |
+| `sales.discount.authorize` | Autorizar en la misma pantalla un descuento arriba del tope de quien cobra, hasta el tope propio; VEN-14. | Sí | Sí | No | No | No | No | Sí |
+| `sales.below_cost.authorize` | Vender o descontar por debajo del costo promedio; VEN-14. | Sí | Sí | No | No | No | No | No |
+| `sales.cash.operate` | Abrir caja con fondo y registrar ingresos y egresos de caja, con motivo; VEN-16/17. | Sí | Sí | No | No | No | Sí | Sí |
+| `sales.cash.close` | Corte de caja: contado contra esperado por forma de pago; VEN-18. | Sí | Sí | No | No | No | No | Sí |
+| `sales.quote.create` | Crear, enviar y convertir cotizaciones y pedidos, con plan de pagos; COT-02..09, PAG-03. | Sí | Sí | No | No | No | Sí | Sí |
+| `sales.quote.read` | Consultar cotizaciones y pedidos; COT. | Sí | Sí | No | No | Sí | Sí | Sí |
+| `sales.receivable.read` | Consultar ventas a plazos, saldos y estados de cuenta; PAG-06..09. | Sí | Sí | No | No | Sí | Sí | Sí |
+| `sales.report.read` | Consultar reportes de ventas; la ganancia solo con `inventory.cost.read`; VEN-23. | Sí | Sí | No | No | Sí | No | Sí |
+| `sales.report.export` | Exportar reportes de ventas; VEN-23. | Sí | Sí | No | No | Sí | No | Sí |
 
 ## Cobertura de pasos sin permiso interactivo propio
 
