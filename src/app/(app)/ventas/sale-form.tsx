@@ -17,7 +17,9 @@ import {
   findSaleProductsAction,
   loadSaleProductAction,
   quoteSaleAction,
+  type SaleCustomer,
 } from "./actions";
+import { CustomerPicker } from "./customer-picker";
 import type { CartQuote, SaleProduct, SaleSearch } from "@/modules/sales";
 
 type Line = {
@@ -37,7 +39,15 @@ type Candidate = SaleSearch["candidates"][number];
  * scanned — and the cart shows what each line costs and what the sale
  * adds up to. Every amount comes from the server.
  */
-export function SaleForm({ maxLines }: { maxLines: number }) {
+export function SaleForm({
+  maxLines,
+  canCreateCustomer,
+  canPickCustomer,
+}: {
+  maxLines: number;
+  canCreateCustomer: boolean;
+  canPickCustomer: boolean;
+}) {
   const searchRef = useRef<HTMLInputElement>(null);
   const nextKey = useRef(1);
   const [lines, setLines] = useState<Line[]>([]);
@@ -47,6 +57,7 @@ export function SaleForm({ maxLines }: { maxLines: number }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [customer, setCustomer] = useState<SaleCustomer | null>(null);
 
   // A reader types faster than the server answers (INV-29): answers change
   // the list as of the last change, not the one that started the search.
@@ -461,42 +472,59 @@ export function SaleForm({ maxLines }: { maxLines: number }) {
         </section>
       </div>
 
-      <section
-        aria-labelledby="total-venta"
-        className="space-y-3 rounded-xl border bg-card p-4 sm:p-5 lg:sticky lg:top-6"
-      >
-        <h2 id="total-venta" className="font-medium">
-          Total
-        </h2>
-        {quoteError && (
-          <p role="alert" className="text-sm text-destructive">
-            {quoteError}
-          </p>
-        )}
-        <dl className="space-y-1 text-sm tabular-nums">
-          {quote && !quote.pricesIncludeTax && (
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Subtotal</dt>
-              <dd>{quote.subtotal}</dd>
-            </div>
-          )}
-          {quote && (
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">{quote.taxLabel}</dt>
-              <dd>{quote.tax}</dd>
-            </div>
-          )}
-          <div
-            className="flex items-baseline justify-between gap-3 border-t pt-2"
-            aria-live="polite"
+      <div className="space-y-4 lg:sticky lg:top-6">
+        {canPickCustomer && (
+          <section
+            aria-labelledby="cliente-venta"
+            className="space-y-3 rounded-xl border bg-card p-4 sm:p-5"
           >
-            <dt className="font-medium">A cobrar</dt>
-            <dd className="text-2xl font-semibold">
-              {quote?.total ?? "$0.00"}
-            </dd>
-          </div>
-        </dl>
-      </section>
+            <h2 id="cliente-venta" className="font-medium">
+              Cliente
+            </h2>
+            <CustomerPicker
+              value={customer}
+              onChange={setCustomer}
+              canCreate={canCreateCustomer}
+            />
+          </section>
+        )}
+        <section
+          aria-labelledby="total-venta"
+          className="space-y-3 rounded-xl border bg-card p-4 sm:p-5"
+        >
+          <h2 id="total-venta" className="font-medium">
+            Total
+          </h2>
+          {quoteError && (
+            <p role="alert" className="text-sm text-destructive">
+              {quoteError}
+            </p>
+          )}
+          <dl className="space-y-1 text-sm tabular-nums">
+            {quote && !quote.pricesIncludeTax && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Subtotal</dt>
+                <dd>{quote.subtotal}</dd>
+              </div>
+            )}
+            {quote && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">{quote.taxLabel}</dt>
+                <dd>{quote.tax}</dd>
+              </div>
+            )}
+            <div
+              className="flex items-baseline justify-between gap-3 border-t pt-2"
+              aria-live="polite"
+            >
+              <dt className="font-medium">A cobrar</dt>
+              <dd className="text-2xl font-semibold">
+                {quote?.total ?? "$0.00"}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      </div>
     </div>
   );
 }

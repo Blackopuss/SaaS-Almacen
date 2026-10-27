@@ -41,7 +41,11 @@ export default async function VentasPage() {
   return (
     <PageContainer>
       <PageHeader title="Ventas" />
-      <SaleForm maxLines={SALE_MAX_LINES} />
+      <SaleForm
+        maxLines={SALE_MAX_LINES}
+        canPickCustomer={access.allows("sales.customer.read")}
+        canCreateCustomer={access.allows("sales.customer.create")}
+      />
     </PageContainer>
   );
 }

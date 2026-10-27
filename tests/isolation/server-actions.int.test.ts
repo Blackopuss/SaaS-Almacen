@@ -18,6 +18,18 @@ type Review = {
 };
 
 const REVIEWED: Record<string, Review> = {
+  findCustomersAction: {
+    input: "texto buscado (nombre, teléfono o RFC)",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo lee clientes de esa empresa",
+    coveredBy: "tests/sales/customers.int.test.ts",
+  },
+  createCustomerAction: {
+    input: "nombre, teléfono y RFC del cliente; si acepta un posible duplicado",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el cliente se crea en esa empresa a nombre de esa persona",
+    coveredBy: "tests/sales/customers.int.test.ts",
+  },
   findSaleProductsAction: {
     input: "texto buscado (nombre, clave o código de barras)",
     identity:
