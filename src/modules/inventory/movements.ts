@@ -666,6 +666,7 @@ export const MOVEMENT_TYPE_LABELS = {
   REVERSAL: "Reversa",
   RECEIPT: "Recepción de compra",
   RETURN: "Devolución a proveedor",
+  SALE: "Venta",
 } as const;
 
 export type MovementType = keyof typeof MOVEMENT_TYPE_LABELS;
@@ -1769,6 +1770,13 @@ export async function reverseMovement(
         return stop(
           "not_allowed",
           "Esta salida es una devolución al proveedor: no se reversa desde Inventario. Si regresa la mercancía, recíbela con una orden de compra.",
+        );
+      }
+      // Nor a sale (VEN-05): its ticket and payments would still stand.
+      if (original.type === "SALE") {
+        return stop(
+          "not_allowed",
+          "Esta salida es una venta: no se reversa desde Inventario. Se devuelve o se cancela desde Ventas.",
         );
       }
       const already = await tx.stockMovement.findFirst({

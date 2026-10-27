@@ -330,7 +330,11 @@ export default async function MovimientosPage({
                   label="Filtrar por tipo de movimiento"
                   value={applied.type ?? ""}
                   allLabel="Tipo"
-                  options={TYPE_OPTIONS}
+                  options={
+                    access.moduleState("sales") === "none"
+                      ? TYPE_OPTIONS.filter((option) => option.id !== "SALE")
+                      : TYPE_OPTIONS
+                  }
                 />
                 {authors.length > 0 && (
                   <FilterSelect
@@ -487,6 +491,7 @@ export default async function MovimientosPage({
                   movement.type !== "REVERSAL" &&
                   movement.type !== "RECEIPT" &&
                   movement.type !== "RETURN" &&
+                  movement.type !== "SALE" &&
                   !movement.reversedByMovementId && (
                     <div className="shrink-0">
                       <ReverseMovement

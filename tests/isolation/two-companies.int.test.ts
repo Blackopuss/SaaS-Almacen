@@ -433,6 +433,60 @@ beforeAll(async () => {
         unitCode: "piece",
       },
     });
+    // A counter sale (VEN-05): its movement, the sale, a line and a payment.
+    const saleMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: saleMovementId,
+        organizationId,
+        type: "SALE",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const saleId = newId();
+    await db.sale.create({
+      data: {
+        id: saleId,
+        organizationId,
+        number: 1,
+        movementId: saleMovementId,
+        pricesIncludeTax: true,
+        taxRate: "16",
+        subtotal: "103.45",
+        tax: "16.55",
+        total: "120",
+        idempotencyKey: newId(),
+        soldByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.saleLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        saleId,
+        lineNumber: 1,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "1",
+        factor: "1",
+        baseQuantity: "1",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "120",
+      },
+    });
+    await db.salePayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        saleId,
+        lineNumber: 1,
+        method: "CASH",
+        amount: "120",
+        received: "200",
+        changeGiven: "80",
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {
