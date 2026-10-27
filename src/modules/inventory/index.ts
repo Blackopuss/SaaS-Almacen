@@ -3,6 +3,14 @@
 export { inventoryModule } from "./contract";
 export { COST_FORMAT_ERROR, parseCost } from "./average-cost";
 export {
+  formatCost,
+  formatValue,
+  getInventoryValue,
+  getProductCost,
+  mayReadInventoryCosts,
+} from "./inventory-value";
+export type { InventoryValue, ProductCostView } from "./inventory-value";
+export {
   MOVEMENT_PAGE_SIZE,
   MOVEMENT_TYPE_LABELS,
   findConfirmation,

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { Decimal, dec } from "@/lib";
+
 import { recordAuditEvent } from "@/platform/audit";
 import type { Permission } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
@@ -13,6 +15,7 @@ import {
   startOfDay,
   type InventoryActor,
 } from "./movements";
+import { mayReadInventoryCosts } from "./inventory-value";
 
 /**
  * Exports to a spreadsheet (IMP-11): the catalog, the stock and the
@@ -191,7 +194,15 @@ async function catalogRows(client: Client): Promise<Cell[][]> {
   ];
 }
 
-async function stockRows(client: Client): Promise<Cell[][]> {
+/**
+ * Stock by location. With `withCosts` (VAL-05, only for who may see
+ * costs) it also says the average cost and what that stock is worth; for
+ * the rest those columns are not there, not empty.
+ */
+async function stockRows(
+  client: Client,
+  withCosts: boolean,
+): Promise<Cell[][]> {
   const [balances, paths] = await Promise.all([
     readAll(
       (after) =>
@@ -203,6 +214,7 @@ async function stockRows(client: Client): Promise<Cell[][]> {
             id: true,
             quantity: true,
             locationId: true,
+            productId: true,
             product: { select: { sku: true, name: true, unitCode: true } },
           },
         }),
@@ -210,27 +222,61 @@ async function stockRows(client: Client): Promise<Cell[][]> {
     ),
     locationPaths(client),
   ]);
-  const rows = balances.map((balance) => ({
-    sku: balance.product.sku,
-    name: balance.product.name,
-    location: paths.get(balance.locationId) ?? "",
-    // The exact decimal, as text: never a floating-point number.
-    quantity: balance.quantity.toString(),
-    unit: getUnit(balance.product.unitCode).name,
-  }));
+  const costs = withCosts
+    ? new Map(
+        (
+          await client.productCost.findMany({
+            where: {
+              productId: {
+                in: [...new Set(balances.map((row) => row.productId))],
+              },
+            },
+            select: { productId: true, averageCost: true },
+          })
+        ).map((row) => [row.productId, dec(row.averageCost.toString())]),
+      )
+    : null;
+  const rows = balances.map((balance) => {
+    const average = costs?.get(balance.productId) ?? null;
+    return {
+      sku: balance.product.sku,
+      name: balance.product.name,
+      location: paths.get(balance.locationId) ?? "",
+      // The exact decimal, as text: never a floating-point number.
+      quantity: balance.quantity.toString(),
+      unit: getUnit(balance.product.unitCode).name,
+      averageCost: average
+        ? average.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toString()
+        : "",
+      value: average
+        ? average
+            .times(balance.quantity.toString())
+            .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+            .toFixed(2)
+        : "",
+    };
+  });
   rows.sort(
     (a, b) =>
       a.sku.localeCompare(b.sku, "es") ||
       a.location.localeCompare(b.location, "es"),
   );
   return [
-    ["Clave (SKU)", "Producto", "Ubicación", "Cantidad", "Unidad"],
+    [
+      "Clave (SKU)",
+      "Producto",
+      "Ubicación",
+      "Cantidad",
+      "Unidad",
+      ...(withCosts ? ["Costo promedio", "Valor"] : []),
+    ],
     ...rows.map((row): Cell[] => [
       row.sku,
       row.name,
       row.location,
       row.quantity,
       row.unit,
+      ...(withCosts ? [row.averageCost, row.value] : []),
     ]),
   ];
 }
@@ -412,7 +458,7 @@ export async function buildExport(
       input.kind === "catalogo"
         ? await catalogRows(client)
         : input.kind === "existencias"
-          ? await stockRows(client)
+          ? await stockRows(client, await mayReadInventoryCosts(actor))
           : await movementRows(client, { from: input.from, to: input.to });
   } catch (error) {
     if (error instanceof Refused) return error.result;

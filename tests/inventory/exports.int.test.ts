@@ -197,9 +197,18 @@ describe("what each export contains", () => {
 
     for (const format of ["xlsx", "csv"] as const) {
       expect((await exported(actor, "existencias", format)).table).toEqual([
-        ["Clave (SKU)", "Producto", "Ubicación", "Cantidad", "Unidad"],
-        ["CAB-2", "Cable THW", "General", "12.6", "metro"],
-        ["TOR-1", "Tornillo", "Zona A › Estante 3", "300", "pieza"],
+        // The titular may see costs (VAL-05); these entries had none.
+        [
+          "Clave (SKU)",
+          "Producto",
+          "Ubicación",
+          "Cantidad",
+          "Unidad",
+          "Costo promedio",
+          "Valor",
+        ],
+        ["CAB-2", "Cable THW", "General", "12.6", "metro", "", ""],
+        ["TOR-1", "Tornillo", "Zona A › Estante 3", "300", "pieza", "", ""],
       ]);
     }
   });

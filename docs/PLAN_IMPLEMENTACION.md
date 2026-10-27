@@ -582,7 +582,7 @@ Decidido con el fundador (ADR 0030): el inventario se valora a costo, con costo 
 | VAL-03A | Costo opcional en entrada manual y saldo inicial | VAL-02 | Permisos `inventory.cost.read` y `inventory.cost.record` (titular, administrador, comprador); sin costo, la entrada se valora al promedio vigente; una salida sale al promedio |
 | VAL-03B | Costo opcional al importar productos con existencias | VAL-03A | Columna de costo en la plantilla; se exige `inventory.cost.record` al confirmar si alguna fila trae costo |
 | VAL-04 | Salidas, ajustes, conteos y reversas valoradas | VAL-02 | Cada salida guarda el costo del momento; la reconciliación compara también el valor |
-| VAL-05 | Valor del inventario en ficha, lista, Inicio y exportación | VAL-04 | Solo para quien puede ver costos; para los demás el dato no existe en la respuesta |
+| VAL-05 | Valor del inventario en ficha, lista y exportación | VAL-04 | Solo para quien puede ver costos; para los demás el dato no existe en la respuesta. No va en Inicio: ahí solo lo que pide atención (regla KISS) |
 | VAL-06 | Arranque desde el último costo de compra y prueba de extremo a extremo | VAL-05 | Los productos existentes empiezan con su último costo; entrada → salida → conteo concilia cantidad y valor |
 
 ### VEN — Ventas: punto de venta (28)

@@ -23,6 +23,7 @@ import { dec, formatDateTime } from "@/lib";
 import {
   formatStock,
   getMinimum,
+  getProductCost,
   getProductStock,
   listRecentMovements,
 } from "@/modules/inventory";
@@ -83,7 +84,7 @@ export default async function ProductoPage({
   const showSuppliers =
     access.moduleState("purchasing") !== "none" &&
     access.can("purchasing.product_supplier.read");
-  const [stock, presentations, movements, minimum, suppliers] =
+  const [stock, presentations, movements, minimum, suppliers, cost] =
     await Promise.all([
       access.can("inventory.stock.read")
         ? getProductStock(actor, product.id)
@@ -98,6 +99,10 @@ export default async function ProductoPage({
         ? getMinimum(actor, product.id)
         : null,
       showSuppliers ? listSuppliersOfProduct(actor, product.id) : null,
+      // VAL-05: what it is worth, only for who may see costs.
+      access.can("inventory.cost.read")
+        ? getProductCost(actor, product.id)
+        : null,
     ]);
   // Low = the real balance is at or below the minimum (INV-30).
   const low =
@@ -245,6 +250,12 @@ export default async function ProductoPage({
                 {equivalence.text}
               </p>
             ))}
+            {cost && (
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Costo promedio {cost.averageCost} por {unit.name} · Vale{" "}
+                {cost.stockValue}
+              </p>
+            )}
           </div>
           {stock.locations.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground sm:px-5">

@@ -124,7 +124,8 @@ const lineCosts = async (productId: string) =>
   (
     await db.stockMovementLine.findMany({
       where: { productId },
-      orderBy: { createdAt: "asc" },
+      // Ids (UUIDv7) are made in order; two lines can share a millisecond.
+      orderBy: { id: "asc" },
       select: { direction: true, unitCost: true },
     })
   ).map((line) => `${line.direction} ${line.unitCost?.toFixed(2) ?? "-"}`);

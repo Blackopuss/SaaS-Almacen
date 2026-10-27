@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import {
   countLowStock,
   formatStock,
+  getInventoryValue,
   getStockTotals,
 } from "@/modules/inventory";
 import { getModuleAccess } from "@/platform/billing";
@@ -116,6 +117,11 @@ export default async function InventarioPage({
         [...products, ...(list.exact ? [list.exact] : [])].map((p) => p.id),
       )
     : null;
+  // VAL-05: what the stock is worth, only for who may see costs.
+  const worth =
+    !showArchived && access.can("inventory.cost.read")
+      ? await getInventoryValue(actor)
+      : null;
   const lowCount =
     !showArchived &&
     access.can("inventory.minimum.read") &&
@@ -211,6 +217,13 @@ export default async function InventarioPage({
           ) : undefined
         }
       />
+      {worth && (
+        <p className="-mt-2 text-sm text-muted-foreground tabular-nums">
+          Tu inventario vale {worth.total} a costo
+          {worth.withoutCost > 0 &&
+            ` · ${count(worth.withoutCost)} ${worth.withoutCost === 1 ? "producto" : "productos"} sin costo`}
+        </p>
+      )}
       {created && (
         <div
           role="status"

@@ -1,8 +1,12 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { ForbiddenError, newId } from "@/lib";
+import { readSpreadsheet } from "@/platform/files";
 import {
   applyCount,
+  buildExport,
+  getInventoryValue,
+  getProductCost,
   captureCount,
   openCount,
   reconcileStock,
@@ -104,7 +108,8 @@ const lineCosts = async (productId: string) =>
   (
     await db.stockMovementLine.findMany({
       where: { productId },
-      orderBy: { createdAt: "asc" },
+      // Ids (UUIDv7) are made in order; two lines can share a millisecond.
+      orderBy: { id: "asc" },
       select: { direction: true, unitCost: true },
     })
   ).map((line) => `${line.direction} ${line.unitCost?.toFixed(2) ?? "-"}`);
@@ -377,6 +382,83 @@ describe("every movement is valued", () => {
         stockValue: "120",
         expected: "100",
       },
+    ]);
+  });
+});
+
+// VAL-05 (NEG-04): the value exists only for who may see costs.
+describe("who sees what the inventory is worth", () => {
+  it("titular sees cost and value; Almacén and Consulta get nothing", async () => {
+    const actor = await company();
+    const martillo = await product(actor);
+    const clavo = await product(actor);
+    await registerEntry(actor, {
+      productId: martillo,
+      quantity: "10",
+      unitCost: "85.5",
+    });
+    await registerEntry(actor, { productId: clavo, quantity: "3" });
+
+    expect(await getProductCost(actor, martillo)).toEqual({
+      averageCost: "$85.50",
+      stockValue: "$855.00",
+    });
+    expect(await getProductCost(actor, clavo)).toBeNull();
+    expect(await getInventoryValue(actor)).toEqual({
+      total: "$855.00",
+      withoutCost: 1,
+    });
+
+    for (const role of ["warehouse", "viewer"] as const) {
+      const person = await member(actor.organizationId, role);
+      await expect(getProductCost(person, martillo)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      await expect(getInventoryValue(person)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      // Its export of stock has no cost columns at all.
+      const file = await buildExport(person, {
+        kind: "existencias",
+        format: "csv",
+      });
+      if (!file.ok) throw new Error("export failed");
+      const sheet = readSpreadsheet("existencias.csv", file.bytes);
+      if (!sheet.ok) throw new Error("export not readable");
+      expect(sheet.rows[0]).toEqual([
+        "Clave (SKU)",
+        "Producto",
+        "Ubicación",
+        "Cantidad",
+        "Unidad",
+      ]);
+    }
+
+    const file = await buildExport(actor, {
+      kind: "existencias",
+      format: "csv",
+    });
+    if (!file.ok) throw new Error("export failed");
+    const sheet = readSpreadsheet("existencias.csv", file.bytes);
+    if (!sheet.ok) throw new Error("export not readable");
+    expect(sheet.rows[0]).toEqual([
+      "Clave (SKU)",
+      "Producto",
+      "Ubicación",
+      "Cantidad",
+      "Unidad",
+      "Costo promedio",
+      "Valor",
+    ]);
+    expect(
+      sheet.rows
+        .slice(1)
+        .map((row) => row.slice(3))
+        .sort((a, b) => b[0]!.localeCompare(a[0]!)),
+    ).toEqual([
+      // The reader drops empty cells at the end of a row.
+      ["3", "pieza"],
+      ["10", "pieza", "85.5", "855.00"],
     ]);
   });
 });
