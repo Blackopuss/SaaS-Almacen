@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { newId } from "@/lib";
@@ -17,6 +20,8 @@ import { createSupplier } from "@/platform/contacts";
 import { invalidateEntitlements } from "@/platform/entitlements";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
+
+import { migratorConnection } from "../setup/test-db";
 
 // VAL-02 (ADR 0031): receipts move the average cost with the cost of their
 // order line; returns to the supplier take back what they came in at.
@@ -227,5 +232,67 @@ describe("returns to the supplier", () => {
       "OUT 95.00",
     ]);
     expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+});
+
+// VAL-06: products bought before VAL start with their last purchase cost.
+describe("start from the last purchase cost", () => {
+  const BACKFILL = readFileSync(
+    path.join(
+      process.cwd(),
+      "prisma/migrations/20261027140000_average_cost_from_last_purchase/migration.sql",
+    ),
+    "utf8",
+  );
+
+  it("gives a cost to what had only a last cost, and leaves the rest", async () => {
+    const actor = await company();
+    const tornillo = await product(actor);
+    const caja = await createPresentation(actor, tornillo, {
+      name: "Caja",
+      factor: "500",
+    });
+    if (!caja.ok) throw new Error("presentation setup failed");
+    await bought(actor, [
+      {
+        productId: tornillo,
+        capture: `p:${caja.presentationId}`,
+        quantity: "2",
+        unitCost: "450",
+      },
+    ]);
+    const martillo = await product(actor);
+    await bought(actor, [
+      { productId: martillo, quantity: "4", unitCost: "85" },
+    ]);
+    // As before VAL-02: the purchases left a last cost, but no average.
+    await db.productCost.deleteMany({ where: { productId: tornillo } });
+    // One that moved after VAL keeps the cost its movements gave it.
+    await db.productCost.updateMany({
+      where: { productId: martillo },
+      data: { averageCost: "80", stockValue: "320" },
+    });
+
+    const connection = await migratorConnection();
+    try {
+      await connection.query(BACKFILL);
+      // Running it again changes nothing.
+      await connection.query(BACKFILL);
+    } finally {
+      await connection.end();
+    }
+
+    // $450 per box of 500 = $0.90 a screw; 1,000 screws = $900.
+    expect(await costOf(tornillo)).toEqual({
+      averageCost: "0.900000",
+      stockValue: "900.000000",
+    });
+    expect(await costOf(martillo)).toEqual({
+      averageCost: "80.000000",
+      stockValue: "320.000000",
+    });
+    expect(await db.productCost.count({ where: { productId: tornillo } })).toBe(
+      1,
+    );
   });
 });
