@@ -16,6 +16,7 @@ import { getQuote, getQuoteDeliveries } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 import { QuoteDeliveryPanel } from "./delivery-panel";
+import { QuoteStatusActions } from "./status-actions";
 
 export const metadata: Metadata = { title: "Cotización" };
 
@@ -64,15 +65,32 @@ export default async function CotizacionPage({
   if (!quote || !delivery) notFound();
   const zone = access.organization.timeZone;
   const active = access.moduleState("sales") === "active";
+  const canAct = active && access.allows("sales.quote.create");
   const edit =
-    quote.status === "DRAFT" && access.allows("sales.quote.create") ? (
-      <Button asChild variant="outline">
-        <Link href={`/ventas/cotizaciones/${quote.id}/editar`}>
-          <Pencil aria-hidden="true" data-icon="inline-start" />
-          Editar cotización
-        </Link>
-      </Button>
+    quote.status === "DRAFT" && canAct ? (
+      <>
+        <Button asChild variant="outline">
+          <Link href={`/ventas/cotizaciones/${quote.id}/editar`}>
+            <Pencil aria-hidden="true" data-icon="inline-start" />
+            Editar cotización
+          </Link>
+        </Button>
+        <QuoteStatusActions
+          quoteId={quote.id}
+          number={quote.number}
+          status="DRAFT"
+          validUntil={quote.validUntil}
+        />
+      </>
     ) : undefined;
+  const badge =
+    quote.status === "ACCEPTED"
+      ? "success"
+      : quote.status === "REJECTED"
+        ? "destructive"
+        : quote.status === "SENT"
+          ? "secondary"
+          : "outline";
 
   return (
     <PageContainer>
@@ -94,11 +112,7 @@ export default async function CotizacionPage({
             className="space-y-2 rounded-xl border bg-card p-4 text-sm sm:p-5"
           >
             <p className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant={quote.status === "DRAFT" ? "outline" : "secondary"}
-              >
-                {quote.statusLabel}
-              </Badge>
+              <Badge variant={badge}>{quote.statusLabel}</Badge>
               <span className="text-muted-foreground">
                 Vale hasta {quote.validUntil}
               </span>
@@ -118,34 +132,57 @@ export default async function CotizacionPage({
             <p className="text-muted-foreground">
               Hecha por {quote.createdBy ?? "alguien que ya no está"} el{" "}
               {quote.createdAtText}
+              {quote.sentAtText && ` · enviada el ${quote.sentAtText}`}
             </p>
+            {quote.decision && (
+              <p>
+                {quote.status === "ACCEPTED" ? "Aceptada" : "Rechazada"} el{" "}
+                {quote.decision.atText}
+                {quote.decision.by && ` (registró ${quote.decision.by})`}
+                {quote.decision.rejectReason &&
+                  `: ${quote.decision.rejectReason}`}
+              </p>
+            )}
             {quote.notes && (
               <p className="[overflow-wrap:anywhere] whitespace-pre-line">
                 {quote.notes}
               </p>
             )}
           </section>
-          <QuoteDeliveryPanel
-            quoteId={quote.id}
-            number={quote.number}
-            customerName={quote.customer.name}
-            draft={quote.status === "DRAFT"}
-            inProgress={delivery.inProgress}
-            send={active ? delivery.send : undefined}
-            canWriteEmail={access.allows("sales.customer.create")}
-            deliveries={delivery.deliveries.map((row) => ({
-              id: row.id,
-              recipient: row.recipient,
-              status: row.status,
-              statusLabel: row.statusLabel,
-              requestedText: formatDateTime(row.requestedAt, zone),
-              endedText: row.sentAt ? formatDateTime(row.sentAt, zone) : null,
-              failureReason: row.failureReason,
-              attempts: row.attempts,
-              maxAttempts: row.maxAttempts,
-              retrying: row.retrying,
-            }))}
-          />
+          {canAct &&
+            (quote.status === "SENT" || quote.status === "EXPIRED") && (
+              <QuoteStatusActions
+                quoteId={quote.id}
+                number={quote.number}
+                status={quote.status}
+                validUntil={quote.validUntil}
+              />
+            )}
+          {(delivery.deliveries.length > 0 ||
+            quote.status === "DRAFT" ||
+            quote.status === "SENT") && (
+            <QuoteDeliveryPanel
+              quoteId={quote.id}
+              number={quote.number}
+              customerName={quote.customer.name}
+              draft={quote.status === "DRAFT"}
+              inProgress={delivery.inProgress}
+              send={active ? delivery.send : undefined}
+              canWriteEmail={access.allows("sales.customer.create")}
+              deliveries={delivery.deliveries.map((row) => ({
+                id: row.id,
+                recipient: row.recipient,
+                status: row.status,
+                statusLabel: row.statusLabel,
+                requestedText: formatDateTime(row.requestedAt, zone),
+                endedText: row.sentAt ? formatDateTime(row.sentAt, zone) : null,
+                failureReason: row.failureReason,
+                attempts: row.attempts,
+                maxAttempts: row.maxAttempts,
+                retrying: row.retrying,
+              }))}
+            />
+          )}
           <section
             aria-labelledby="productos-cotizados"
             className="rounded-xl border bg-card"

@@ -406,6 +406,14 @@ export type QuoteView = {
   createdAt: Date;
   /** «12 oct 2026, 10:15 a.m.», in the company's time zone. */
   createdAtText: string;
+  /** When it was sent, and the customer's answer (COT-04). */
+  sentAtText: string | null;
+  decision: {
+    atText: string;
+    /** Who recorded it. */
+    by: string | null;
+    rejectReason: string | null;
+  } | null;
   lines: {
     id: string;
     productId: string;
@@ -457,10 +465,18 @@ export async function getQuote(
     },
   });
   if (!quote) return null;
-  const author = await client.membership.findFirst({
-    where: { userId: quote.createdByUserId },
-    select: { user: { select: { name: true } } },
+  const people = await client.membership.findMany({
+    where: {
+      userId: {
+        in: [quote.createdByUserId, quote.decidedByUserId ?? ""].filter(
+          Boolean,
+        ),
+      },
+    },
+    select: { userId: true, user: { select: { name: true } } },
   });
+  const nameOf = (userId: string | null) =>
+    people.find((person) => person.userId === userId)?.user.name ?? null;
   const timeZone = quote.organization.timeZone || "America/Mexico_City";
   const today = await companyToday(actor.organizationId);
   const status = statusOf(quote.status, quote.validUntil, today);
@@ -484,9 +500,17 @@ export async function getQuote(
     customer: quote.customer,
     validUntil: dayOfDate(quote.validUntil),
     notes: quote.notes,
-    createdBy: author?.user.name ?? null,
+    createdBy: nameOf(quote.createdByUserId),
     createdAt: quote.createdAt,
     createdAtText: formatDateTime(quote.createdAt, timeZone),
+    sentAtText: quote.sentAt ? formatDateTime(quote.sentAt, timeZone) : null,
+    decision: quote.decidedAt
+      ? {
+          atText: formatDateTime(quote.decidedAt, timeZone),
+          by: nameOf(quote.decidedByUserId),
+          rejectReason: quote.rejectReason,
+        }
+      : null,
     lines: quote.lines.map((line) => {
       const unit = getUnit(line.unitCode);
       const captured = dec(line.capturedQuantity.toString());

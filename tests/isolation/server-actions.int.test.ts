@@ -73,6 +73,13 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); el cliente es el de la cotización, buscada solo en esa empresa",
     coveredBy: "tests/sales/quote-delivery.int.test.ts",
   },
+  changeQuoteStatusAction: {
+    input:
+      "id de la cotización, el estado al que pasa y el motivo de un rechazo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa",
+    coveredBy: "tests/sales/quote-status.int.test.ts",
+  },
   returnSaleAction: {
     input:
       "id de la venta, cantidades por línea, motivo, forma de reembolso y referencia",

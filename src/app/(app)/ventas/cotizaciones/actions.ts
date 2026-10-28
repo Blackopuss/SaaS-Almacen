@@ -6,11 +6,14 @@ import { redirect } from "next/navigation";
 import { isAppError } from "@/lib";
 import {
   QUOTE_MAX_LINES,
+  acceptQuote,
   createQuote,
   findSaleProducts,
   getQuote,
   getSaleProduct,
+  markQuoteSent,
   previewQuote,
+  rejectQuote,
   requestQuoteDelivery,
   updateQuote,
   type QuoteField,
@@ -209,6 +212,47 @@ export async function setQuoteCustomerEmailAction(
     if (!result.ok) return { ok: false, error: result.error };
     revalidatePath(`/ventas/cotizaciones/${idPath(quote.id)}`);
     return { ok: true, message: `Guardamos ${result.email}.` };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * What the customer answered (COT-04): handed over without mail, accepted
+ * or rejected with its reason. The quote is looked for in the company of
+ * the session; the service checks the permission and the state.
+ */
+export async function changeQuoteStatusAction(
+  quoteId: string,
+  to: "SENT" | "ACCEPTED" | "REJECTED",
+  reason = "",
+): Promise<QuoteActionResult> {
+  const actor = await actorOfSession();
+  const id = String(quoteId).slice(0, 36);
+  try {
+    const result =
+      to === "SENT"
+        ? await markQuoteSent(actor, id)
+        : to === "ACCEPTED"
+          ? await acceptQuote(actor, id)
+          : to === "REJECTED"
+            ? await rejectQuote(actor, id, String(reason ?? "").slice(0, 600))
+            : { ok: false as const, error: "Esa respuesta no existe." };
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidatePath(`/ventas/cotizaciones/${idPath(id)}`);
+    revalidatePath("/ventas/cotizaciones");
+    return {
+      ok: true,
+      message:
+        to === "SENT"
+          ? "La cotización quedó como enviada."
+          : to === "ACCEPTED"
+            ? "La cotización quedó como aceptada."
+            : "La cotización quedó como rechazada.",
+    };
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { ok: false, error: error.message };
