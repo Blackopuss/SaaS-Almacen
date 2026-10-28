@@ -186,6 +186,37 @@ function draw(
     y += strong ? 16 : 13;
   }
 
+  // The payment plan offered (PAG-03): the calendar in amounts; its dates
+  // start the day of the sale.
+  if (quote.plan) {
+    const plan = quote.plan;
+    const rows: [string, string][] = [
+      ["Enganche", plan.downPayment],
+      [`${plan.months} mensualidades de`, plan.installment],
+      ...(plan.lastInstallment
+        ? ([["La última", plan.lastInstallment]] as [string, string][])
+        : []),
+      [`Interés (${plan.interestText})`, plan.interest],
+      ["Total a plazos", plan.totalToPay],
+    ];
+    if (y + 30 + rows.length * 13 > BOTTOM) startPage(false);
+    y += 14;
+    page.text(MARGIN, y, `PLAN DE PAGOS: A ${plan.months} MESES`, label);
+    y += 13;
+    for (const [name, value] of rows) {
+      page.text(MARGIN, y, name, { size: 9 });
+      page.text(COLUMN.amount - 2, y, value, { size: 9, align: "right" });
+      y += 13;
+    }
+    page.text(
+      MARGIN,
+      y,
+      "Las mensualidades vencen cada mes a partir del día de la compra.",
+      { size: 8, gray: 0.35 },
+    );
+    y += 12;
+  }
+
   if (quote.notes) {
     const notes = wrapText(quote.notes, RIGHT - MARGIN, 9, "regular");
     if (y + 30 + notes.length * 12 > BOTTOM) startPage(false);

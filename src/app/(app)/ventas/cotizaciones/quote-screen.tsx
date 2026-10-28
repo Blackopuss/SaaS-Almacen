@@ -12,6 +12,8 @@ import {
 import {
   QUOTE_MAX_LINES,
   defaultQuoteValidity,
+  describeTerms,
+  getInstallmentTerms,
   getQuote,
   getSaleProduct,
 } from "@/modules/sales";
@@ -99,6 +101,8 @@ export async function QuoteScreen({
       notes: quote.notes ?? "",
       discountPercent: quote.discount?.percent ?? "",
       discountReason: quote.discount?.reason ?? "",
+      planMonths: quote.plan ? String(quote.plan.months) : "",
+      planDownPayment: quote.plan?.downPayment ?? "",
       lines: quote.lines.flatMap((line, index) => {
         const product = products[index];
         return product
@@ -113,9 +117,12 @@ export async function QuoteScreen({
       notes: "",
       discountPercent: "",
       discountReason: "",
+      planMonths: "",
+      planDownPayment: "",
       lines: [],
     };
   }
+  const terms = await getInstallmentTerms(actor);
 
   return (
     <PageContainer>
@@ -130,6 +137,10 @@ export async function QuoteScreen({
         quoteId={quoteId}
         draft={draft}
         maxLines={QUOTE_MAX_LINES}
+        terms={terms.map((term) => ({
+          value: String(term.months),
+          label: describeTerms([term]),
+        }))}
         canCreateCustomer={access.allows("sales.customer.create")}
         cancelHref={backHref}
       />

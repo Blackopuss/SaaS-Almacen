@@ -2218,36 +2218,41 @@ enum SalesQuoteStatus {
 /// stock nor the cash register. Its totals are not stored: they come from
 /// its lines with `saleTotals`, like a sale's.
 model SalesQuote {
-  id               String               @id @db.Char(36)
-  organizationId   String               @db.Char(36)
-  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                         String               @id @db.Char(36)
+  organizationId             String               @db.Char(36)
+  organization               Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive number of the company: 1, 2, 3…
-  number           Int
-  status           SalesQuoteStatus     @default(DRAFT)
+  number                     Int
+  status                     SalesQuoteStatus     @default(DRAFT)
   /// Always a customer: a quote goes to someone.
-  customerId       String               @db.Char(36)
-  customer         Contact              @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  customerId                 String               @db.Char(36)
+  customer                   Contact              @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
   /// Last day it holds, of the company's calendar.
-  validUntil       DateTime             @db.Date
+  validUntil                 DateTime             @db.Date
   /// VAT rule when it was written (VEN-04).
-  pricesIncludeTax Boolean
-  taxRate          Decimal              @db.Decimal(5, 2)
+  pricesIncludeTax           Boolean
+  taxRate                    Decimal              @db.Decimal(5, 2)
   /// Discount of the whole quote, in percent, and why (VEN-14).
-  discountPercent  Decimal              @default(0) @db.Decimal(5, 2)
-  discountReason   String?              @db.VarChar(200)
+  discountPercent            Decimal              @default(0) @db.Decimal(5, 2)
+  discountReason             String?              @db.VarChar(200)
   /// For the customer: conditions, delivery, what was talked about.
-  notes            String?              @db.VarChar(1000)
-  createdByUserId  String               @db.Char(36)
-  createdAt        DateTime             @default(now()) @db.DateTime(3)
-  updatedAt        DateTime             @updatedAt @db.DateTime(3)
-  sentAt           DateTime?            @db.DateTime(3)
+  /// Payment plan offered (PAG-03); all three null = cash. The interest
+  /// is copied from the company's term when the quote is written.
+  installmentMonths          Int?
+  installmentInterestPercent Decimal?             @db.Decimal(5, 2)
+  downPayment                Decimal?             @db.Decimal(14, 2)
+  notes                      String?              @db.VarChar(1000)
+  createdByUserId            String               @db.Char(36)
+  createdAt                  DateTime             @default(now()) @db.DateTime(3)
+  updatedAt                  DateTime             @updatedAt @db.DateTime(3)
+  sentAt                     DateTime?            @db.DateTime(3)
   /// Accepted or rejected: when, by whom (who recorded it) and why.
-  decidedAt        DateTime?            @db.DateTime(3)
-  decidedByUserId  String?              @db.Char(36)
-  rejectReason     String?              @db.VarChar(500)
-  lines            SalesQuoteLine[]
-  deliveries       SalesQuoteDelivery[]
-  order            SalesOrder?
+  decidedAt                  DateTime?            @db.DateTime(3)
+  decidedByUserId            String?              @db.Char(36)
+  rejectReason               String?              @db.VarChar(500)
+  lines                      SalesQuoteLine[]
+  deliveries                 SalesQuoteDelivery[]
+  order                      SalesOrder?
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])

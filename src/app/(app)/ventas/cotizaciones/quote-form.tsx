@@ -46,6 +46,9 @@ export type QuoteFormDraft = {
   notes: string;
   discountPercent: string;
   discountReason: string;
+  /** «6»; empty = cash (PAG-03). */
+  planMonths: string;
+  planDownPayment: string;
   lines: { product: SaleProduct; quantity: string; capture: string }[];
 };
 
@@ -66,6 +69,7 @@ export function QuoteForm({
   quoteId,
   draft,
   maxLines,
+  terms,
   canCreateCustomer,
   cancelHref,
 }: {
@@ -73,6 +77,8 @@ export function QuoteForm({
   quoteId: string | null;
   draft: QuoteFormDraft;
   maxLines: number;
+  /** The company's installment terms: «6» → «6 meses con 10 %». */
+  terms: { value: string; label: string }[];
   canCreateCustomer: boolean;
   cancelHref: string;
 }) {
@@ -88,6 +94,8 @@ export function QuoteForm({
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [discountPercent, setDiscountPercent] = useState(draft.discountPercent);
+  const [planMonths, setPlanMonths] = useState(draft.planMonths);
+  const [planDown, setPlanDown] = useState(draft.planDownPayment);
   const [preview, setPreview] = useState<QuotePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   /** Problems the server found, by line key: lines may move after. */
@@ -193,6 +201,7 @@ export function QuoteForm({
         const answer = await previewQuoteAction(
           JSON.parse(payload),
           discountPercent,
+          { months: planMonths, downPayment: planDown },
         );
         if (ticket !== asked.current) return;
         if ("error" in answer) {
@@ -211,7 +220,7 @@ export function QuoteForm({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [payload, discountPercent]);
+  }, [payload, discountPercent, planMonths, planDown]);
 
   const [state, formAction, pending] = useActionState(
     async (prev: QuoteFormState, formData: FormData) => {
@@ -240,6 +249,8 @@ export function QuoteForm({
       "lines",
       "discountPercent",
       "discountReason",
+      "planMonths",
+      "planDownPayment",
       "notes",
     ] as const;
     const first = order.find((name) => state.fieldErrors[name]);
@@ -254,6 +265,16 @@ export function QuoteForm({
   }, [state]);
 
   const fresh = preview !== null && preview.lines.length === lines.length;
+  const planMonthsError =
+    state.fieldErrors.planMonths ??
+    (preview?.planError?.field === "planMonths"
+      ? preview.planError.error
+      : undefined);
+  const planDownError =
+    state.fieldErrors.planDownPayment ??
+    (preview?.planError?.field === "planDownPayment" && planDown.trim() !== ""
+      ? preview.planError.error
+      : undefined);
   const units = lines.length === 1 ? "1 producto" : `${lines.length} productos`;
 
   return (
@@ -644,6 +665,126 @@ export function QuoteForm({
               </FormField>
             </div>
           </details>
+
+          {terms.length > 0 && (
+            <fieldset className="space-y-3">
+              <legend className="mb-2 text-sm font-medium">
+                Forma de pago
+              </legend>
+              <input type="hidden" name="planMonths" value={planMonths} />
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "", label: "Contado" },
+                  { value: planMonths || terms[0]!.value, label: "A plazos" },
+                ].map((option) => {
+                  const checked =
+                    option.value === "" ? planMonths === "" : planMonths !== "";
+                  return (
+                    <label
+                      key={option.label}
+                      className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border bg-card px-3 text-sm font-medium has-checked:border-primary has-checked:bg-primary/5 has-checked:text-primary has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                    >
+                      <input
+                        type="radio"
+                        name="planMode"
+                        className="sr-only"
+                        checked={checked}
+                        onChange={() => setPlanMonths(option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+              {planMonths !== "" && (
+                <>
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="plazo-cotizacion"
+                      className="text-sm font-medium"
+                    >
+                      Plazo
+                    </label>
+                    <NativeSelect
+                      id="plazo-cotizacion"
+                      data-field="planMonths"
+                      key={`plan-${state.answers}`}
+                      defaultValue={planMonths}
+                      onChange={(event) => setPlanMonths(event.target.value)}
+                      aria-invalid={Boolean(planMonthsError)}
+                      aria-describedby={
+                        planMonthsError ? "plazo-cotizacion-error" : undefined
+                      }
+                    >
+                      {terms.map((term) => (
+                        <option key={term.value} value={term.value}>
+                          {term.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    {planMonthsError && (
+                      <p
+                        id="plazo-cotizacion-error"
+                        className="text-sm text-destructive"
+                      >
+                        {planMonthsError}
+                      </p>
+                    )}
+                  </div>
+                  <FormField
+                    id="enganche-cotizacion"
+                    label="Enganche ($)"
+                    error={planDownError}
+                  >
+                    {(control) => (
+                      <Input
+                        {...control}
+                        name="planDownPayment"
+                        data-field="planDownPayment"
+                        value={planDown}
+                        onChange={(event) => setPlanDown(event.target.value)}
+                        inputMode="decimal"
+                        autoComplete="off"
+                        maxLength={16}
+                        className="tabular-nums"
+                      />
+                    )}
+                  </FormField>
+                  {preview?.plan && (
+                    <dl
+                      className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm tabular-nums"
+                      aria-live="polite"
+                    >
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">
+                          {preview.plan.months} mensualidades
+                        </dt>
+                        <dd className="font-medium">
+                          {preview.plan.installment}
+                        </dd>
+                      </div>
+                      {preview.plan.lastInstallment && (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">La última</dt>
+                          <dd>{preview.plan.lastInstallment}</dd>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Interés</dt>
+                        <dd>{preview.plan.interest}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3 border-t pt-1">
+                        <dt className="font-medium">Total a plazos</dt>
+                        <dd className="font-medium">
+                          {preview.plan.totalToPay}
+                        </dd>
+                      </div>
+                    </dl>
+                  )}
+                </>
+              )}
+            </fieldset>
+          )}
 
           <div className="flex flex-col gap-2">
             <Button type="submit" disabled={pending}>

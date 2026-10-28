@@ -258,6 +258,39 @@ export default async function CotizacionPage({
               <dd className="text-2xl font-semibold">{quote.total}</dd>
             </div>
           </dl>
+          {quote.plan && (
+            <div className="space-y-1 border-t pt-3 text-sm">
+              <p className="font-medium">
+                A {quote.plan.months} meses, {quote.plan.interestText}
+              </p>
+              <dl className="space-y-1 tabular-nums">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Enganche</dt>
+                  <dd>{quote.plan.downPayment}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">
+                    {quote.plan.months} mensualidades
+                  </dt>
+                  <dd>{quote.plan.installment}</dd>
+                </div>
+                {quote.plan.lastInstallment && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">La última</dt>
+                    <dd>{quote.plan.lastInstallment}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Interés</dt>
+                  <dd>{quote.plan.interest}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="font-medium">Total a plazos</dt>
+                  <dd className="font-medium">{quote.plan.totalToPay}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
         </section>
       </div>
     </PageContainer>

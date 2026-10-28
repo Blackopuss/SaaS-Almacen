@@ -36,6 +36,7 @@ export {
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
 export { addMonths, planInstallments } from "./installment-plan";
+export type { QuotePlanInput, QuotePlanView } from "./quote-plan";
 export type {
   InstallmentPlan,
   InstallmentPlanInput,

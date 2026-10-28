@@ -3,6 +3,7 @@ import "server-only";
 import { dec, formatDateTime, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { loadSubject } from "@/platform/authorization";
+import { mayReadInventoryCosts } from "@/modules/inventory";
 import { assertModulePermission } from "@/platform/billing";
 import {
   LOCKING_TRANSACTION,
@@ -17,6 +18,13 @@ import { quantityText } from "./line-text";
 import { PERCENT_ERROR, formatPercent, parsePercent } from "./discounts";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
+import {
+  checkQuotePlan,
+  planView,
+  storedPlanView,
+  type QuotePlanInput,
+  type QuotePlanView,
+} from "./quote-plan";
 import { checkDiscount } from "./sale-discount";
 import { readTaxRule } from "./settings";
 import { formatTaxRate, saleTotals } from "./tax";
@@ -56,6 +64,8 @@ export type QuoteInput = {
   lines: readonly CartLineInput[];
   /** Discount of the whole quote, as typed: «10», with its reason. */
   discount?: { percent?: string; reason?: string };
+  /** Payment plan (PAG-03); absent or no months = cash. */
+  plan?: QuotePlanInput;
 };
 
 export type QuoteField =
@@ -64,6 +74,8 @@ export type QuoteField =
   | "notes"
   | "discountPercent"
   | "discountReason"
+  | "planMonths"
+  | "planDownPayment"
   | "lines";
 
 export type QuoteResult =
@@ -107,6 +119,9 @@ async function readInput(
       lines: CartLineInput[];
       percent: string | null;
       reason: string | null;
+      plan: QuotePlanInput | undefined;
+      today: string;
+      mayReadCosts: boolean;
     }
   | { ok: false; failure: Failure }
 > {
@@ -166,6 +181,15 @@ async function readInput(
     lines,
     percent: discounted ? percent : null,
     reason: discounted ? reason : null,
+    plan: input.plan
+      ? {
+          months: String(input.plan.months ?? "").slice(0, 4),
+          downPayment: String(input.plan.downPayment ?? "").slice(0, 20),
+        }
+      : undefined,
+    today,
+    // Read before the transaction (MOD-08): it opens its own connection.
+    mayReadCosts: await mayReadInventoryCosts(actor),
   };
 }
 
@@ -222,8 +246,28 @@ async function priceQuote(
     discounts = check.discounts;
   }
   const rule = await readTaxRule(tx, actor.organizationId);
+  const total = saleTotals(
+    lines.map((line, index) => line.amount.minus(discounts[index]!)),
+    rule,
+  ).total;
+  const plan = await checkQuotePlan(tx, {
+    plan: read.plan,
+    lines,
+    total,
+    today: read.today,
+    mayReadCosts: read.mayReadCosts,
+  });
+  if (!plan.ok) {
+    throw new Rejected(failure({ fieldErrors: { [plan.field]: plan.error } }));
+  }
+  const stored = plan.stored ?? {
+    installmentMonths: null,
+    installmentInterestPercent: null,
+    downPayment: null,
+  };
   return {
     rule,
+    stored,
     rows: lines.map((line, index) => ({
       id: newId(),
       organizationId: actor.organizationId,
@@ -258,7 +302,7 @@ export async function createQuote(
   const { organizationId, userId } = actor;
   try {
     return await forOrganization(organizationId).$transaction(async (tx) => {
-      const { rule, rows } = await priceQuote(tx, actor, read);
+      const { rule, rows, stored } = await priceQuote(tx, actor, read);
       const last = await tx.salesQuote.findFirst({
         orderBy: { number: "desc" },
         select: { number: true },
@@ -277,6 +321,7 @@ export async function createQuote(
           discountPercent: read.percent ?? "0",
           discountReason: read.reason,
           notes: read.notes,
+          ...stored,
           createdByUserId: userId,
         },
       });
@@ -345,7 +390,7 @@ export async function updateQuote(
           }),
         );
       }
-      const { rule, rows } = await priceQuote(tx, actor, read);
+      const { rule, rows, stored } = await priceQuote(tx, actor, read);
       await tx.salesQuoteLine.deleteMany({ where: { quoteId: quote.id } });
       await tx.salesQuote.update({
         where: { id: quote.id },
@@ -357,6 +402,7 @@ export async function updateQuote(
           discountPercent: read.percent ?? "0",
           discountReason: read.reason,
           notes: read.notes,
+          ...stored,
         },
       });
       await tx.salesQuoteLine.createMany({
@@ -437,6 +483,8 @@ export type QuoteView = {
   taxLabel: string;
   tax: string;
   total: string;
+  /** Payment plan offered (PAG-03); null = cash. */
+  plan: QuotePlanView | null;
 };
 
 /** A quote of the company with its totals; null when it does not exist. */
@@ -544,6 +592,7 @@ export async function getQuote(
       : `IVA (${rate})`,
     tax: formatMoney(totals.tax),
     total: formatMoney(totals.total),
+    plan: storedPlanView(quote, totals.total, today),
   };
 }
 
@@ -632,12 +681,19 @@ export type QuotePreview = {
   total: string;
   discount: string | null;
   discountError?: string;
+  /** The plan as it would be offered (PAG-03). */
+  plan: QuotePlanView | null;
+  planError?: { field: "planMonths" | "planDownPayment"; error: string };
 };
 
 /** What a quote being written adds up to. Reads only; prices from here. */
 export async function previewQuote(
   actor: SalesActor,
-  input: { lines: readonly CartLineInput[]; discountPercent?: string },
+  input: {
+    lines: readonly CartLineInput[];
+    discountPercent?: string;
+    plan?: QuotePlanInput;
+  },
 ): Promise<QuotePreview> {
   await assertModulePermission(
     actor.organizationId,
@@ -683,6 +739,16 @@ export async function previewQuote(
     rule,
   );
   const rate = formatTaxRate(rule.rate);
+  const plan =
+    sellable.length > 0
+      ? await checkQuotePlan(client, {
+          plan: input.plan,
+          lines: sellable,
+          total: totals.total,
+          today: await companyToday(actor.organizationId),
+          mayReadCosts: await mayReadInventoryCosts(actor),
+        })
+      : null;
   return {
     lines: priced.map((line, index) => ({
       unitPrice: line ? `${formatMoney(line.unitPrice)} c/u` : null,
@@ -697,6 +763,17 @@ export async function previewQuote(
     total: formatMoney(totals.total),
     discount: off.isZero() ? null : `-${formatMoney(off)}`,
     ...(discountError ? { discountError } : {}),
+    plan:
+      plan?.ok && plan.plan && plan.stored
+        ? planView(
+            plan.plan,
+            plan.stored.installmentMonths,
+            plan.stored.installmentInterestPercent,
+          )
+        : null,
+    ...(plan && !plan.ok
+      ? { planError: { field: plan.field, error: plan.error } }
+      : {}),
   };
 }
 

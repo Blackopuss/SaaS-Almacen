@@ -75,13 +75,21 @@ function readLines(lines: unknown) {
 export async function previewQuoteAction(
   lines: unknown,
   discountPercent?: unknown,
+  plan?: unknown,
 ): Promise<QuotePreview | { error: string }> {
   const actor = await quoter();
   if (!actor) return { error: NOT_ALLOWED };
+  const fields =
+    plan && typeof plan === "object" ? (plan as Record<string, unknown>) : {};
+  const text = (value: unknown, max: number) =>
+    typeof value === "string" ? value.slice(0, max) : "";
   return previewQuote(actor, {
     lines: readLines(lines).slice(0, QUOTE_MAX_LINES),
-    discountPercent:
-      typeof discountPercent === "string" ? discountPercent.slice(0, 16) : "",
+    discountPercent: text(discountPercent, 16),
+    plan: {
+      months: text(fields.months, 4),
+      downPayment: text(fields.downPayment, 20),
+    },
   });
 }
 
@@ -127,6 +135,10 @@ export async function saveQuoteAction(
     discount: {
       percent: field("discountPercent", 16),
       reason: field("discountReason", 300),
+    },
+    plan: {
+      months: field("planMonths", 4),
+      downPayment: field("planDownPayment", 20),
     },
   };
   const answers = prev.answers + 1;
