@@ -34,6 +34,17 @@ export {
   findSaleByKey,
   registerSale,
 } from "./sales";
+export { fulfillSalesOrder } from "./order-fulfillment";
+export type {
+  FulfillmentInput,
+  FulfillmentLineInput,
+  FulfillmentResult,
+} from "./order-fulfillment";
+export {
+  SALES_ORDER_TRANSITIONS,
+  awaitsFulfillment,
+  canSalesOrderTransition,
+} from "./sales-order-states";
 export type { SaleInput, SaleResult } from "./sales";
 export {
   PAYMENT_METHODS,
@@ -148,9 +159,9 @@ export {
   getSalesOrder,
   listSalesOrders,
 } from "./sales-orders";
+export type { SalesOrderStatus } from "./sales-order-states";
 export type {
   ConvertQuoteResult,
-  SalesOrderStatus,
   SalesOrderSummary,
   SalesOrderView,
 } from "./sales-orders";

@@ -1943,6 +1943,9 @@ model Sale {
   cancelledByUserId       String?                    @db.Char(36)
   cancelledAt             DateTime?                  @db.DateTime(3)
   cancelReason            String?                    @db.VarChar(500)
+  /// The order it fulfills (COT-07); null for a counter sale.
+  salesOrderId            String?                    @db.Char(36)
+  salesOrder              SalesOrder?                @relation(fields: [organizationId, salesOrderId], references: [organizationId, id], onDelete: Restrict)
   lines                   SaleLine[]
   payments                SalePayment[]
   returns                 SaleReturn[]
@@ -1956,6 +1959,7 @@ model Sale {
   @@index([organizationId, cashSessionId])
   @@index([organizationId, soldByUserId, createdAt])
   @@index([organizationId, customerId, createdAt])
+  @@index([organizationId, salesOrderId])
   @@map("sale")
 }
 
@@ -1993,12 +1997,16 @@ model SaleLine {
   /// Average cost of one unit of the product it took (VAL, ADR 0031);
   /// null when unknown. Private to who may see costs.
   unitCost              Decimal?             @db.Decimal(18, 6)
+  /// The line of the order it fulfills (COT-07), in the same terms.
+  orderLineId           String?              @db.Char(36)
+  orderLine             SalesOrderLine?      @relation(fields: [organizationId, orderLineId], references: [organizationId, id], onDelete: Restrict)
   returnLines           SaleReturnLine[]
   createdAt             DateTime             @default(now()) @db.DateTime(3)
 
   @@unique([organizationId, id])
   @@unique([organizationId, saleId, lineNumber])
   @@index([organizationId, productId, createdAt])
+  @@index([organizationId, orderLineId])
   @@map("sale_line")
 }
 
@@ -2328,6 +2336,8 @@ model SalesOrder {
   createdByUserId  String           @db.Char(36)
   createdAt        DateTime         @default(now()) @db.DateTime(3)
   lines            SalesOrderLine[]
+  /// What was fulfilled of it: each delivery is a sale (COT-07).
+  sales            Sale[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -2359,6 +2369,7 @@ model SalesOrderLine {
   discount              Decimal              @default(0) @db.Decimal(12, 2)
   amount                Decimal              @db.Decimal(14, 2)
   createdAt             DateTime             @default(now()) @db.DateTime(3)
+  saleLines             SaleLine[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, orderId, lineNumber])

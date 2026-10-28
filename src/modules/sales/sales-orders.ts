@@ -9,16 +9,17 @@ import { formatPercent } from "./discounts";
 import { quantityText } from "./line-text";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
+import { deliveredByLine } from "./order-fulfillment";
+import type { SalesOrderStatus } from "./sales-order-states";
 import { formatTaxRate, saleTotals } from "./tax";
 
 /**
  * Sales orders (COT-05, ADR 0030): an accepted quote becomes an order with
  * the prices, discount and VAT rule the customer accepted, copied line by
  * line. One order per quote: converting it again answers with the same
- * order. An order does not touch stock until it is fulfilled (COT-07).
+ * order. An order does not touch stock until it is fulfilled: each
+ * delivery is a sale of the order (COT-07, `order-fulfillment.ts`).
  */
-
-export type SalesOrderStatus = "OPEN" | "PARTIAL" | "FULFILLED" | "CANCELLED";
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrderStatus, string> = {
   OPEN: "Por surtir",
@@ -176,6 +177,20 @@ export type SalesOrderView = {
     unitPrice: string;
     /** Before the discount. */
     amount: string;
+    /** What is still missing, in the line's terms: «1», «0.5». */
+    missing: string;
+    /** «1 caja de 500 piezas»; null when nothing was delivered yet. */
+    deliveredText: string | null;
+    /** «1 caja de 500 piezas»; null when nothing is missing. */
+    missingText: string | null;
+  }[];
+  /** Its deliveries: each one a sale (COT-07), oldest first. */
+  sales: {
+    id: string;
+    number: number;
+    createdAtText: string;
+    total: string;
+    cancelled: boolean;
   }[];
   discount: { text: string; reason: string } | null;
   subtotal: string;
@@ -208,9 +223,24 @@ export async function getSalesOrder(
           presentation: { select: { name: true } },
         },
       },
+      sales: {
+        orderBy: { number: "asc" },
+        select: {
+          id: true,
+          number: true,
+          createdAt: true,
+          total: true,
+          status: true,
+        },
+      },
     },
   });
   if (!order) return null;
+  const timeZone = order.organization.timeZone || "America/Mexico_City";
+  const delivered = await deliveredByLine(
+    client,
+    order.lines.map((line) => line.id),
+  );
   const author = await client.membership.findFirst({
     where: { userId: order.createdByUserId },
     select: { user: { select: { name: true } } },
@@ -236,20 +266,35 @@ export async function getSalesOrder(
     customer: order.customer,
     notes: order.notes,
     createdBy: author?.user.name ?? null,
-    createdAtText: formatDateTime(
-      order.createdAt,
-      order.organization.timeZone || "America/Mexico_City",
-    ),
-    lines: order.lines.map((line) => ({
-      id: line.id,
-      productId: line.productId,
-      productName: line.product.name,
-      sku: line.product.sku,
-      quantityText: quantityText(line),
-      unitPrice: `${formatMoney(line.unitPrice.toString())} c/u`,
-      amount: formatMoney(
-        dec(line.amount.toString()).plus(line.discount.toString()),
-      ),
+    createdAtText: formatDateTime(order.createdAt, timeZone),
+    lines: order.lines.map((line) => {
+      const done = delivered.get(line.id) ?? dec(0);
+      const missing = dec(line.capturedQuantity.toString()).minus(done);
+      return {
+        id: line.id,
+        productId: line.productId,
+        productName: line.product.name,
+        sku: line.product.sku,
+        quantityText: quantityText(line),
+        unitPrice: `${formatMoney(line.unitPrice.toString())} c/u`,
+        amount: formatMoney(
+          dec(line.amount.toString()).plus(line.discount.toString()),
+        ),
+        missing: missing.toString(),
+        deliveredText: done.isZero()
+          ? null
+          : quantityText({ ...line, capturedQuantity: done }),
+        missingText: missing.isZero()
+          ? null
+          : quantityText({ ...line, capturedQuantity: missing }),
+      };
+    }),
+    sales: order.sales.map((sale) => ({
+      id: sale.id,
+      number: sale.number,
+      createdAtText: formatDateTime(sale.createdAt, timeZone),
+      total: formatMoney(sale.total.toString()),
+      cancelled: sale.status === "CANCELLED",
     })),
     discount: off.isZero()
       ? null

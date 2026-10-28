@@ -124,6 +124,12 @@ export default async function PedidoPage({
                     <span className="block text-muted-foreground">
                       {line.quantityText} × {line.unitPrice}
                     </span>
+                    {line.deliveredText && (
+                      <span className="block text-muted-foreground">
+                        Entregado: {line.deliveredText}
+                        {line.missingText && ` · Falta: ${line.missingText}`}
+                      </span>
+                    )}
                   </p>
                   <p className="shrink-0 font-medium tabular-nums">
                     {line.amount}
@@ -132,6 +138,47 @@ export default async function PedidoPage({
               ))}
             </ul>
           </section>
+          {order.sales.length > 0 && (
+            <section
+              aria-labelledby="entregas-pedido"
+              className="rounded-xl border bg-card"
+            >
+              <h2
+                id="entregas-pedido"
+                className="border-b p-4 font-medium sm:px-5"
+              >
+                Entregas
+              </h2>
+              <ul className="divide-y">
+                {order.sales.map((sale) => (
+                  <li
+                    key={sale.id}
+                    className="relative flex items-start justify-between gap-3 p-4 text-sm hover:bg-muted/40 sm:px-5"
+                  >
+                    <p className="min-w-0">
+                      <Link
+                        href={`/ventas/${sale.id}`}
+                        className="rounded font-medium outline-none after:absolute after:inset-0 focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        Venta {sale.number}
+                      </Link>
+                      {sale.cancelled && (
+                        <Badge variant="destructive" className="ml-2">
+                          Cancelada
+                        </Badge>
+                      )}
+                      <span className="block text-muted-foreground">
+                        {sale.createdAtText}
+                      </span>
+                    </p>
+                    <p className="shrink-0 font-medium tabular-nums">
+                      {sale.total}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
         <section
           aria-labelledby="total-pedido"

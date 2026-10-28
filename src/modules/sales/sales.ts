@@ -5,7 +5,12 @@ import { postSaleExit } from "@/modules/inventory";
 import { recordAuditEvent } from "@/platform/audit";
 import { loadSubject, type Subject } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
-import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
+import {
+  LOCKING_TRANSACTION,
+  forOrganization,
+  lockRows,
+  type TenantDb,
+} from "@/server";
 
 import { SALE_MAX_LINES, priceLines, type CartLineInput } from "./cart";
 import { PERCENT_ERROR, formatPercent, parsePercent } from "./discounts";
@@ -256,21 +261,7 @@ async function save(
       };
     }
 
-    // VEN-16: without an open register of who charges, nobody charges.
-    // Locked so a close cannot happen in between: the sale lands in it.
-    const open = await tx.cashSession.findFirst({
-      where: { openedByUserId: userId, isOpen: true },
-      select: { id: true },
-    });
-    const [lockedSession] = open
-      ? await lockRows(tx, "cashSession", [open.id])
-      : [];
-    const cashSession = lockedSession
-      ? await tx.cashSession.findFirst({
-          where: { id: lockedSession, isOpen: true },
-          select: { id: true },
-        })
-      : null;
+    const cashSession = await lockOwnCashSession(tx, userId);
     if (!cashSession) {
       throw new Rejected(
         failure({ reason: "not_allowed", formError: NO_CASH_SESSION }),
@@ -495,6 +486,28 @@ async function save(
       change: change ? formatMoney(change.change!) : null,
     };
   }, LOCKING_TRANSACTION);
+}
+
+/**
+ * VEN-16: without an open register of who charges, nobody charges. The
+ * register is locked so a close cannot happen in between: the sale lands
+ * in it. Take it after the products.
+ */
+export async function lockOwnCashSession(
+  tx: Parameters<Parameters<TenantDb["$transaction"]>[0]>[0],
+  userId: string,
+): Promise<{ id: string } | null> {
+  const open = await tx.cashSession.findFirst({
+    where: { openedByUserId: userId, isOpen: true },
+    select: { id: true },
+  });
+  const [locked] = open ? await lockRows(tx, "cashSession", [open.id]) : [];
+  return locked
+    ? tx.cashSession.findFirst({
+        where: { id: locked, isOpen: true },
+        select: { id: true },
+      })
+    : null;
 }
 
 /**
