@@ -248,14 +248,14 @@ export async function registerReceivablePayment(
   }
 }
 
-/** What is still owed of an account: owed − its payments. */
+/** What is still owed of an account: owed − its payments − returns (PAG-08). */
 async function balanceOf(
   tx: Parameters<
     Parameters<ReturnType<typeof forOrganization>["$transaction"]>[0]
   >[0],
   receivableId: string,
 ) {
-  const [account, payments] = await Promise.all([
+  const [account, payments, credits] = await Promise.all([
     tx.salesReceivable.findFirstOrThrow({
       where: { id: receivableId },
       select: { owed: true },
@@ -264,11 +264,15 @@ async function balanceOf(
       where: { receivableId },
       _sum: { amount: true },
     }),
+    tx.salesReceivableCredit.aggregate({
+      where: { receivableId },
+      _sum: { credited: true },
+    }),
   ]);
   return {
-    balance: dec(account.owed.toString()).minus(
-      payments._sum.amount?.toString() ?? 0,
-    ),
+    balance: dec(account.owed.toString())
+      .minus(payments._sum.amount?.toString() ?? 0)
+      .minus(credits._sum.credited?.toString() ?? 0),
   };
 }
 

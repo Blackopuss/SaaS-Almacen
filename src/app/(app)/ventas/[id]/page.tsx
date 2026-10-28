@@ -28,10 +28,13 @@ export const metadata: Metadata = { title: "Ticket de venta" };
  * link — a QR to scan or the address to send.
  */
 /** What to give back, said once the return is registered. */
-function given(refund: string, method: string) {
-  if (method === "CASH") return `Entrega ${refund} en efectivo al cliente.`;
-  if (method === "CARD") return `Se devolvieron ${refund} a la tarjeta.`;
-  return `Se devolvieron ${refund} por transferencia.`;
+function given(refund: string, method: string | null, credited: string | null) {
+  const off = credited ? `Se descontaron ${credited} de su cuenta. ` : "";
+  if (method === null) return `${off}No hay dinero que devolver.`;
+  if (method === "CASH")
+    return `${off}Entrega ${refund} en efectivo al cliente.`;
+  if (method === "CARD") return `${off}Se devolvieron ${refund} a la tarjeta.`;
+  return `${off}Se devolvieron ${refund} por transferencia.`;
 }
 
 export default async function VentaPage({
@@ -83,7 +86,6 @@ export default async function VentaPage({
   const registered = returnable.returns.find((r) => r.id === asked);
   const somethingLeft =
     !returnable.cancelled &&
-    !returnable.onInstallments &&
     returnable.lines.some((line) => line.returnable !== "0");
   const occasional = somethingLeft
     ? [
@@ -134,14 +136,18 @@ export default async function VentaPage({
                   ? "Venta cancelada."
                   : "Devolución registrada."}
               </span>{" "}
-              {given(registered.refund, registered.refundMethod)} Lo que regresó
-              ya está en el inventario.
+              {given(
+                registered.refund,
+                registered.refundMethod,
+                registered.credited,
+              )}{" "}
+              Lo que regresó ya está en el inventario.
             </p>
           </div>
         )}
         {returnable.refunded !== "$0.00" && (
           <p className="text-sm text-muted-foreground">
-            Se devolvieron {returnable.refunded} de {returnable.total}.
+            Regresó mercancía por {returnable.refunded} de {returnable.total}.
           </p>
         )}
         {(occasional.length > 0 ||

@@ -134,7 +134,13 @@ export async function listSales(
       soldByUserId: true,
       customer: { select: { name: true } },
       payments: { orderBy: { lineNumber: "asc" }, select: { method: true } },
-      returns: { select: { refund: true } },
+      // On installments, what came back is its goods, not the money (PAG-08).
+      returns: {
+        select: {
+          refund: true,
+          accountCredit: { select: { goodsValue: true } },
+        },
+      },
     },
   });
   // Names come from the memberships of this company only.
@@ -147,7 +153,8 @@ export async function listSales(
   return {
     items: rows.map((row) => {
       const refunded = row.returns.reduce(
-        (sum, r) => sum.plus(r.refund.toString()),
+        (sum, r) =>
+          sum.plus((r.accountCredit?.goodsValue ?? r.refund).toString()),
         dec(0),
       );
       const methods = [

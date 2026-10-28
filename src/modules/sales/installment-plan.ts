@@ -113,16 +113,21 @@ export type InstallmentState = {
   number: number;
   dueDay: string;
   amount: Decimal;
+  /** What returns took off it (PAG-08), from the last installment back. */
+  credited: Decimal;
   /** What the payments covered of it. */
   paid: Decimal;
   /** What is still missing of it. */
   left: Decimal;
-  status: "PAID" | "PARTIAL" | "DUE" | "OVERDUE";
+  /** CREDITED: nothing left to pay of it because goods came back. */
+  status: "PAID" | "PARTIAL" | "DUE" | "OVERDUE" | "CREDITED";
 };
 
 /**
  * Where the payments of an account went (PAG-05): their sum covers the
- * installments oldest first. Derived each time, never stored. An unpaid
+ * installments oldest first. What returns took off the debt (PAG-08)
+ * comes off the last installments first, so the monthly payment stays and
+ * the plan ends sooner. Derived each time, never stored. An unpaid
  * installment whose day passed is overdue.
  */
 export function applyPayments(
@@ -133,28 +138,40 @@ export function applyPayments(
   }[],
   paidTotal: DecimalInput,
   today: string,
+  creditedTotal: DecimalInput = 0,
 ): InstallmentState[] {
+  const ordered = [...installments].sort((a, b) => a.number - b.number);
+  let credit = Decimal.max(dec(creditedTotal), 0);
+  const credited = new Map<number, Decimal>();
+  for (const installment of [...ordered].reverse()) {
+    const taken = Decimal.min(dec(installment.amount), credit);
+    credit = credit.minus(taken);
+    credited.set(installment.number, taken);
+  }
   let rest = dec(paidTotal);
-  return [...installments]
-    .sort((a, b) => a.number - b.number)
-    .map((installment) => {
-      const amount = dec(installment.amount);
-      const paid = Decimal.min(amount, Decimal.max(rest, 0));
-      rest = rest.minus(paid);
-      const left = amount.minus(paid);
-      return {
-        number: installment.number,
-        dueDay: installment.dueDay,
-        amount,
-        paid,
-        left,
-        status: left.isZero()
-          ? "PAID"
-          : installment.dueDay < today
-            ? "OVERDUE"
-            : paid.isZero()
-              ? "DUE"
-              : "PARTIAL",
-      };
-    });
+  return ordered.map((installment) => {
+    const amount = dec(installment.amount);
+    const off = credited.get(installment.number) ?? dec(0);
+    const owed = amount.minus(off);
+    const paid = Decimal.min(owed, Decimal.max(rest, 0));
+    rest = rest.minus(paid);
+    const left = owed.minus(paid);
+    return {
+      number: installment.number,
+      dueDay: installment.dueDay,
+      amount,
+      credited: off,
+      paid,
+      left,
+      status: left.isZero()
+        ? off.equals(amount)
+          ? "CREDITED"
+          : "PAID"
+        : installment.dueDay < today
+          ? "OVERDUE"
+          : paid.isZero()
+            ? "DUE"
+            : "PARTIAL",
+    };
+  });
 }

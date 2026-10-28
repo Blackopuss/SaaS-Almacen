@@ -87,7 +87,7 @@ export async function getCustomerStatement(
   const upcoming = accounts
     .flatMap((account) =>
       account.installments
-        .filter((installment) => installment.status !== "PAID")
+        .filter((installment) => installment.left !== "$0.00")
         .map((installment) => ({
           accountNumber: account.number,
           number: installment.number,

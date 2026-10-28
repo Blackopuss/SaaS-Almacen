@@ -49,6 +49,7 @@ export function ReturnForm({
   saleId,
   lines,
   left,
+  account,
   defaultMethod,
   idempotencyKey,
 }: {
@@ -57,6 +58,8 @@ export function ReturnForm({
   lines: ReturnFormLine[];
   /** What a cancellation gives back. */
   left: string;
+  /** Sold on installments (PAG-08): what its account still owes. */
+  account: { number: number; balance: string } | null;
   defaultMethod: string;
   idempotencyKey: string;
 }) {
@@ -111,6 +114,8 @@ export function ReturnForm({
     picked && picked.at === state.answers
       ? picked.method
       : state.values.refundMethod || defaultMethod;
+  // Cancelling a sale on installments that gives nothing back: no method.
+  const noMoney = mode === "cancel" && account !== null && left === "$0.00";
 
   useEffect(() => {
     const form = formRef.current;
@@ -226,8 +231,18 @@ export function ReturnForm({
       ) : (
         <div className="space-y-2 text-sm">
           <p>
-            Regresa al inventario todo lo que queda de la venta y se devuelven{" "}
-            <span className="font-medium tabular-nums">{left}</span>.
+            Regresa al inventario todo lo que queda de la venta
+            {account && `, se cancela la cuenta ${account.number}`}
+            {noMoney ? (
+              " y no hay dinero que devolver."
+            ) : (
+              <>
+                {" "}
+                y se devuelven{" "}
+                <span className="font-medium tabular-nums">{left}</span>
+                {account && " (lo pagado, menos lo que aún debía)"}.
+              </>
+            )}
           </p>
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
             {lines
@@ -241,46 +256,61 @@ export function ReturnForm({
         </div>
       )}
 
-      <fieldset
-        key={`method-${state.answers}`}
-        aria-describedby={
-          state.fieldErrors.refundMethod ? "devolucion-metodo-error" : undefined
-        }
-      >
-        <legend className="mb-2 text-sm font-medium">
-          ¿Cómo se devuelve el dinero?
-        </legend>
-        <div className="grid grid-cols-3 gap-2">
-          {METHODS.map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border bg-card px-2 text-sm font-medium has-checked:border-primary has-checked:bg-primary/5 has-checked:text-primary has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
-            >
-              <input
-                type="radio"
-                name="refundMethod"
-                value={option.value}
-                defaultChecked={method === option.value}
-                onChange={() =>
-                  setPicked({ at: state.answers, method: option.value })
-                }
-                className="sr-only"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-        {state.fieldErrors.refundMethod && (
-          <p
-            id="devolucion-metodo-error"
-            className="mt-2 text-sm text-destructive"
-          >
-            {state.fieldErrors.refundMethod}
-          </p>
-        )}
-      </fieldset>
+      {account && mode === "return" && (
+        <p className="rounded-lg bg-muted/60 p-3 text-sm">
+          Es una venta a plazos (cuenta {account.number}, debe{" "}
+          <span className="font-medium tabular-nums">{account.balance}</span>):
+          lo que regresa se descuenta de lo que debe, con su parte del interés.
+          Solo si pasa de eso se le devuelve la diferencia.
+        </p>
+      )}
 
-      {method !== "CASH" && (
+      {!noMoney && (
+        <fieldset
+          key={`method-${state.answers}`}
+          aria-describedby={
+            state.fieldErrors.refundMethod
+              ? "devolucion-metodo-error"
+              : undefined
+          }
+        >
+          <legend className="mb-2 text-sm font-medium">
+            {account && mode === "return"
+              ? "Si hay dinero que devolver, ¿cómo?"
+              : "¿Cómo se devuelve el dinero?"}
+          </legend>
+          <div className="grid grid-cols-3 gap-2">
+            {METHODS.map((option) => (
+              <label
+                key={option.value}
+                className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border bg-card px-2 text-sm font-medium has-checked:border-primary has-checked:bg-primary/5 has-checked:text-primary has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+              >
+                <input
+                  type="radio"
+                  name="refundMethod"
+                  value={option.value}
+                  defaultChecked={method === option.value}
+                  onChange={() =>
+                    setPicked({ at: state.answers, method: option.value })
+                  }
+                  className="sr-only"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+          {state.fieldErrors.refundMethod && (
+            <p
+              id="devolucion-metodo-error"
+              className="mt-2 text-sm text-destructive"
+            >
+              {state.fieldErrors.refundMethod}
+            </p>
+          )}
+        </fieldset>
+      )}
+
+      {!noMoney && method !== "CASH" && (
         <FormField
           id="devolucion-referencia"
           label={

@@ -32,6 +32,7 @@ const BADGE = {
   PARTIAL: "secondary",
   DUE: "outline",
   OVERDUE: "destructive",
+  CREDITED: "outline",
 } as const;
 
 /**
@@ -197,6 +198,8 @@ export default async function CuentaPage({
             <p className="text-sm text-muted-foreground tabular-nums">
               Enganche {account.downPayment} · Financiado {account.financed} ·
               Interés {account.interest} · Pagado {account.paid}
+              {account.credited !== "$0.00" &&
+                ` · Descontado por devoluciones ${account.credited}`}
             </p>
           </section>
           <section
@@ -311,6 +314,7 @@ export default async function CuentaPage({
             <PaymentForm
               receivableId={account.id}
               suggested={next ? plain(next.left) : ""}
+              balance={plain(account.balance)}
               idempotencyKey={newId()}
             />
           ) : (

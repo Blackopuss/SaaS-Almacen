@@ -144,4 +144,27 @@ describe("applying payments", () => {
       ),
     ).toBe(true);
   });
+
+  it("what returns took off comes off the last installments first", () => {
+    // $150 back: the third goes whole and $49.95 of the second.
+    const states = applyPayments(calendar, "100", "2026-12-29", "150");
+    expect(
+      states.map((s) => [
+        s.number,
+        s.credited.toFixed(2),
+        s.left.toFixed(2),
+        s.status,
+      ]),
+    ).toEqual([
+      [1, "0.00", "0.00", "PAID"],
+      [2, "49.95", "50.05", "OVERDUE"],
+      [3, "100.05", "0.00", "CREDITED"],
+    ]);
+    // Paid and credited together never pass what is owed.
+    expect(
+      applyPayments(calendar, "150.05", "2027-06-01", "150").every((s) =>
+        s.left.isZero(),
+      ),
+    ).toBe(true);
+  });
 });

@@ -161,7 +161,13 @@ export async function getSalesReport(
       pricesIncludeTax: true,
       taxRate: true,
       total: true,
-      returns: { select: { refund: true } },
+      // On installments, what came back is its goods, not the money (PAG-08).
+      returns: {
+        select: {
+          refund: true,
+          accountCredit: { select: { goodsValue: true } },
+        },
+      },
       lines: {
         select: {
           productId: true,
@@ -206,7 +212,8 @@ export async function getSalesReport(
     const rate = dec(sale.taxRate.toString()).dividedBy(100);
     // What the customer paid for the whole sale, after its returns.
     const net = sale.returns.reduce(
-      (sum, r) => sum.minus(r.refund.toString()),
+      (sum, r) =>
+        sum.minus((r.accountCredit?.goodsValue ?? r.refund).toString()),
       dec(sale.total.toString()),
     );
     let saleProfit = dec(0);

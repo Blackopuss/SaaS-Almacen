@@ -89,6 +89,7 @@ export async function ReturnScreen({
           saleId={sale.saleId}
           lines={sale.lines}
           left={sale.left}
+          account={sale.account}
           defaultMethod={sale.paidWith[0] ?? "CASH"}
           idempotencyKey={newId()}
         />

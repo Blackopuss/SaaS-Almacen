@@ -36,6 +36,7 @@ const INSTALLMENT_STATUS_LABELS = {
   PARTIAL: "Abonada en parte",
   DUE: "Por pagar",
   OVERDUE: "Vencida",
+  CREDITED: "Descontada por devolución",
 } as const;
 
 export type ReceivableView = {
@@ -52,6 +53,8 @@ export type ReceivableView = {
   interest: string;
   owed: string;
   paid: string;
+  /** What returns of its goods took off the debt (PAG-08). */
+  credited: string;
   /** What is still owed. */
   balance: string;
   /** What of it is already past its day. */
@@ -79,6 +82,10 @@ export type ReceivableView = {
   }[];
 };
 
+/** What returns took off an account (PAG-08). */
+export const creditedOf = (credits: readonly { credited: unknown }[]) =>
+  credits.reduce((sum, credit) => sum.plus(String(credit.credited)), dec(0));
+
 const METHOD_LABELS = {
   CASH: "Efectivo",
   CARD: "Tarjeta",
@@ -103,6 +110,7 @@ async function viewOf(
       sale: { select: { id: true, number: true } },
       installments: { orderBy: { number: "asc" } },
       payments: { orderBy: { number: "asc" } },
+      credits: { select: { credited: true } },
     },
   });
   if (!account) return null;
@@ -112,6 +120,7 @@ async function viewOf(
     (sum, payment) => sum.plus(payment.amount.toString()),
     dec(0),
   );
+  const credited = creditedOf(account.credits);
   const states = applyPayments(
     account.installments.map((installment) => ({
       number: installment.number,
@@ -120,6 +129,7 @@ async function viewOf(
     })),
     paid,
     today,
+    credited,
   );
   const people = await client.membership.findMany({
     where: {
@@ -145,7 +155,10 @@ async function viewOf(
     interest: formatMoney(account.interest.toString()),
     owed: formatMoney(account.owed.toString()),
     paid: formatMoney(paid),
-    balance: formatMoney(dec(account.owed.toString()).minus(paid)),
+    credited: formatMoney(credited),
+    balance: formatMoney(
+      dec(account.owed.toString()).minus(paid).minus(credited),
+    ),
     overdue: formatMoney(
       states
         .filter((state) => state.status === "OVERDUE")
@@ -228,6 +241,8 @@ export async function findOverdue(
   client: Client,
   today: string,
 ): Promise<OverdueAccount[]> {
+  // Returns only lower what is owed, so an account can be behind only
+  // when what fell due passes what was paid: those are looked at closely.
   const [due, paid] = await Promise.all([
     client.salesReceivableInstallment.groupBy({
       by: ["receivableId"],
@@ -236,7 +251,6 @@ export async function findOverdue(
         receivable: { status: "OPEN" },
       },
       _sum: { amount: true },
-      _max: { number: true },
     }),
     client.salesReceivablePayment.groupBy({
       by: ["receivableId"],
@@ -250,17 +264,46 @@ export async function findOverdue(
       dec(row._sum.amount?.toString() ?? 0),
     ]),
   );
-  return due
-    .flatMap((row) => {
-      const overdue = dec(row._sum.amount?.toString() ?? 0).minus(
+  const candidates = due
+    .filter((row) =>
+      dec(row._sum.amount?.toString() ?? 0).greaterThan(
         paidOf.get(row.receivableId) ?? 0,
-      );
-      return overdue.greaterThan(0)
+      ),
+    )
+    .map((row) => row.receivableId);
+  if (candidates.length === 0) return [];
+  const accounts = await client.salesReceivable.findMany({
+    where: { id: { in: candidates } },
+    select: {
+      id: true,
+      installments: {
+        orderBy: { number: "asc" },
+        select: { number: true, dueDay: true, amount: true },
+      },
+      credits: { select: { credited: true } },
+    },
+  });
+  return accounts
+    .flatMap((account) => {
+      const late = applyPayments(
+        account.installments.map((installment) => ({
+          number: installment.number,
+          dueDay: dayOfDate(installment.dueDay),
+          amount: installment.amount.toString(),
+        })),
+        paidOf.get(account.id) ?? 0,
+        today,
+        creditedOf(account.credits),
+      ).filter((state) => state.status === "OVERDUE");
+      return late.length > 0
         ? [
             {
-              receivableId: row.receivableId,
-              overdue,
-              latestDue: row._max.number ?? 0,
+              receivableId: account.id,
+              overdue: late.reduce(
+                (sum, state) => sum.plus(state.left),
+                dec(0),
+              ),
+              latestDue: late[late.length - 1]!.number,
             },
           ]
         : [];
@@ -290,6 +333,7 @@ export async function overdueOf(
         select: { number: true, dueDay: true, amount: true },
       },
       payments: { select: { amount: true } },
+      credits: { select: { credited: true } },
     },
   });
   if (!account) return null;
@@ -297,6 +341,7 @@ export async function overdueOf(
     (sum, payment) => sum.plus(payment.amount.toString()),
     dec(0),
   );
+  const credited = creditedOf(account.credits);
   const states = applyPayments(
     account.installments.map((installment) => ({
       number: installment.number,
@@ -305,6 +350,7 @@ export async function overdueOf(
     })),
     paid,
     today,
+    credited,
   );
   const first = states.findIndex((state) => state.status === "OVERDUE");
   if (first < 0) return null;
@@ -313,7 +359,7 @@ export async function overdueOf(
       .filter((state) => state.status === "OVERDUE")
       .reduce((sum, state) => sum.plus(state.left), dec(0)),
     since: account.installments[first]!.dueDay,
-    balance: dec(account.owed.toString()).minus(paid),
+    balance: dec(account.owed.toString()).minus(paid).minus(credited),
   };
 }
 
@@ -376,6 +422,7 @@ export async function listReceivables(
           select: { number: true, dueDay: true, amount: true },
         },
         payments: { select: { amount: true } },
+        credits: { select: { credited: true } },
       },
     }),
   ]);
@@ -397,6 +444,7 @@ export async function listReceivables(
         })),
         paid,
         today,
+        creditedOf(row.credits),
       );
       const next = states.findIndex((state) => !state.left.isZero());
       const late = states.filter((state) => state.status === "OVERDUE");
@@ -405,7 +453,9 @@ export async function listReceivables(
         number: row.number,
         customer: row.customer.name,
         statusLabel: RECEIVABLE_STATUS_LABELS[row.status],
-        balance: formatMoney(dec(row.owed.toString()).minus(paid)),
+        balance: formatMoney(
+          dec(row.owed.toString()).minus(paid).minus(creditedOf(row.credits)),
+        ),
         nextDueText:
           next >= 0 ? formatDueDay(row.installments[next]!.dueDay) : null,
         overdue: late.length > 0,
@@ -472,13 +522,22 @@ export async function getReceivablePayment(
     },
   });
   if (!payment) return null;
-  const before = await client.salesReceivablePayment.aggregate({
-    where: {
-      receivableId: payment.receivableId,
-      number: { lte: payment.number },
-    },
-    _sum: { amount: true },
-  });
+  const [before, creditedBefore] = await Promise.all([
+    client.salesReceivablePayment.aggregate({
+      where: {
+        receivableId: payment.receivableId,
+        number: { lte: payment.number },
+      },
+      _sum: { amount: true },
+    }),
+    client.salesReceivableCredit.aggregate({
+      where: {
+        receivableId: payment.receivableId,
+        createdAt: { lte: payment.createdAt },
+      },
+      _sum: { credited: true },
+    }),
+  ]);
   const by = await client.membership.findFirst({
     where: { userId: payment.receivedByUserId },
     select: { user: { select: { name: true } } },
@@ -503,9 +562,9 @@ export async function getReceivablePayment(
         ? formatMoney(payment.changeGiven.toString())
         : null,
     balanceAfter: formatMoney(
-      dec(payment.receivable.owed.toString()).minus(
-        before._sum.amount?.toString() ?? 0,
-      ),
+      dec(payment.receivable.owed.toString())
+        .minus(before._sum.amount?.toString() ?? 0)
+        .minus(creditedBefore._sum.credited?.toString() ?? 0),
     ),
     by: by?.user.name ?? null,
   };

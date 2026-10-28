@@ -18,7 +18,6 @@ import {
   getSalesOrder,
   markQuoteSent,
   previewFulfillment,
-  returnSale,
   setInstallmentTerms,
   setSalePrices,
 } from "@/modules/sales";
@@ -170,23 +169,6 @@ describe("sale on installments", () => {
     });
     expect(await reconcileStock(titular.organizationId)).toEqual([]);
     expect(await reconcileValue(titular.organizationId)).toEqual([]);
-
-    // Returns of a sale on installments wait for their rules (PAG-08).
-    const encargado = await salesMember(titular.organizationId, "cash_manager");
-    const saleLine = await db.saleLine.findFirstOrThrow({
-      where: { saleId: done.saleId },
-    });
-    expect(
-      await returnSale(encargado, done.saleId, {
-        lines: [{ saleLineId: saleLine.id, quantity: "1" }],
-        reason: "No enfría",
-        refundMethod: "CASH",
-        idempotencyKey: newId(),
-      }),
-    ).toMatchObject({
-      ok: false,
-      formError: expect.stringMatching(/es a plazos/),
-    });
   });
 
   it("a cash sale has no account; another company sees nothing", async () => {

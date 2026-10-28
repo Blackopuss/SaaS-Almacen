@@ -181,6 +181,7 @@ model Organization {
   salesReceivablePayments     SalesReceivablePayment[]
   salesStatementDeliveries    SalesStatementDelivery[]
   salesReceivableReminders    SalesReceivableReminder[]
+  salesReceivableCredits      SalesReceivableCredit[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1950,6 +1951,7 @@ model SalesReceivable {
   installments    SalesReceivableInstallment[]
   payments        SalesReceivablePayment[]
   reminders       SalesReceivableReminder[]
+  credits         SalesReceivableCredit[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -2246,26 +2248,30 @@ model CashMovement {
 /// changed nor deleted. A cash refund comes out of the open register of
 /// who gives it. `cancelsSale` marks the one that cancelled the sale.
 model SaleReturn {
-  id              String            @id @db.Char(36)
-  organizationId  String            @db.Char(36)
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  saleId          String            @db.Char(36)
-  sale            Sale              @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Restrict)
-  movementId      String            @db.Char(36)
-  movement        StockMovement     @relation(fields: [organizationId, movementId], references: [organizationId, id], onDelete: Restrict)
-  refundMethod    SalePaymentMethod
+  id              String                 @id @db.Char(36)
+  organizationId  String                 @db.Char(36)
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  saleId          String                 @db.Char(36)
+  sale            Sale                   @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Restrict)
+  movementId      String                 @db.Char(36)
+  movement        StockMovement          @relation(fields: [organizationId, movementId], references: [organizationId, id], onDelete: Restrict)
+  /// Null when no money went back: a return of a sale on installments
+  /// that only lowered what is owed (PAG-08).
+  refundMethod    SalePaymentMethod?
   /// What was given back, VAT included.
-  refund          Decimal           @db.Decimal(14, 2)
+  refund          Decimal                @db.Decimal(14, 2)
   /// Card or transfer: the reference of the refund.
-  reference       String?           @db.VarChar(60)
-  cashSessionId   String?           @db.Char(36)
-  cashSession     CashSession?      @relation(fields: [organizationId, cashSessionId], references: [organizationId, id], onDelete: Restrict)
-  reason          String            @db.VarChar(500)
-  cancelsSale     Boolean           @default(false)
-  idempotencyKey  String            @db.VarChar(64)
-  createdByUserId String            @db.Char(36)
-  createdAt       DateTime          @default(now()) @db.DateTime(3)
+  reference       String?                @db.VarChar(60)
+  cashSessionId   String?                @db.Char(36)
+  cashSession     CashSession?           @relation(fields: [organizationId, cashSessionId], references: [organizationId, id], onDelete: Restrict)
+  reason          String                 @db.VarChar(500)
+  cancelsSale     Boolean                @default(false)
+  idempotencyKey  String                 @db.VarChar(64)
+  createdByUserId String                 @db.Char(36)
+  createdAt       DateTime               @default(now()) @db.DateTime(3)
   lines           SaleReturnLine[]
+  /// A return of a sale on installments: what it took off the account.
+  accountCredit   SalesReceivableCredit?
 
   @@unique([organizationId, id])
   @@unique([organizationId, movementId])
@@ -2457,6 +2463,32 @@ model SalesStatementDelivery {
   @@index([organizationId, customerId, requestedAt])
   @@index([organizationId, requestedAt])
   @@map("sales_statement_delivery")
+}
+
+/// What a return of a sale on installments took off its account (PAG-08):
+/// the goods that came back (VAT included) plus their share of the
+/// interest. That lowers what is owed; what passes the balance is given
+/// back (the return's refund), so the balance is never negative:
+///
+///   goodsValue + interest = credited + refund of the return
+model SalesReceivableCredit {
+  id             String          @id @db.Char(36)
+  organizationId String          @db.Char(36)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  receivableId   String          @db.Char(36)
+  receivable     SalesReceivable @relation(fields: [organizationId, receivableId], references: [organizationId, id], onDelete: Restrict)
+  returnId       String          @db.Char(36)
+  saleReturn     SaleReturn      @relation(fields: [organizationId, returnId], references: [organizationId, id], onDelete: Restrict)
+  goodsValue     Decimal         @db.Decimal(14, 2)
+  interest       Decimal         @db.Decimal(14, 2)
+  /// Taken off what is owed.
+  credited       Decimal         @db.Decimal(14, 2)
+  createdAt      DateTime        @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, returnId])
+  @@index([organizationId, receivableId])
+  @@map("sales_receivable_credit")
 }
 
 /// A reminder of an overdue payment (PAG-07): one per installment that

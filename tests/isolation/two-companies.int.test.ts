@@ -687,6 +687,18 @@ beforeAll(async () => {
         receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    // What a return of the sale took off its account (PAG-08).
+    await db.salesReceivableCredit.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        returnId: saleReturnId,
+        goodsValue: "120",
+        interest: "0",
+        credited: "0",
+      },
+    });
     // A reminder of an overdue payment (PAG-07).
     await db.salesReceivableReminder.create({
       data: {

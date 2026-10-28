@@ -22,16 +22,20 @@ const METHODS = [
 
 /**
  * A payment to an account (PAG-05): how much and how. It goes to the
- * oldest installment; a lost answer is checked by its key.
+ * oldest installment; a lost answer is checked by its key. Paying off
+ * early (PAG-08) is a payment of the whole balance.
  */
 export function PaymentForm({
   receivableId,
   suggested,
+  balance,
   idempotencyKey,
 }: {
   receivableId: string;
   /** What is due now: «1466.66». */
   suggested: string;
+  /** All that is still owed: «4400.00». */
+  balance: string;
   idempotencyKey: string;
 }) {
   const router = useRouter();
@@ -127,6 +131,23 @@ export function PaymentForm({
           />
         )}
       </FormField>
+      {balance !== suggested && (
+        <Button
+          type="button"
+          variant="outline"
+          className="-mt-1"
+          onClick={() => {
+            const input = document.getElementById(
+              "abono-importe",
+            ) as HTMLInputElement | null;
+            if (!input) return;
+            input.value = balance;
+            input.focus();
+          }}
+        >
+          Liquidar todo
+        </Button>
+      )}
       <fieldset key={`method-${state.answers}`}>
         <legend className="mb-2 text-sm font-medium">Forma de pago</legend>
         <div className="grid grid-cols-3 gap-2">

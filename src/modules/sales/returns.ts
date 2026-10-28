@@ -25,6 +25,11 @@ import { formatMoney } from "./pricing";
  * than what was sold of each line. The last return of a sale gives back
  * exactly what is left of its total, so cents never get lost.
  * Cancelling a sale is returning all that is left and marking it.
+ *
+ * A sale on installments (PAG-08) first lowers what is owed: what comes
+ * back, with its share of the interest, comes off the account, and only
+ * what passes the balance is given back. The balance is never negative;
+ * cancelling it gives back the down payment and the payments made.
  */
 
 type Tx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
@@ -33,6 +38,7 @@ type Client = TenantDb | Tx;
 const cents = (value: Decimal) =>
   value.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,64}$/;
+const PICK_METHOD = "Elige cómo se devuelve el dinero.";
 const NO_CONTROL = /^[^\u0000-\u001f\u007f]*$/;
 
 export type ReturnableLine = {
@@ -53,22 +59,25 @@ export type ReturnableSale = {
   number: number;
   cancelled: boolean;
   total: string;
-  /** Already given back. */
+  /** What came back so far, VAT included. */
   refunded: string;
-  /** What is still to give back if all that is left comes back. */
+  /** Money to give back if all that is left comes back. */
   left: string;
   lines: ReturnableLine[];
   /** Methods it was paid with, to suggest how to give the money back. */
   paidWith: PaymentMethod[];
   /** The order it delivered (COT-07); null for a counter sale. */
   salesOrder: { id: string; number: number } | null;
-  /** Sold on installments (PAG-04): its returns wait for PAG-08. */
-  onInstallments: boolean;
+  /** Sold on installments (PAG-04): what its account still owes. */
+  account: { id: string; number: number; balance: string } | null;
   /** Returns so far, oldest first. */
   returns: {
     id: string;
+    /** Money given back; «$0.00» when it all came off the account. */
     refund: string;
-    refundMethod: PaymentMethod;
+    refundMethod: PaymentMethod | null;
+    /** Taken off the account (PAG-08); null for a cash sale. */
+    credited: string | null;
     cancelsSale: boolean;
   }[];
 };
@@ -84,7 +93,9 @@ async function loadSale(client: Client, saleId: string) {
       pricesIncludeTax: true,
       taxRate: true,
       salesOrder: { select: { id: true, number: true } },
-      receivable: { select: { id: true } },
+      receivable: {
+        select: { id: true, number: true, owed: true, interest: true },
+      },
       lines: {
         orderBy: { lineNumber: "asc" },
         select: {
@@ -111,6 +122,9 @@ async function loadSale(client: Client, saleId: string) {
           refund: true,
           refundMethod: true,
           cancelsSale: true,
+          accountCredit: {
+            select: { goodsValue: true, interest: true, credited: true },
+          },
         },
       },
     },
@@ -118,6 +132,50 @@ async function loadSale(client: Client, saleId: string) {
 }
 
 type LoadedSale = NonNullable<Awaited<ReturnType<typeof loadSale>>>;
+
+/** What a return brought back, VAT included (on installments, its goods). */
+const valueOf = (r: LoadedSale["returns"][number]) =>
+  dec((r.accountCredit?.goodsValue ?? r.refund).toString());
+
+/** What an account still owes: owed − payments − returns. */
+async function accountBalance(
+  client: Client,
+  account: { id: string; owed: { toString(): string } },
+): Promise<Decimal> {
+  const [payments, credits] = await Promise.all([
+    client.salesReceivablePayment.aggregate({
+      where: { receivableId: account.id },
+      _sum: { amount: true },
+    }),
+    client.salesReceivableCredit.aggregate({
+      where: { receivableId: account.id },
+      _sum: { credited: true },
+    }),
+  ]);
+  return dec(account.owed.toString())
+    .minus(payments._sum.amount?.toString() ?? 0)
+    .minus(credits._sum.credited?.toString() ?? 0);
+}
+
+/**
+ * The share of the interest that goes with goods worth `value` (PAG-08):
+ * interest × value ÷ total, to cents; what comes back last takes what is
+ * left of it, so cents never get lost.
+ */
+function interestShare(sale: LoadedSale, value: Decimal, everything: boolean) {
+  const interest = dec(sale.receivable?.interest.toString() ?? 0);
+  if (everything) {
+    const taken = sale.returns.reduce(
+      (sum, r) => sum.plus(r.accountCredit?.interest.toString() ?? 0),
+      dec(0),
+    );
+    return Decimal.max(interest.minus(taken), 0);
+  }
+  const total = dec(sale.total.toString());
+  return total.isZero()
+    ? dec(0)
+    : cents(interest.times(value).dividedBy(total));
+}
 
 const returnedOf = (line: LoadedSale["lines"][number]) =>
   line.returnLines.reduce(
@@ -148,18 +206,29 @@ export async function getReturnableSale(
   );
   if (!sale) return null;
   const refunded = sale.returns.reduce(
-    (sum, r) => sum.plus(r.refund.toString()),
+    (sum, r) => sum.plus(valueOf(r)),
     dec(0),
   );
+  const goodsLeft = Decimal.max(dec(sale.total.toString()).minus(refunded), 0);
+  const balance = sale.receivable
+    ? await accountBalance(
+        forOrganization(actor.organizationId),
+        sale.receivable,
+      )
+    : null;
+  const left = balance
+    ? Decimal.max(
+        goodsLeft.plus(interestShare(sale, goodsLeft, true)).minus(balance),
+        0,
+      )
+    : goodsLeft;
   return {
     saleId: sale.id,
     number: sale.number,
     cancelled: sale.status === "CANCELLED",
     total: formatMoney(sale.total.toString()),
     refunded: formatMoney(refunded),
-    left: formatMoney(
-      Decimal.max(dec(sale.total.toString()).minus(refunded), 0),
-    ),
+    left: formatMoney(left),
     lines: sale.lines.map((line) => {
       const sold = dec(line.capturedQuantity.toString());
       const returned = returnedOf(line);
@@ -177,11 +246,21 @@ export async function getReturnableSale(
     }),
     paidWith: [...new Set(sale.payments.map((p) => p.method as PaymentMethod))],
     salesOrder: sale.salesOrder,
-    onInstallments: sale.receivable !== null,
+    account:
+      sale.receivable && balance
+        ? {
+            id: sale.receivable.id,
+            number: sale.receivable.number,
+            balance: formatMoney(balance),
+          }
+        : null,
     returns: sale.returns.map((r) => ({
       id: r.id,
       refund: formatMoney(r.refund.toString()),
       refundMethod: r.refundMethod,
+      credited: r.accountCredit
+        ? formatMoney(r.accountCredit.credited.toString())
+        : null,
       cancelsSale: r.cancelsSale,
     })),
   };
@@ -236,6 +315,8 @@ export type ReturnResult =
       returnId: string;
       /** «$503.00» given back. */
       refund: string;
+      /** Taken off the account of a sale on installments (PAG-08). */
+      credited?: string;
       repeated?: true;
     }
   | {
@@ -308,14 +389,20 @@ async function process(
   if (reason.length < 3 || reason.length > 500 || !NO_CONTROL.test(reason)) {
     fieldErrors.reason = "Escribe el motivo (de 3 a 500 caracteres).";
   }
-  const method = String(input.refundMethod ?? "") as PaymentMethod;
-  if (!PAYMENT_METHODS.includes(method)) {
-    fieldErrors.refundMethod = "Elige cómo se devuelve el dinero.";
+  // On installments it may all come off the account: then no method.
+  const typedMethod = String(input.refundMethod ?? "");
+  const method = typedMethod === "" ? null : (typedMethod as PaymentMethod);
+  if (method !== null && !PAYMENT_METHODS.includes(method)) {
+    fieldErrors.refundMethod = PICK_METHOD;
   }
   const reference = String(input.reference ?? "")
     .trim()
     .slice(0, 100);
-  if (method !== "CASH" && PAYMENT_METHODS.includes(method)) {
+  if (
+    method !== null &&
+    method !== "CASH" &&
+    PAYMENT_METHODS.includes(method)
+  ) {
     if (
       reference === "" ||
       reference.length > 60 ||
@@ -405,16 +492,14 @@ async function process(
           }),
         );
       }
-      // Its rules (what goes back of what was paid and what is owed) come
-      // with PAG-08; until then nothing of it comes back here.
-      if (sale.receivable) {
+      if (!sale.receivable && method === null) {
         throw new Rejected(
-          failure({
-            reason: "not_allowed",
-            formError:
-              "Esta venta es a plazos: todavía no se puede devolver ni cancelar.",
-          }),
+          failure({ fieldErrors: { refundMethod: PICK_METHOD } }),
         );
+      }
+      // On installments the account is locked too, after the sale.
+      if (sale.receivable) {
+        await lockRows(tx, "salesReceivable", [sale.receivable.id]);
       }
 
       // What comes back of each line, never more than what is left.
@@ -484,7 +569,7 @@ async function process(
       // VAT as the sale charged it; the last return closes the total.
       const lines = back.reduce((sum, b) => sum.plus(b.refund), dec(0));
       const refundedSale = sale.returns.reduce(
-        (sum, r) => sum.plus(r.refund.toString()),
+        (sum, r) => sum.plus(valueOf(r)),
         dec(0),
       );
       const everything = sale.lines.every((line) => {
@@ -494,15 +579,46 @@ async function process(
           .plus(coming)
           .equals(line.capturedQuantity.toString());
       });
-      const refund = everything
+      const goodsValue = everything
         ? Decimal.max(dec(sale.total.toString()).minus(refundedSale), 0)
         : sale.pricesIncludeTax
           ? lines
           : lines.plus(
               cents(lines.times(sale.taxRate.toString()).dividedBy(100)),
             );
+      // On installments it comes off what is owed first; only what passes
+      // the balance is given back, so the balance is never negative.
+      let refund = goodsValue;
+      let credit: {
+        receivableId: string;
+        interest: Decimal;
+        credited: Decimal;
+        settles: boolean;
+      } | null = null;
+      if (sale.receivable) {
+        const interest = interestShare(sale, goodsValue, everything);
+        const balance = await accountBalance(tx, sale.receivable);
+        const credited = Decimal.min(goodsValue.plus(interest), balance);
+        refund = goodsValue.plus(interest).minus(credited);
+        credit = {
+          receivableId: sale.receivable.id,
+          interest,
+          credited,
+          settles: balance.minus(credited).isZero(),
+        };
+      }
+      const moneyMethod = refund.isZero() && credit ? null : method;
+      if (moneyMethod === null && !refund.isZero()) {
+        throw new Rejected(
+          failure({
+            fieldErrors: {
+              refundMethod: `Se devuelven ${formatMoney(refund)}: ${PICK_METHOD.toLowerCase()}`,
+            },
+          }),
+        );
+      }
 
-      if (method === "CASH") {
+      if (moneyMethod === "CASH") {
         const session = lockedSession
           ? await tx.cashSession.findFirst({
               where: { id: lockedSession, isOpen: true },
@@ -554,10 +670,11 @@ async function process(
           organizationId,
           saleId: sale.id,
           movementId: entry.movementId,
-          refundMethod: method,
+          refundMethod: moneyMethod,
           refund: refund.toFixed(2),
-          reference: method === "CASH" ? null : reference,
-          cashSessionId: method === "CASH" ? lockedSession! : null,
+          reference:
+            moneyMethod === null || moneyMethod === "CASH" ? null : reference,
+          cashSessionId: moneyMethod === "CASH" ? lockedSession! : null,
           reason,
           cancelsSale: cancel,
           idempotencyKey: key,
@@ -583,6 +700,31 @@ async function process(
           refund: b.refund.toFixed(2),
         })),
       });
+      if (credit) {
+        await tx.salesReceivableCredit.create({
+          data: {
+            id: newId(),
+            organizationId,
+            receivableId: credit.receivableId,
+            returnId,
+            goodsValue: goodsValue.toFixed(2),
+            interest: credit.interest.toFixed(2),
+            credited: credit.credited.toFixed(2),
+          },
+        });
+        // Cancelled with its sale; settled when nothing is owed any more.
+        if (cancel) {
+          await tx.salesReceivable.updateMany({
+            where: { id: credit.receivableId, status: { not: "CANCELLED" } },
+            data: { status: "CANCELLED" },
+          });
+        } else if (credit.settles) {
+          await tx.salesReceivable.updateMany({
+            where: { id: credit.receivableId, status: "OPEN" },
+            data: { status: "PAID" },
+          });
+        }
+      }
       if (cancel) {
         await tx.sale.updateMany({
           where: { id: sale.id, status: "COMPLETED" },
@@ -603,12 +745,16 @@ async function process(
         metadata: {
           venta: String(sale.number),
           importe: formatMoney(refund),
+          ...(credit
+            ? { descontadoDeLaCuenta: formatMoney(credit.credited) }
+            : {}),
         },
       });
       return {
         ok: true as const,
         returnId,
         refund: formatMoney(refund),
+        ...(credit ? { credited: formatMoney(credit.credited) } : {}),
       };
     }, LOCKING_TRANSACTION);
   } catch (error) {
