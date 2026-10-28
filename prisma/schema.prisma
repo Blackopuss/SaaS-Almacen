@@ -180,6 +180,7 @@ model Organization {
   salesReceivableInstallments SalesReceivableInstallment[]
   salesReceivablePayments     SalesReceivablePayment[]
   salesStatementDeliveries    SalesStatementDelivery[]
+  salesReceivableReminders    SalesReceivableReminder[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1886,6 +1887,8 @@ model SalesSettings {
   discountCapCashier       Decimal      @default(5) @db.Decimal(5, 2)
   discountCapCashManager   Decimal      @default(20) @db.Decimal(5, 2)
   discountCapAdministrator Decimal      @default(100) @db.Decimal(5, 2)
+  /// Mail customers when an installment falls due unpaid (PAG-07).
+  overdueReminders         Boolean      @default(false)
   updatedByUserId          String       @db.Char(36)
   updatedAt                DateTime     @updatedAt @db.DateTime(3)
 
@@ -1946,6 +1949,7 @@ model SalesReceivable {
   createdAt       DateTime                     @default(now()) @db.DateTime(3)
   installments    SalesReceivableInstallment[]
   payments        SalesReceivablePayment[]
+  reminders       SalesReceivableReminder[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -2453,6 +2457,34 @@ model SalesStatementDelivery {
   @@index([organizationId, customerId, requestedAt])
   @@index([organizationId, requestedAt])
   @@map("sales_statement_delivery")
+}
+
+/// A reminder of an overdue payment (PAG-07): one per installment that
+/// falls due unpaid, asked by the worker's round and sent by a job. The
+/// account was behind when it was asked; the job checks again before
+/// sending. Written once; only its outcome changes, once.
+model SalesReceivableReminder {
+  id                String                   @id @db.Char(36)
+  organizationId    String                   @db.Char(36)
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  receivableId      String                   @db.Char(36)
+  receivable        SalesReceivable          @relation(fields: [organizationId, receivableId], references: [organizationId, id], onDelete: Restrict)
+  /// The latest installment already due when it was asked.
+  installmentNumber Int
+  /// The customer's address when it was asked.
+  recipient         String                   @db.VarChar(254)
+  status            SalesQuoteDeliveryStatus @default(QUEUED)
+  jobId             String                   @db.Char(36)
+  requestedAt       DateTime                 @default(now()) @db.DateTime(3)
+  sentAt            DateTime?                @db.DateTime(3)
+  failedAt          DateTime?                @db.DateTime(3)
+  failureReason     String?                  @db.VarChar(300)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, jobId])
+  @@unique([organizationId, receivableId, installmentNumber])
+  @@index([organizationId, requestedAt])
+  @@map("sales_receivable_reminder")
 }
 
 /// Where a sales order stands (COT-05): open until it is fulfilled or

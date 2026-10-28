@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { newId } from "@/lib";
 import {
   getMyCashSession,
+  getAccountReminders,
   getReceivable,
   getReceivablePayment,
 } from "@/modules/sales";
@@ -77,8 +78,10 @@ export default async function CuentaPage({
   const account = await getReceivable(actor, id);
   if (!account) notFound();
   const { abono } = await searchParams;
-  const receipt =
-    typeof abono === "string" ? await getReceivablePayment(actor, abono) : null;
+  const [receipt, reminders] = await Promise.all([
+    typeof abono === "string" ? getReceivablePayment(actor, abono) : null,
+    getAccountReminders(actor, account.id),
+  ]);
   const mayCharge =
     account.status === "OPEN" &&
     moduleState === "active" &&
@@ -255,6 +258,48 @@ export default async function CuentaPage({
                     <span className="font-medium tabular-nums">
                       {payment.amount}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {reminders.length > 0 && (
+            <section
+              aria-labelledby="recordatorios"
+              className="rounded-xl border bg-card print:hidden"
+            >
+              <h2
+                id="recordatorios"
+                className="border-b p-4 font-medium sm:px-5"
+              >
+                Recordatorios por correo
+              </h2>
+              <ul className="divide-y">
+                {reminders.map((reminder) => (
+                  <li
+                    key={reminder.id}
+                    className="space-y-1 p-4 text-sm sm:px-5"
+                  >
+                    <p className="flex flex-wrap justify-between gap-x-4">
+                      <span>
+                        Mensualidad {reminder.installmentNumber} ·{" "}
+                        {reminder.requestedAtText}
+                      </span>
+                      <span
+                        className={
+                          reminder.status === "FAILED"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {reminder.statusLabel}
+                      </span>
+                    </p>
+                    {reminder.failureReason && (
+                      <p className="text-muted-foreground">
+                        {reminder.failureReason}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -12,6 +12,7 @@ import {
 import {
   MAX_INSTALLMENT_TERMS,
   getInstallmentTerms,
+  getOverdueReminders,
   getSalesSettings,
 } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
@@ -61,9 +62,10 @@ export default async function VentasConfigPage() {
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const [settings, terms] = await Promise.all([
+  const [settings, terms, reminders] = await Promise.all([
     getSalesSettings(actor),
     getInstallmentTerms(actor),
+    getOverdueReminders(actor),
   ]);
 
   return (
@@ -85,6 +87,7 @@ export default async function VentasConfigPage() {
           interest: plain(term.interestPercent),
         }))}
         maxTerms={MAX_INSTALLMENT_TERMS}
+        reminders={reminders}
       />
     </PageContainer>
   );

@@ -28,5 +28,6 @@ export {
   purchaseOrderEmail,
   salesQuoteEmail,
   salesStatementEmail,
+  overdueReminderEmail,
   verificationEmail,
 } from "./templates";

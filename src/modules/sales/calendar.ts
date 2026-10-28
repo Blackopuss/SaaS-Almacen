@@ -39,9 +39,23 @@ export async function timeZoneOf(organizationId: string): Promise<string> {
   return company?.organization.timeZone || "America/Mexico_City";
 }
 
+let clock = () => Date.now();
+
+/** Now, for what depends on the day (what is overdue, PAG-07). */
+export const salesNow = () => new Date(clock());
+
+/** For tests: moves «now» of Ventas; returns how to put it back. */
+export function setSalesClock(next: () => number): () => void {
+  const previous = clock;
+  clock = next;
+  return () => {
+    clock = previous;
+  };
+}
+
 /** Today in the company's calendar. */
 export async function companyToday(organizationId: string): Promise<string> {
-  return dayOf(new Date(), await timeZoneOf(organizationId));
+  return dayOf(salesNow(), await timeZoneOf(organizationId));
 }
 
 /** A `DATE` column as it is stored: the day at 00:00 UTC. */

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { isAppError } from "@/lib";
 import {
   setInstallmentTerms,
+  setOverdueReminders,
   updateSalesSettings,
   type SalesSettingsField,
 } from "@/modules/sales";
@@ -81,7 +82,8 @@ export type InstallmentTermsFormState = {
 
 /**
  * Saves the terms of sales on installments (PAG-01): months and interest
- * of each. Only the titular: the service checks it.
+ * of each, and whether customers get reminders of overdue payments
+ * (PAG-07). Only the titular: the services check it.
  */
 export async function updateInstallmentTermsAction(
   prev: InstallmentTermsFormState,
@@ -95,12 +97,13 @@ export async function updateInstallmentTermsAction(
     interest: String(interest[index] ?? "").slice(0, 16),
   }));
   const answers = prev.answers + 1;
+  const actor = { organizationId: organization.id, userId: user.id };
   let result;
   try {
-    result = await setInstallmentTerms(
-      { organizationId: organization.id, userId: user.id },
-      rows,
-    );
+    result = await setInstallmentTerms(actor, rows);
+    if (result.ok) {
+      await setOverdueReminders(actor, formData.get("reminders") === "1");
+    }
   } catch (error) {
     if (isAppError(error) && error.kind === "forbidden") {
       return { rowErrors: {}, formError: error.message, answers };

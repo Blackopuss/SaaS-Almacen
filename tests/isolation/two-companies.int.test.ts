@@ -687,6 +687,17 @@ beforeAll(async () => {
         receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    // A reminder of an overdue payment (PAG-07).
+    await db.salesReceivableReminder.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        installmentNumber: 1,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+      },
+    });
     await db.salesOrder.create({
       data: {
         id: salesOrderId,

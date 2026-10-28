@@ -18,7 +18,8 @@ export const metadata: Metadata = { title: "Cuentas por cobrar" };
 
 /**
  * Accounts of sales on installments (PAG-05): the open ones by default,
- * newest first; each row opens the account.
+ * newest first, or only the overdue ones, most overdue first (PAG-07);
+ * each row opens the account.
  */
 export default async function CuentasPage({
   searchParams,
@@ -49,12 +50,14 @@ export default async function CuentasPage({
       </PageContainer>
     );
   }
-  const { pagina, todas } = await searchParams;
-  const all = todas === "1";
+  const { pagina, todas, vencidas } = await searchParams;
+  const late = vencidas === "1";
+  const all = !late && todas === "1";
   const list = await listReceivables(
     { organizationId: access.organization.id, userId: access.user.id },
     {
       open: !all,
+      overdue: late,
       page:
         typeof pagina === "string" && /^\d{1,6}$/.test(pagina)
           ? Number(pagina)
@@ -67,6 +70,7 @@ export default async function CuentasPage({
   const pageHref = (page: number) => {
     const params = new URLSearchParams();
     if (all) params.set("todas", "1");
+    if (late) params.set("vencidas", "1");
     if (page > 1) params.set("pagina", String(page));
     const query = params.toString();
     return query ? `/ventas/cuentas?${query}` : "/ventas/cuentas";
@@ -76,11 +80,47 @@ export default async function CuentasPage({
     <PageContainer>
       {back}
       <PageHeader title="Cuentas por cobrar" />
+      <nav
+        aria-label="Qué cuentas ver"
+        className="-mt-2 flex flex-wrap gap-x-5"
+      >
+        {[
+          {
+            href: "/ventas/cuentas",
+            label: "Abiertas",
+            current: !all && !late,
+          },
+          {
+            href: "/ventas/cuentas?vencidas=1",
+            label: "Con pagos vencidos",
+            current: late,
+          },
+        ].map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={link.current ? "page" : undefined}
+            className="inline-flex min-h-11 items-center rounded-lg text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:text-foreground aria-[current=page]:underline"
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
       {list.items.length === 0 ? (
         <EmptyState
           icon={Wallet}
-          title={all ? "Todavía no hay ventas a plazos" : "Nadie debe nada"}
-          description="Una cuenta nace al cobrar el enganche de una venta a plazos."
+          title={
+            late
+              ? "Nadie está atrasado"
+              : all
+                ? "Todavía no hay ventas a plazos"
+                : "Nadie debe nada"
+          }
+          description={
+            late
+              ? "Aquí aparece quien tenga un pago con su fecha pasada."
+              : "Una cuenta nace al cobrar el enganche de una venta a plazos."
+          }
         />
       ) : (
         <section
@@ -89,7 +129,11 @@ export default async function CuentasPage({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b p-4 sm:px-5">
             <h2 id="lista-cuentas" className="font-medium">
-              {all ? "Todas las cuentas" : "Cuentas abiertas"}
+              {late
+                ? "Con pagos vencidos"
+                : all
+                  ? "Todas las cuentas"
+                  : "Cuentas abiertas"}
             </h2>
             <p className="text-sm text-muted-foreground tabular-nums">
               {list.total === 1
@@ -111,14 +155,18 @@ export default async function CuentasPage({
                     >
                       {item.customer}
                     </Link>
-                    {item.overdue && (
-                      <Badge variant="destructive">Con atraso</Badge>
+                    {item.overdueAmount && (
+                      <Badge variant="destructive">
+                        Vencido {item.overdueAmount}
+                      </Badge>
                     )}
                     {all && <Badge variant="outline">{item.statusLabel}</Badge>}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Cuenta {item.number}
-                    {item.nextDueText && ` · próxima el ${item.nextDueText}`}
+                    {item.overdueSinceText
+                      ? ` · atrasada desde el ${item.overdueSinceText}`
+                      : item.nextDueText && ` · próxima el ${item.nextDueText}`}
                   </p>
                 </div>
                 <p className="shrink-0 font-medium tabular-nums">
@@ -159,14 +207,16 @@ export default async function CuentasPage({
           )}
         </section>
       )}
-      <p>
-        <Link
-          href={all ? "/ventas/cuentas" : "/ventas/cuentas?todas=1"}
-          className="inline-flex min-h-11 items-center rounded-lg text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {all ? "Ver solo las abiertas" : "Ver también las pagadas"}
-        </Link>
-      </p>
+      {!late && (
+        <p>
+          <Link
+            href={all ? "/ventas/cuentas" : "/ventas/cuentas?todas=1"}
+            className="inline-flex min-h-11 items-center rounded-lg text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {all ? "Ver solo las abiertas" : "Ver también las pagadas"}
+          </Link>
+        </p>
+      )}
     </PageContainer>
   );
 }

@@ -22,10 +22,13 @@ type Row = { key: number; months: string; interest: string };
 export function InstallmentTermsForm({
   terms,
   maxTerms,
+  reminders,
 }: {
   /** «6» months, «10» % interest. */
   terms: { months: string; interest: string }[];
   maxTerms: number;
+  /** Customers get a mail when a payment falls due unpaid (PAG-07). */
+  reminders: boolean;
 }) {
   const next = useRef(terms.length);
   const [rows, setRows] = useState<Row[]>(() =>
@@ -38,7 +41,7 @@ export function InstallmentTermsForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.saved) toast.success("Plazos guardados.");
+    if (state.saved) toast.success("Ventas a plazos guardadas.");
     const first = Object.keys(state.rowErrors)[0];
     if (first !== undefined) {
       formRef.current
@@ -141,6 +144,16 @@ export function InstallmentTermsForm({
           })}
         </ul>
       )}
+      <label className="flex min-h-11 items-center gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="reminders"
+          value="1"
+          defaultChecked={reminders}
+          className="size-5 shrink-0 accent-primary"
+        />
+        Mandar un correo al cliente cuando se le pase un pago
+      </label>
       <div className="flex flex-wrap gap-3">
         {rows.length < maxTerms && (
           <Button
@@ -159,7 +172,7 @@ export function InstallmentTermsForm({
         )}
         <Button type="submit" disabled={pending}>
           {pending && <Loader2 aria-hidden="true" className="animate-spin" />}
-          Guardar plazos
+          Guardar
         </Button>
       </div>
     </form>

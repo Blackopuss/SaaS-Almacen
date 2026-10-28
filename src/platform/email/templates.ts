@@ -300,6 +300,38 @@ export function salesStatementEmail(input: {
   };
 }
 
+/** A reminder of an overdue payment, from the business (PAG-07). */
+export function overdueReminderEmail(input: {
+  to: string;
+  greeting: string;
+  organizationName: string;
+  /** «$1,000.00». */
+  overdue: string;
+  /** «28 nov 2026»: the oldest installment still unpaid. */
+  sinceText: string;
+  balance: string;
+  /** The titular: answers go to them. */
+  replyTo: { name: string; email: string };
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.replyTo.email,
+    subject: `Tienes un pago vencido con ${company}`,
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `Te recordamos que tienes ${oneLine(input.overdue, 30)} vencidos con ${company}, desde el ${oneLine(input.sinceText, 40)}.`,
+      `Tu saldo total es de ${oneLine(input.balance, 30)}.`,
+      "",
+      "Si ya pagaste, no hagas caso de este aviso.",
+      `Si tienes dudas, responde a este correo: le llega a ${oneLine(input.replyTo.name, 120)} (${input.replyTo.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}.`,
+    ].join("\n"),
+  };
+}
+
 /** Operations alert for whoever runs the server (PIL-04). */
 export function operationsAlertEmail(input: {
   to: string;

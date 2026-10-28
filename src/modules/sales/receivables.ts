@@ -1,10 +1,10 @@
 import "server-only";
 
-import { dec, formatDateTime } from "@/lib";
+import { dec, formatDateTime, type Decimal } from "@/lib";
 import { assertModulePermission } from "@/platform/billing";
-import { forOrganization } from "@/server";
+import { forOrganization, type TenantDb } from "@/server";
 
-import { companyToday, dayOfDate } from "./calendar";
+import { companyToday, dateOfDay, dayOfDate } from "./calendar";
 import { formatPercent } from "./discounts";
 import { applyPayments } from "./installment-plan";
 import type { SalesActor } from "./prices";
@@ -202,12 +202,128 @@ export type ReceivableSummary = {
   /** «28 nov 2026»; null when nothing is due. */
   nextDueText: string | null;
   overdue: boolean;
+  /** «$500.00» past its day; null when nothing is. */
+  overdueAmount: string | null;
+  /** «28 sep 2026»: the oldest installment still unpaid and past its day. */
+  overdueSinceText: string | null;
 };
 
-/** Accounts of the company, the open ones first, newest first. */
+/** The company client or a transaction of it. */
+type Client = TenantDb | Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
+
+export type OverdueAccount = {
+  receivableId: string;
+  overdue: Decimal;
+  /** The latest installment already past its day. */
+  latestDue: number;
+};
+
+/**
+ * Open accounts behind on their payments (PAG-07), most overdue first.
+ * Payments cover the oldest installments first, so an account is behind
+ * exactly when what fell due before today passes what was paid, and then
+ * its latest installment due is the one unpaid. Derived, never stored.
+ */
+export async function findOverdue(
+  client: Client,
+  today: string,
+): Promise<OverdueAccount[]> {
+  const [due, paid] = await Promise.all([
+    client.salesReceivableInstallment.groupBy({
+      by: ["receivableId"],
+      where: {
+        dueDay: { lt: dateOfDay(today) },
+        receivable: { status: "OPEN" },
+      },
+      _sum: { amount: true },
+      _max: { number: true },
+    }),
+    client.salesReceivablePayment.groupBy({
+      by: ["receivableId"],
+      where: { receivable: { status: "OPEN" } },
+      _sum: { amount: true },
+    }),
+  ]);
+  const paidOf = new Map(
+    paid.map((row) => [
+      row.receivableId,
+      dec(row._sum.amount?.toString() ?? 0),
+    ]),
+  );
+  return due
+    .flatMap((row) => {
+      const overdue = dec(row._sum.amount?.toString() ?? 0).minus(
+        paidOf.get(row.receivableId) ?? 0,
+      );
+      return overdue.greaterThan(0)
+        ? [
+            {
+              receivableId: row.receivableId,
+              overdue,
+              latestDue: row._max.number ?? 0,
+            },
+          ]
+        : [];
+    })
+    .sort(
+      (a, b) =>
+        b.overdue.comparedTo(a.overdue) ||
+        (a.receivableId < b.receivableId ? -1 : 1),
+    );
+}
+
+/**
+ * What one open account has past its day, since when and what it owes in
+ * all; null when it is up to date (or not open).
+ */
+export async function overdueOf(
+  client: Client,
+  receivableId: string,
+  today: string,
+): Promise<{ overdue: Decimal; since: Date; balance: Decimal } | null> {
+  const account = await client.salesReceivable.findFirst({
+    where: { id: receivableId, status: "OPEN" },
+    select: {
+      owed: true,
+      installments: {
+        orderBy: { number: "asc" },
+        select: { number: true, dueDay: true, amount: true },
+      },
+      payments: { select: { amount: true } },
+    },
+  });
+  if (!account) return null;
+  const paid = account.payments.reduce(
+    (sum, payment) => sum.plus(payment.amount.toString()),
+    dec(0),
+  );
+  const states = applyPayments(
+    account.installments.map((installment) => ({
+      number: installment.number,
+      dueDay: dayOfDate(installment.dueDay),
+      amount: installment.amount.toString(),
+    })),
+    paid,
+    today,
+  );
+  const first = states.findIndex((state) => state.status === "OVERDUE");
+  if (first < 0) return null;
+  return {
+    overdue: states
+      .filter((state) => state.status === "OVERDUE")
+      .reduce((sum, state) => sum.plus(state.left), dec(0)),
+    since: account.installments[first]!.dueDay,
+    balance: dec(account.owed.toString()).minus(paid),
+  };
+}
+
+/**
+ * Accounts of the company: the open ones (or all), newest first; or only
+ * those behind on their payments, most overdue first.
+ */
 export async function listReceivables(
   actor: SalesActor,
-  filters: { page?: number; open?: boolean } = {},
+  filters: { page?: number; open?: boolean; overdue?: boolean } = {},
 ): Promise<{
   items: ReceivableSummary[];
   total: number;
@@ -220,17 +336,35 @@ export async function listReceivables(
     "sales.receivable.read",
   );
   const client = forOrganization(actor.organizationId);
-  const where = filters.open === false ? {} : { status: "OPEN" as const };
-  const total = await client.salesReceivable.count({ where });
+  const today = await companyToday(actor.organizationId);
+  const behind = filters.overdue
+    ? (await findOverdue(client, today)).map((row) => row.receivableId)
+    : null;
+  const where = behind
+    ? { id: { in: behind } }
+    : filters.open === false
+      ? {}
+      : { status: "OPEN" as const };
+  const total = behind
+    ? behind.length
+    : await client.salesReceivable.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / RECEIVABLE_PAGE_SIZE));
   const requested = Number.isInteger(filters.page) ? Number(filters.page) : 1;
   const page = Math.min(Math.max(requested, 1), pageCount);
-  const [rows, today] = await Promise.all([
+  const shown = behind?.slice(
+    (page - 1) * RECEIVABLE_PAGE_SIZE,
+    page * RECEIVABLE_PAGE_SIZE,
+  );
+  const [found] = await Promise.all([
     client.salesReceivable.findMany({
-      where,
+      where: shown ? { id: { in: shown } } : where,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: (page - 1) * RECEIVABLE_PAGE_SIZE,
-      take: RECEIVABLE_PAGE_SIZE,
+      ...(shown
+        ? {}
+        : {
+            skip: (page - 1) * RECEIVABLE_PAGE_SIZE,
+            take: RECEIVABLE_PAGE_SIZE,
+          }),
       select: {
         id: true,
         number: true,
@@ -244,8 +378,11 @@ export async function listReceivables(
         payments: { select: { amount: true } },
       },
     }),
-    companyToday(actor.organizationId),
   ]);
+  // Most overdue first, as `findOverdue` ordered them.
+  const rows = shown
+    ? shown.flatMap((id) => found.filter((row) => row.id === id))
+    : found;
   return {
     items: rows.map((row) => {
       const paid = row.payments.reduce(
@@ -262,6 +399,7 @@ export async function listReceivables(
         today,
       );
       const next = states.findIndex((state) => !state.left.isZero());
+      const late = states.filter((state) => state.status === "OVERDUE");
       return {
         id: row.id,
         number: row.number,
@@ -270,7 +408,20 @@ export async function listReceivables(
         balance: formatMoney(dec(row.owed.toString()).minus(paid)),
         nextDueText:
           next >= 0 ? formatDueDay(row.installments[next]!.dueDay) : null,
-        overdue: states.some((state) => state.status === "OVERDUE"),
+        overdue: late.length > 0,
+        overdueAmount:
+          late.length > 0
+            ? formatMoney(
+                late.reduce((sum, state) => sum.plus(state.left), dec(0)),
+              )
+            : null,
+        overdueSinceText:
+          late.length > 0
+            ? formatDueDay(
+                row.installments.find((i) => i.number === late[0]!.number)!
+                  .dueDay,
+              )
+            : null,
       };
     }),
     total,

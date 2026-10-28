@@ -15,6 +15,7 @@ import { companyToday, dayOfDate } from "./calendar";
 import { usableEmail } from "./email-address";
 import type { SalesActor } from "./prices";
 import { composeQuotePdf } from "./quote-pdf";
+import { REMINDER_JOB_TYPE, reminderJobHandler } from "./reminders";
 import {
   STATEMENT_DELIVERY_JOB_TYPE,
   statementJobHandler,
@@ -497,6 +498,7 @@ const deliveryIdOf = (payload: unknown) =>
 /** Background work of Ventas, by job type. */
 export const salesJobHandlers: JobHandlers = {
   [STATEMENT_DELIVERY_JOB_TYPE]: statementJobHandler,
+  [REMINDER_JOB_TYPE]: reminderJobHandler,
   [QUOTE_DELIVERY_JOB_TYPE]: {
     // The company is the one of the job, never one named in the payload.
     handle: (context) =>
