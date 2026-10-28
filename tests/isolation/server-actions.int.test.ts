@@ -80,6 +80,20 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa",
     coveredBy: "tests/sales/quote-status.int.test.ts",
   },
+  previewFulfillmentAction: {
+    input:
+      "id del pedido, líneas (id de línea, cantidad, ubicación) y pagos tecleados",
+    identity:
+      "sesión y empresa activa (getModuleAccess); el pedido se busca solo en esa empresa y no escribe nada",
+    coveredBy: "tests/sales/order-fulfillment.int.test.ts",
+  },
+  fulfillOrderAction: {
+    input:
+      "id del pedido, líneas (id de línea, cantidad, ubicación), pagos y clave",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); el pedido y la caja se bloquean solo en esa empresa y la caja es la de quien cobra",
+    coveredBy: "tests/sales/order-fulfillment.int.test.ts",
+  },
   convertQuoteAction: {
     input: "id de la cotización",
     identity:

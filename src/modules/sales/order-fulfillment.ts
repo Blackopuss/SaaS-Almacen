@@ -1,9 +1,13 @@
 import "server-only";
 
 import { Decimal, dec, newId } from "@/lib";
-import { postSaleExit } from "@/modules/inventory";
+import {
+  formatStock,
+  listStockLocations,
+  postSaleExit,
+} from "@/modules/inventory";
 import { assertModulePermission } from "@/platform/billing";
-import { parseQuantity } from "@/platform/catalog";
+import { getUnit, parseQuantity, pluralizeName } from "@/platform/catalog";
 import {
   LOCKING_TRANSACTION,
   forOrganization,
@@ -11,13 +15,19 @@ import {
   type TenantDb,
 } from "@/server";
 
-import { discountLines } from "./discounts";
-import { SALE_MAX_PAYMENTS, readPayments, type PaymentInput } from "./payments";
+import { discountLines, formatPercent } from "./discounts";
+import { quantityText } from "./line-text";
+import {
+  SALE_MAX_PAYMENTS,
+  paymentNote,
+  readPayments,
+  type PaymentInput,
+} from "./payments";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
 import { NO_CASH_SESSION, SALE_KEY_REUSED, lockOwnCashSession } from "./sales";
 import { awaitsFulfillment } from "./sales-order-states";
-import { saleTotals } from "./tax";
+import { formatTaxRate, saleTotals } from "./tax";
 
 /**
  * Fulfilling an order (COT-07, ADR 0030). There is no «fiado»: what leaves
@@ -111,6 +121,100 @@ export async function deliveredByLine(
       dec(row._sum.capturedQuantity?.toString() ?? 0),
     ]),
   );
+}
+
+type OrderToPlan = {
+  discountPercent: { toString(): string };
+  pricesIncludeTax: boolean;
+  taxRate: { toString(): string };
+  lines: {
+    id: string;
+    productId: string;
+    unitCode: string;
+    capturedQuantity: { toString(): string };
+    factor: { toString(): string };
+    unitPrice: { toString(): string };
+    presentation: { name: string } | null;
+    product: { name: string; quantityStep: { toString(): string } };
+  }[];
+};
+
+/**
+ * What a delivery takes of each line and what it adds up to: at the agreed
+ * price, with the agreed discount off each line as at the counter (VEN-14).
+ * Delivered whole in one go, it adds up to the order. Never more than what
+ * is missing of a line. Reads only.
+ */
+async function planDelivery<Order extends OrderToPlan>(
+  client: Client,
+  order: Order,
+  wanted: Map<string, { quantity: string; locationId: string }>,
+) {
+  const delivered = await deliveredByLine(
+    client,
+    order.lines.map((line) => line.id),
+  );
+  const lineErrors: Record<string, string> = {};
+  const going: {
+    line: Order["lines"][number];
+    quantity: Decimal;
+    locationId: string;
+    missingAfter: Decimal;
+  }[] = [];
+  for (const line of order.lines) {
+    const typed = wanted.get(line.id);
+    if (!typed || typed.quantity === "" || typed.quantity === "0") continue;
+    const parsed = parseQuantity(
+      {
+        unitCode: line.unitCode,
+        quantityStep: line.presentation
+          ? "1"
+          : line.product.quantityStep.toString(),
+      },
+      typed.quantity,
+    );
+    if (!parsed.ok) {
+      lineErrors[line.id] = line.presentation
+        ? "Escribe cuántas completas entregas."
+        : parsed.error;
+      continue;
+    }
+    const missing = dec(line.capturedQuantity.toString()).minus(
+      delivered.get(line.id) ?? 0,
+    );
+    if (parsed.quantity.greaterThan(missing)) {
+      lineErrors[line.id] = missing.isZero()
+        ? "De esta línea ya se entregó todo."
+        : `Solo ${missing.equals(1) ? "falta" : "faltan"} ${quantityText({ ...line, capturedQuantity: missing })}.`;
+      continue;
+    }
+    if (parsed.quantity.isZero()) continue;
+    going.push({
+      line,
+      quantity: parsed.quantity,
+      locationId: typed.locationId,
+      missingAfter: missing.minus(parsed.quantity),
+    });
+  }
+  const gross = going.map((g) =>
+    cents(g.quantity.times(g.line.unitPrice.toString())),
+  );
+  const discounts = discountLines(gross, order.discountPercent.toString());
+  const net = gross.map((amount, index) => amount.minus(discounts[index]!));
+  const discountTotal = discounts.reduce((sum, d) => sum.plus(d), dec(0));
+  const totals = saleTotals(net, {
+    pricesIncludeTax: order.pricesIncludeTax,
+    rate: order.taxRate.toString(),
+  });
+  return {
+    delivered,
+    lineErrors,
+    going,
+    discounts,
+    net,
+    discountTotal,
+    totals,
+  };
 }
 
 export const ORDER_NOT_WAITING: Record<string, string> = {
@@ -280,57 +384,12 @@ async function deliver(
       );
     }
 
-    // What goes of each line: never more than what is missing, read under
-    // the lock of the order.
-    const delivered = await deliveredByLine(
-      tx,
-      order.lines.map((line) => line.id),
-    );
-    const lineErrors: Record<string, string> = {};
-    const going: {
-      line: (typeof order.lines)[number];
-      quantity: Decimal;
-      locationId: string;
-      missingAfter: Decimal;
-    }[] = [];
-    for (const line of order.lines) {
-      const typed = input.wanted.get(line.id);
-      if (!typed || typed.quantity === "" || typed.quantity === "0") continue;
-      const parsed = parseQuantity(
-        {
-          unitCode: line.unitCode,
-          quantityStep: line.presentation
-            ? "1"
-            : line.product.quantityStep.toString(),
-        },
-        typed.quantity,
-      );
-      if (!parsed.ok) {
-        lineErrors[line.id] = line.presentation
-          ? "Escribe cuántas completas entregas."
-          : parsed.error;
-        continue;
-      }
-      const missing = dec(line.capturedQuantity.toString()).minus(
-        delivered.get(line.id) ?? 0,
-      );
-      if (parsed.quantity.greaterThan(missing)) {
-        lineErrors[line.id] = missing.isZero()
-          ? "De esta línea ya se entregó todo."
-          : `Solo faltan ${missing.toString()} por entregar.`;
-        continue;
-      }
-      if (parsed.quantity.isZero()) continue;
-      going.push({
-        line,
-        quantity: parsed.quantity,
-        locationId: typed.locationId,
-        missingAfter: missing.minus(parsed.quantity),
-      });
+    // Never more than what is missing, read under the lock of the order.
+    const plan = await planDelivery(tx, order, input.wanted);
+    if (Object.keys(plan.lineErrors).length > 0) {
+      throw new Rejected(failure({ lineErrors: plan.lineErrors }));
     }
-    if (Object.keys(lineErrors).length > 0) {
-      throw new Rejected(failure({ lineErrors }));
-    }
+    const { going, delivered, discounts, net, discountTotal, totals } = plan;
     if (going.length === 0) {
       throw new Rejected(
         failure({
@@ -338,20 +397,6 @@ async function deliver(
         }),
       );
     }
-
-    // At the agreed price; the agreed discount off each line, as at the
-    // counter. Delivered whole in one go, it adds up to the order.
-    const gross = going.map((g) =>
-      cents(g.quantity.times(g.line.unitPrice.toString())),
-    );
-    const percent = dec(order.discountPercent.toString());
-    const discounts = discountLines(gross, percent);
-    const net = gross.map((amount, index) => amount.minus(discounts[index]!));
-    const discountTotal = discounts.reduce((sum, d) => sum.plus(d), dec(0));
-    const totals = saleTotals(net, {
-      pricesIncludeTax: order.pricesIncludeTax,
-      rate: order.taxRate.toString(),
-    });
     const paid = readPayments(input.payments, totals.total);
     if (!paid.ok) {
       throw new Rejected(
@@ -398,7 +443,7 @@ async function deliver(
       );
     }
 
-    const discounted = percent.greaterThan(0);
+    const discounted = dec(order.discountPercent.toString()).greaterThan(0);
     const saleId = newId();
     await tx.sale.create({
       data: {
@@ -485,4 +530,260 @@ async function deliver(
       fulfilled,
     };
   }, LOCKING_TRANSACTION);
+}
+
+export type FulfillmentLineView = {
+  id: string;
+  productName: string;
+  sku: string;
+  /** «2 cajas de 500 piezas». */
+  orderedText: string;
+  /** «1 caja de 500 piezas». */
+  missingText: string;
+  /** What is missing, in the line's terms: «1». */
+  missing: string;
+  /** How the quantity is typed: «cajas de 500 piezas», «metros». */
+  unitLabel: string;
+  /** «$500.00 c/u». */
+  unitPrice: string;
+  /** Locations that hold some of the product, the fullest first. */
+  locations: { id: string; label: string }[];
+  /** What can go now from the fullest location: the missing, or less. */
+  suggested: string;
+};
+
+export type OrderToFulfill = {
+  id: string;
+  number: number;
+  customerName: string;
+  /** Why nothing can be delivered anymore; null while it can. */
+  closed: string | null;
+  /** Only the lines with something missing. */
+  lines: FulfillmentLineView[];
+};
+
+/** An order as the delivery screen needs it; null when it does not exist. */
+export async function getOrderToFulfill(
+  actor: SalesActor,
+  orderId: string,
+): Promise<OrderToFulfill | null> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "sales.sale.create",
+  );
+  const client = forOrganization(actor.organizationId);
+  const order = await client.salesOrder.findFirst({
+    where: { id: text(orderId, 36) },
+    include: {
+      customer: { select: { name: true } },
+      lines: {
+        orderBy: { lineNumber: "asc" },
+        include: {
+          product: { select: { name: true, sku: true } },
+          presentation: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!order) return null;
+  const head = {
+    id: order.id,
+    number: order.number,
+    customerName: order.customer.name,
+  };
+  if (!awaitsFulfillment(order.status)) {
+    return { ...head, closed: ORDER_NOT_WAITING[order.status]!, lines: [] };
+  }
+  const delivered = await deliveredByLine(
+    client,
+    order.lines.map((line) => line.id),
+  );
+  const pending = order.lines.filter((line) =>
+    dec(line.capturedQuantity.toString()).greaterThan(
+      delivered.get(line.id) ?? 0,
+    ),
+  );
+  const places = await listStockLocations(actor);
+  const balances = await client.stockBalance.findMany({
+    where: {
+      productId: { in: [...new Set(pending.map((l) => l.productId))] },
+      quantity: { gt: 0 },
+    },
+    select: { productId: true, locationId: true, quantity: true },
+  });
+  return {
+    ...head,
+    closed: null,
+    lines: pending.map((line) => {
+      const missing = dec(line.capturedQuantity.toString()).minus(
+        delivered.get(line.id) ?? 0,
+      );
+      const factor = dec(line.factor.toString());
+      const held = places
+        .map((place) => ({
+          place,
+          quantity: dec(
+            balances
+              .find(
+                (b) =>
+                  b.productId === line.productId && b.locationId === place.id,
+              )
+              ?.quantity.toString() ?? 0,
+          ),
+        }))
+        .filter((row) => row.quantity.greaterThan(0))
+        .sort((a, b) => b.quantity.comparedTo(a.quantity));
+      // Whole boxes only: what the fullest location holds, in boxes.
+      const fits = held[0]
+        ? line.presentation
+          ? held[0].quantity.dividedToIntegerBy(factor)
+          : held[0].quantity
+        : dec(0);
+      const unit = getUnit(line.unitCode);
+      return {
+        id: line.id,
+        productName: line.product.name,
+        sku: line.product.sku,
+        orderedText: quantityText(line),
+        missingText: quantityText({ ...line, capturedQuantity: missing }),
+        missing: missing.toString(),
+        unitLabel: line.presentation
+          ? `${pluralizeName(line.presentation.name, dec(2))} de ${factor.toString()} ${unit.plural}`
+          : unit.plural,
+        unitPrice: `${formatMoney(line.unitPrice.toString())} c/u`,
+        locations: held.map(({ place, quantity }) => ({
+          id: place.id,
+          label: `${place.path} — hay ${formatStock(quantity.toString(), line.unitCode)}`,
+        })),
+        suggested: Decimal.min(missing, fits).toString(),
+      };
+    }),
+  };
+}
+
+export type FulfillmentPreview = {
+  /** Lines that go, by id of the order's line. */
+  lines: Record<string, { amount: string; error?: string }>;
+  /** Problems of lines that do not go, by id. */
+  lineErrors: Record<string, string>;
+  discount: { text: string; reason: string } | null;
+  subtotal: string;
+  taxLabel: string;
+  tax: string;
+  total: string;
+  /** «Cambio: $95.50», «Faltan $4.50». */
+  paymentNote: string | null;
+};
+
+/**
+ * What a delivery adds up to before charging, with the same rules as
+ * charging it. Says when a line asks for more than its location holds;
+ * charging checks it again under the locks. Reads only.
+ */
+export async function previewFulfillment(
+  actor: SalesActor,
+  orderId: string,
+  input: { lines: FulfillmentLineInput[]; payments?: PaymentInput[] },
+): Promise<FulfillmentPreview | null> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "sales.sale.create",
+  );
+  const client = forOrganization(actor.organizationId);
+  const order = await client.salesOrder.findFirst({
+    where: { id: text(orderId, 36) },
+    include: {
+      lines: {
+        include: {
+          product: { select: { name: true, quantityStep: true } },
+          presentation: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!order || !awaitsFulfillment(order.status)) return null;
+  const wanted = new Map<string, { quantity: string; locationId: string }>();
+  for (const line of Array.isArray(input?.lines) ? input.lines : []) {
+    const lineId = text(line?.orderLineId, 36);
+    if (wanted.has(lineId)) continue;
+    wanted.set(lineId, {
+      quantity: text(line?.quantity, 40).trim(),
+      locationId: text(line?.locationId, 36),
+    });
+  }
+  const plan = await planDelivery(client, order, wanted);
+  const general = plan.going.some((g) => !g.locationId)
+    ? await client.location.findFirst({
+        where: { isDefault: true },
+        select: { id: true },
+      })
+    : null;
+  const placeOf = (g: (typeof plan.going)[number]) =>
+    g.locationId || general?.id || "";
+  const balances = await client.stockBalance.findMany({
+    where: {
+      OR: plan.going.map((g) => ({
+        productId: g.line.productId,
+        locationId: placeOf(g),
+      })),
+    },
+    select: { productId: true, locationId: true, quantity: true },
+  });
+  // Several lines of one product from one place share what it holds.
+  const taken = new Map<string, Decimal>();
+  const lines: FulfillmentPreview["lines"] = {};
+  plan.going.forEach((g, index) => {
+    const slot = `${g.line.productId}|${placeOf(g)}`;
+    const held = dec(
+      balances
+        .find(
+          (b) =>
+            b.productId === g.line.productId && b.locationId === placeOf(g),
+        )
+        ?.quantity.toString() ?? 0,
+    );
+    const after = (taken.get(slot) ?? dec(0)).plus(
+      g.quantity.times(g.line.factor.toString()),
+    );
+    taken.set(slot, after);
+    lines[g.line.id] = {
+      amount: formatMoney(plan.net[index]!),
+      ...(after.greaterThan(held)
+        ? {
+            error: held.isZero()
+              ? "Ahí ya no hay de este producto."
+              : `Ahí solo hay ${formatStock(held.toString(), g.line.unitCode)}.`,
+          }
+        : {}),
+    };
+  });
+  const rate = formatTaxRate(order.taxRate.toString());
+  return {
+    lines,
+    lineErrors: plan.lineErrors,
+    discount: plan.discountTotal.isZero()
+      ? null
+      : {
+          text: `-${formatMoney(plan.discountTotal)} (${formatPercent(order.discountPercent.toString())})`,
+          reason: order.discountReason ?? "",
+        },
+    subtotal: formatMoney(plan.totals.subtotal),
+    taxLabel: order.pricesIncludeTax
+      ? `IVA incluido (${rate})`
+      : `IVA (${rate})`,
+    tax: formatMoney(plan.totals.tax),
+    total: formatMoney(plan.totals.total),
+    paymentNote:
+      plan.going.length > 0
+        ? paymentNote(
+            (Array.isArray(input?.payments) ? input.payments : []).slice(
+              0,
+              SALE_MAX_PAYMENTS,
+            ),
+            plan.totals.total,
+          )
+        : null,
+  };
 }

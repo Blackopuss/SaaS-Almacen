@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, HandCoins } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,7 +10,8 @@ import {
   PageHeader,
 } from "@/components";
 import { Badge } from "@/components/ui/badge";
-import { getSalesOrder } from "@/modules/sales";
+import { Button } from "@/components/ui/button";
+import { awaitsFulfillment, getSalesOrder } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 export const metadata: Metadata = { title: "Pedido" };
@@ -57,11 +58,27 @@ export default async function PedidoPage({
     id,
   );
   if (!order) notFound();
+  const canDeliver =
+    access.allows("sales.sale.create") &&
+    access.moduleState("sales") === "active" &&
+    awaitsFulfillment(order.status);
 
   return (
     <PageContainer>
       {back}
-      <PageHeader title={`Pedido ${order.number}`} />
+      <PageHeader
+        title={`Pedido ${order.number}`}
+        actions={
+          canDeliver ? (
+            <Button asChild>
+              <Link href={`/ventas/pedidos/${order.id}/entregar`}>
+                <HandCoins aria-hidden="true" data-icon="inline-start" />
+                Entregar y cobrar
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
       <p className="-mt-2 flex flex-wrap gap-x-6">
         <Link
           href={`/ventas/cotizaciones/${order.quote.id}`}

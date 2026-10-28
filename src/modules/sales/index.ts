@@ -34,11 +34,18 @@ export {
   findSaleByKey,
   registerSale,
 } from "./sales";
-export { fulfillSalesOrder } from "./order-fulfillment";
+export {
+  fulfillSalesOrder,
+  getOrderToFulfill,
+  previewFulfillment,
+} from "./order-fulfillment";
 export type {
   FulfillmentInput,
   FulfillmentLineInput,
+  FulfillmentLineView,
+  FulfillmentPreview,
   FulfillmentResult,
+  OrderToFulfill,
 } from "./order-fulfillment";
 export {
   SALES_ORDER_TRANSITIONS,

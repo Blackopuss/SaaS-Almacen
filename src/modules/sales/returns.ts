@@ -60,6 +60,8 @@ export type ReturnableSale = {
   lines: ReturnableLine[];
   /** Methods it was paid with, to suggest how to give the money back. */
   paidWith: PaymentMethod[];
+  /** The order it delivered (COT-07); null for a counter sale. */
+  salesOrder: { id: string; number: number } | null;
   /** Returns so far, oldest first. */
   returns: {
     id: string;
@@ -79,6 +81,7 @@ async function loadSale(client: Client, saleId: string) {
       total: true,
       pricesIncludeTax: true,
       taxRate: true,
+      salesOrder: { select: { id: true, number: true } },
       lines: {
         orderBy: { lineNumber: "asc" },
         select: {
@@ -170,6 +173,7 @@ export async function getReturnableSale(
       };
     }),
     paidWith: [...new Set(sale.payments.map((p) => p.method as PaymentMethod))],
+    salesOrder: sale.salesOrder,
     returns: sale.returns.map((r) => ({
       id: r.id,
       refund: formatMoney(r.refund.toString()),

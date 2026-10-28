@@ -13,8 +13,10 @@ import {
   convertQuoteToOrder,
   createQuote,
   fulfillSalesOrder,
+  getOrderToFulfill,
   getSalesOrder,
   markQuoteSent,
+  previewFulfillment,
   setSalePrices,
 } from "@/modules/sales";
 import { createPresentation, createProduct } from "@/platform/catalog";
@@ -165,7 +167,7 @@ describe("fulfilling an order", () => {
     ).toMatchObject({
       ok: false,
       lineErrors: {
-        [boxLine]: "Solo faltan 1 por entregar.",
+        [boxLine]: "Solo falta 1 caja de 500 piezas.",
         [pieceLine]: "De esta línea ya se entregó todo.",
       },
     });
@@ -387,5 +389,64 @@ describe("fulfilling an order", () => {
         data: { status: "OPEN" },
       }),
     ).rejects.toThrow(/status change is not allowed/);
+  });
+
+  it("the screen: what is missing, what fits now and what it adds up to (COT-08)", async () => {
+    const { actor, orderId, boxLine, pieceLine } = await order();
+    // 600 pieces: one box fits, not two.
+    let view = await getOrderToFulfill(actor, orderId);
+    expect(view).toMatchObject({ number: 1, closed: null });
+    expect(
+      view!.lines.map((line) => [
+        line.missingText,
+        line.unitLabel,
+        line.suggested,
+        line.locations.length,
+      ]),
+    ).toEqual([
+      ["2 cajas de 500 piezas", "cajas de 500 piezas", "1", 1],
+      ["3 piezas", "piezas", "3", 1],
+    ]);
+    const lines = [
+      { orderLineId: boxLine, quantity: "1" },
+      { orderLineId: pieceLine, quantity: "3" },
+    ];
+    const preview = await previewFulfillment(actor, orderId, {
+      lines,
+      payments: cash("500"),
+    });
+    expect(preview).toMatchObject({
+      lines: {
+        [boxLine]: { amount: "$475.00" },
+        [pieceLine]: { amount: "$4.27" },
+      },
+      lineErrors: {},
+      total: "$479.27",
+      paymentNote: "Cambio: $20.73",
+    });
+    // Two boxes do not fit: it says so before charging.
+    expect(
+      (
+        await previewFulfillment(actor, orderId, {
+          lines: [{ orderLineId: boxLine, quantity: "2" }],
+        })
+      )?.lines[boxLine],
+    ).toEqual({ amount: "$950.00", error: "Ahí solo hay 600 piezas." });
+    const done = await fulfillSalesOrder(actor, orderId, {
+      lines,
+      payments: cash("500"),
+      idempotencyKey: newId(),
+    });
+    expect(done).toMatchObject({ ok: true, total: preview!.total });
+    // Only what is missing; nothing fits now.
+    view = await getOrderToFulfill(actor, orderId);
+    expect(
+      view!.lines.map((line) => [line.id, line.missingText, line.suggested]),
+    ).toEqual([[boxLine, "1 caja de 500 piezas", "0"]]);
+    expect(await getOrderToFulfill(await salesCompany(), orderId)).toBeNull();
+    const consulta = await salesMember(actor.organizationId, "viewer");
+    await expect(getOrderToFulfill(consulta, orderId)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });

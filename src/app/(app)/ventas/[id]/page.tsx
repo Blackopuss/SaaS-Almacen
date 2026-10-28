@@ -70,7 +70,9 @@ export default async function VentaPage({
     getReturnableSale(actor, id),
   ]);
   if (!ticket || !returnable) notFound();
-  const asked = (await searchParams).devolucion;
+  const query = await searchParams;
+  const asked = query.devolucion;
+  const delivered = query.entrega === "1" && returnable.salesOrder;
   const registered = returnable.returns.find((r) => r.id === asked);
   const somethingLeft =
     !returnable.cancelled &&
@@ -94,6 +96,21 @@ export default async function VentaPage({
       {back}
       <div className="space-y-2 print:hidden">
         <PageHeader title={`Venta ${ticket.number}`} />
+        {delivered && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-xl border border-success/40 bg-success/10 p-4 text-sm"
+          >
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-success"
+            />
+            <p>
+              <span className="font-medium">Entrega cobrada.</span> Ya salió del
+              inventario.
+            </p>
+          </div>
+        )}
         {registered && (
           <div
             role="status"
@@ -119,8 +136,17 @@ export default async function VentaPage({
             Se devolvieron {returnable.refunded} de {returnable.total}.
           </p>
         )}
-        {occasional.length > 0 && (
+        {(occasional.length > 0 ||
+          (returnable.salesOrder && access.allows("sales.quote.read"))) && (
           <p className="flex flex-wrap gap-x-6">
+            {returnable.salesOrder && access.allows("sales.quote.read") && (
+              <Link
+                href={`/ventas/pedidos/${returnable.salesOrder.id}`}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Pedido {returnable.salesOrder.number}
+              </Link>
+            )}
             {occasional.map(({ href, label }) => (
               <Link
                 key={href}

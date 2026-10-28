@@ -6,7 +6,6 @@ import { headers } from "next/headers";
 import { isAppError, newId } from "@/lib";
 import {
   SALE_MAX_LINES,
-  SALE_MAX_PAYMENTS,
   authorizeDiscount,
   findSaleByKey,
   findSaleProducts,
@@ -26,6 +25,8 @@ import {
   type CustomerSummary,
 } from "@/platform/contacts";
 import { requireOrganizationContext } from "@/platform/tenancy";
+
+import { readPaymentFields } from "./payment-fields";
 
 /**
  * The counter (VEN-06..13). Person and company come from the session;
@@ -74,26 +75,6 @@ function readLines(lines: unknown) {
 }
 
 /** The payments as the form sends them: method and what was typed. */
-function readPaymentFields(payments: unknown) {
-  const sent = Array.isArray(payments)
-    ? payments.slice(0, SALE_MAX_PAYMENTS + 1)
-    : [];
-  return sent.map((payment) => {
-    const fields =
-      payment && typeof payment === "object"
-        ? (payment as Record<string, unknown>)
-        : {};
-    const field = (name: string) =>
-      typeof fields[name] === "string" ? fields[name].slice(0, 100) : "";
-    return {
-      method: field("method"),
-      amount: field("amount"),
-      received: field("received"),
-      reference: field("reference"),
-    };
-  });
-}
-
 /** Prices, totals and change of the cart, computed here; never in the browser. */
 export async function quoteSaleAction(
   lines: unknown,
