@@ -18,12 +18,13 @@ El fundador decidió adelantar Ventas antes de los pilotos (el servidor actual e
 - **Ventas a plazos (fase PAG), no «fiado».** Se pactan desde la cotización: enganche y el resto en mensualidades a los meses que el cliente necesite. El **enganche mínimo cubre el costo** de lo vendido (costo promedio × cantidad). El interés es **opcional y configurable por empresa** (un porcentaje por plazo; cero por omisión). La mercancía se entrega y sale del inventario **al pagar el enganche**; desde ahí nace una cuenta por cobrar con su calendario. Una venta a plazos siempre tiene cliente identificado.
 - **Sin existencias suficientes la venta se rechaza**, como cualquier salida (ADR 0012).
 - **Sin factura (CFDI)** en esta etapa: ticket y cotización no fiscales. Lo fiscal sigue pendiente del fundador.
+- **Un pedido no aparta existencias** (COT-06, decidido por el fundador el 2026-10-28). Lo pedido sigue disponible para el mostrador hasta que se surte; al surtir se valida lo que hay en ese momento y, si no alcanza, se surte en parte y el resto queda pendiente. Es lo más simple y no deja existencias «atoradas» en pedidos que no se concretan; se revisará con los pilotos.
 
 ## Lo que no se hace por ahora
 
 - Listas de precios, precio de mayoreo o promociones automáticas.
 - Recargos por atraso en los plazos.
-- Reserva de existencias para pedidos (COT-06 se decide después).
+- Reserva de existencias para pedidos (COT-06: decidido no apartar; se revisa con los pilotos).
 - Cobro con tarjeta dentro de la aplicación: la terminal es externa (VEN-12).
 
 ## Consecuencias
