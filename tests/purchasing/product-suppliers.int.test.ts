@@ -534,7 +534,12 @@ describe("last cost", () => {
       expect(link).toMatchObject({ sku: "TOR-1", supplierSku: "FN-1" });
       // …but not a trace of the cost: no field, no number anywhere.
       expect(link && "lastCost" in link).toBe(false);
-      expect(JSON.stringify(link)).not.toContain("987");
+      // Ids are random and may hold those digits: they are left out.
+      const text = JSON.stringify(link).replace(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+        "",
+      );
+      expect(text).not.toContain("987");
     }
     expect((await listProductsOfSupplier(viewer, norte)).costsVisible).toBe(
       false,
