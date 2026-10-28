@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import type { FulfillmentLineView, FulfillmentPreview } from "@/modules/sales";
+import type {
+  FulfillmentLineView,
+  FulfillmentPreview,
+  QuotePlanView,
+} from "@/modules/sales";
 
 import { checkSaleAction } from "../../../actions";
 import {
@@ -42,11 +46,14 @@ export function FulfillForm({
   lines,
   idempotencyKey,
   maxPayments,
+  plan,
 }: {
   orderId: string;
   lines: FulfillmentLineView[];
   idempotencyKey: string;
   maxPayments: number;
+  /** On installments (PAG-04): delivered whole, charging the down payment. */
+  plan: QuotePlanView | null;
 }) {
   const router = useRouter();
   const [key] = useState(idempotencyKey);
@@ -261,44 +268,56 @@ export function FulfillForm({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor={id}>
-                      <span className="sr-only">{line.productName}: </span>
-                      Entregar ahora
-                    </Label>
-                    <Input
-                      id={id}
-                      inputMode="decimal"
-                      autoComplete="off"
-                      maxLength={20}
-                      placeholder="0"
-                      defaultValue={quantities[line.id]}
-                      key={`q-${line.id}-${state.answers}`}
-                      onChange={(event) =>
-                        setQuantities({
-                          ...quantities,
-                          [line.id]: event.target.value,
-                        })
-                      }
-                      aria-invalid={Boolean(error)}
-                      aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
-                      className="tabular-nums"
-                    />
-                    <p
-                      id={`${id}-hint`}
-                      className="text-sm text-muted-foreground"
-                    >
-                      En {line.unitLabel}
-                    </p>
-                    {error && (
-                      <p
-                        id={`${id}-error`}
-                        className="text-sm text-destructive"
-                      >
-                        {error}
+                  {plan ? (
+                    <div className="space-y-1">
+                      <p className="text-sm">
+                        Se entrega:{" "}
+                        <span className="font-medium">{line.missingText}</span>
                       </p>
-                    )}
-                  </div>
+                      {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label htmlFor={id}>
+                        <span className="sr-only">{line.productName}: </span>
+                        Entregar ahora
+                      </Label>
+                      <Input
+                        id={id}
+                        inputMode="decimal"
+                        autoComplete="off"
+                        maxLength={20}
+                        placeholder="0"
+                        defaultValue={quantities[line.id]}
+                        key={`q-${line.id}-${state.answers}`}
+                        onChange={(event) =>
+                          setQuantities({
+                            ...quantities,
+                            [line.id]: event.target.value,
+                          })
+                        }
+                        aria-invalid={Boolean(error)}
+                        aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+                        className="tabular-nums"
+                      />
+                      <p
+                        id={`${id}-hint`}
+                        className="text-sm text-muted-foreground"
+                      >
+                        En {line.unitLabel}
+                      </p>
+                      {error && (
+                        <p
+                          id={`${id}-error`}
+                          className="text-sm text-destructive"
+                        >
+                          {error}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {line.locations.length > 1 && (
                     <div className="space-y-1">
                       <Label htmlFor={`${id}-lugar`}>Sale de</Label>
@@ -370,11 +389,29 @@ export function FulfillForm({
             className="flex items-baseline justify-between gap-3 border-t pt-2"
             aria-live="polite"
           >
-            <dt className="font-medium">A cobrar</dt>
-            <dd className="text-2xl font-semibold">
+            <dt className="font-medium">
+              {plan ? "Total de la venta" : "A cobrar"}
+            </dt>
+            <dd className={plan ? "font-medium" : "text-2xl font-semibold"}>
               {preview?.total ?? "$0.00"}
             </dd>
           </div>
+          {plan && (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="font-medium">Enganche, se cobra hoy</dt>
+                <dd className="text-2xl font-semibold">
+                  {preview?.charge ?? plan.downPayment}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 text-muted-foreground">
+                <dt>
+                  Después, {plan.months} mensualidades ({plan.interestText})
+                </dt>
+                <dd>{plan.installment}</dd>
+              </div>
+            </>
+          )}
         </dl>
         {preview?.paymentNote && (
           <p
@@ -427,7 +464,7 @@ export function FulfillForm({
               : pending
                 ? "Cobrando…"
                 : !blocked && preview
-                  ? `Cobrar ${preview.total}`
+                  ? `Cobrar ${preview.charge}`
                   : "Cobrar"}
           </Button>
         </div>

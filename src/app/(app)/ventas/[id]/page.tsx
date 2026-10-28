@@ -10,7 +10,11 @@ import {
   PageHeader,
   QrCode,
 } from "@/components";
-import { getReturnableSale, getSaleTicket } from "@/modules/sales";
+import {
+  getReceivableOfSale,
+  getReturnableSale,
+  getSaleTicket,
+} from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 import { PrintButton } from "../../../ticket/print-button";
@@ -65,9 +69,12 @@ export default async function VentaPage({
     organizationId: access.organization.id,
     userId: access.user.id,
   };
-  const [ticket, returnable] = await Promise.all([
+  const [ticket, returnable, account] = await Promise.all([
     getSaleTicket(actor, id),
     getReturnableSale(actor, id),
+    access.allows("sales.receivable.read")
+      ? getReceivableOfSale(actor, id)
+      : null,
   ]);
   if (!ticket || !returnable) notFound();
   const query = await searchParams;
@@ -76,6 +83,7 @@ export default async function VentaPage({
   const registered = returnable.returns.find((r) => r.id === asked);
   const somethingLeft =
     !returnable.cancelled &&
+    !returnable.onInstallments &&
     returnable.lines.some((line) => line.returnable !== "0");
   const occasional = somethingLeft
     ? [
@@ -159,6 +167,33 @@ export default async function VentaPage({
           </p>
         )}
       </div>
+      {account && (
+        <section
+          aria-labelledby="venta-a-plazos"
+          className="max-w-xl space-y-3 rounded-xl border bg-card p-4 sm:p-5 print:hidden"
+        >
+          <h2 id="venta-a-plazos" className="font-medium">
+            Venta a plazos · Cuenta {account.number}
+          </h2>
+          <p className="text-sm tabular-nums">
+            Enganche pagado {account.downPayment}. Resta {account.owed} en{" "}
+            {account.months} mensualidades ({account.interestText}).
+          </p>
+          <ol className="divide-y rounded-lg border text-sm tabular-nums">
+            {account.installments.map((installment) => (
+              <li
+                key={installment.number}
+                className="flex justify-between gap-3 px-3 py-2"
+              >
+                <span>
+                  {installment.number}. Vence el {installment.dueText}
+                </span>
+                <span className="font-medium">{installment.amount}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <div className="grid gap-6 md:grid-cols-[minmax(0,24rem)_1fr] md:items-start print:block">
         <TicketView ticket={ticket} />
         <section

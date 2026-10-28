@@ -93,6 +93,7 @@ export default async function EntregarPedidoPage({
           lines={order.lines}
           idempotencyKey={newId()}
           maxPayments={SALE_MAX_PAYMENTS}
+          plan={order.plan}
         />
       ) : access.allows("sales.cash.operate") ? (
         <OpenCashForm />

@@ -26,6 +26,9 @@ import {
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
 import { NO_CASH_SESSION, SALE_KEY_REUSED, lockOwnCashSession } from "./sales";
+import { companyToday, dateOfDay } from "./calendar";
+import { planInstallments, type InstallmentPlan } from "./installment-plan";
+import { storedPlanView, type QuotePlanView } from "./quote-plan";
 import { awaitsFulfillment } from "./sales-order-states";
 import { formatTaxRate, saleTotals } from "./tax";
 
@@ -64,7 +67,10 @@ export type FulfillmentResult =
       ok: true;
       saleId: string;
       number: number;
+      /** What the sale adds up to. */
       total: string;
+      /** What was charged now: the total, or the down payment on a plan. */
+      charged: string;
       change: string | null;
       /** Nothing is missing anymore. */
       fulfilled: boolean;
@@ -263,6 +269,8 @@ export async function fulfillSalesOrder(
     SALE_MAX_PAYMENTS + 1,
   );
 
+  // Read before the transaction: it opens its own connection (MOD-08).
+  const today = await companyToday(organizationId);
   for (let attempt = 1; ; attempt++) {
     try {
       return await deliver(actor, {
@@ -271,6 +279,7 @@ export async function fulfillSalesOrder(
         wanted,
         payments,
         key,
+        today,
       });
     } catch (error) {
       if (error instanceof Rejected) return error.result;
@@ -292,6 +301,8 @@ async function deliver(
     wanted: Map<string, { quantity: string; locationId: string }>;
     payments: PaymentInput[];
     key: string;
+    /** The day of the sale, for the calendar of a plan. */
+    today: string;
   },
 ): Promise<FulfillmentResult> {
   const { organizationId, userId } = actor;
@@ -308,7 +319,7 @@ async function deliver(
         soldByUserId: true,
         salesOrderId: true,
         lines: { select: { orderLineId: true, capturedQuantity: true } },
-        payments: { select: { changeGiven: true } },
+        payments: { select: { amount: true, changeGiven: true } },
         salesOrder: { select: { status: true } },
       },
     });
@@ -344,6 +355,12 @@ async function deliver(
         saleId: replay.id,
         number: replay.number,
         total: formatMoney(replay.total.toString()),
+        charged: formatMoney(
+          replay.payments.reduce(
+            (sum, p) => sum.plus(p.amount.toString()),
+            dec(0),
+          ),
+        ),
         change: change ? formatMoney(change.changeGiven!.toString()) : null,
         fulfilled: replay.salesOrder?.status === "FULFILLED",
         repeated: true as const,
@@ -397,7 +414,42 @@ async function deliver(
         }),
       );
     }
-    const paid = readPayments(input.payments, totals.total);
+    // On installments (PAG-04): delivered whole, at once; today only the
+    // down payment is charged and the rest is owed on its calendar.
+    const onPlan =
+      order.installmentMonths !== null &&
+      order.installmentInterestPercent !== null &&
+      order.downPayment !== null;
+    let schedule: InstallmentPlan | null = null;
+    if (onPlan) {
+      const whole =
+        order.status === "OPEN" &&
+        going.length === order.lines.length &&
+        going.every((g) => g.missingAfter.isZero());
+      if (!whole) {
+        throw new Rejected(
+          failure({
+            formError:
+              "Un pedido a plazos se entrega completo, de una vez: escribe todo lo que falta de cada producto.",
+          }),
+        );
+      }
+      const result = planInstallments({
+        total: totals.total,
+        downPayment: order.downPayment!.toString(),
+        months: order.installmentMonths!,
+        interestPercent: order.installmentInterestPercent!.toString(),
+        startDay: input.today,
+      });
+      if (!result.ok) {
+        throw new Rejected(failure({ formError: result.error }));
+      }
+      schedule = result.plan;
+    }
+    const charge = schedule ? schedule.downPayment : totals.total;
+    const paid = charge.isZero()
+      ? { ok: true as const, payments: [] }
+      : readPayments(input.payments, charge);
     if (!paid.ok) {
       throw new Rejected(
         failure({
@@ -501,6 +553,40 @@ async function deliver(
       })),
     });
 
+    if (schedule) {
+      const lastAccount = await tx.salesReceivable.findFirst({
+        orderBy: { number: "desc" },
+        select: { number: true },
+      });
+      const receivableId = newId();
+      await tx.salesReceivable.create({
+        data: {
+          id: receivableId,
+          organizationId,
+          number: (lastAccount?.number ?? 0) + 1,
+          saleId,
+          customerId: order.customerId,
+          downPayment: schedule.downPayment.toFixed(2),
+          financed: schedule.financed.toFixed(2),
+          interestPercent: order.installmentInterestPercent!,
+          interest: schedule.interest.toFixed(2),
+          owed: schedule.financed.plus(schedule.interest).toFixed(2),
+          months: order.installmentMonths!,
+          startDay: dateOfDay(input.today),
+        },
+      });
+      await tx.salesReceivableInstallment.createMany({
+        data: schedule.installments.map((installment) => ({
+          id: newId(),
+          organizationId,
+          receivableId,
+          number: installment.number,
+          dueDay: dateOfDay(installment.dueDay),
+          amount: installment.amount.toFixed(2),
+        })),
+      });
+    }
+
     const goingIds = new Set(going.map((g) => g.line.id));
     const fulfilled =
       going.every((g) => g.missingAfter.isZero()) &&
@@ -526,6 +612,7 @@ async function deliver(
       saleId,
       number,
       total: formatMoney(totals.total),
+      charged: formatMoney(charge),
       change: change ? formatMoney(change.change!) : null,
       fulfilled,
     };
@@ -560,6 +647,8 @@ export type OrderToFulfill = {
   closed: string | null;
   /** Only the lines with something missing. */
   lines: FulfillmentLineView[];
+  /** On installments (PAG-04): delivered whole, charging the down payment. */
+  plan: QuotePlanView | null;
 };
 
 /** An order as the delivery screen needs it; null when it does not exist. */
@@ -593,7 +682,12 @@ export async function getOrderToFulfill(
     customerName: order.customer.name,
   };
   if (!awaitsFulfillment(order.status)) {
-    return { ...head, closed: ORDER_NOT_WAITING[order.status]!, lines: [] };
+    return {
+      ...head,
+      closed: ORDER_NOT_WAITING[order.status]!,
+      lines: [],
+      plan: null,
+    };
   }
   const delivered = await deliveredByLine(
     client,
@@ -612,9 +706,24 @@ export async function getOrderToFulfill(
     },
     select: { productId: true, locationId: true, quantity: true },
   });
+  const onPlan = order.installmentMonths !== null;
+  const plan = onPlan
+    ? storedPlanView(
+        order,
+        saleTotals(
+          order.lines.map((line) => line.amount.toString()),
+          {
+            pricesIncludeTax: order.pricesIncludeTax,
+            rate: order.taxRate.toString(),
+          },
+        ).total,
+        await companyToday(actor.organizationId),
+      )
+    : null;
   return {
     ...head,
     closed: null,
+    plan,
     lines: pending.map((line) => {
       const missing = dec(line.capturedQuantity.toString()).minus(
         delivered.get(line.id) ?? 0,
@@ -656,7 +765,10 @@ export async function getOrderToFulfill(
           id: place.id,
           label: `${place.path} — hay ${formatStock(quantity.toString(), line.unitCode)}`,
         })),
-        suggested: Decimal.min(missing, fits).toString(),
+        // A plan is delivered whole; a shortfall is said when charging.
+        suggested: onPlan
+          ? missing.toString()
+          : Decimal.min(missing, fits).toString(),
       };
     }),
   };
@@ -672,6 +784,8 @@ export type FulfillmentPreview = {
   taxLabel: string;
   tax: string;
   total: string;
+  /** What is charged now: the total, or the down payment on a plan. */
+  charge: string;
   /** «Cambio: $95.50», «Faltan $4.50». */
   paymentNote: string | null;
 };
@@ -760,6 +874,11 @@ export async function previewFulfillment(
     };
   });
   const rate = formatTaxRate(order.taxRate.toString());
+  // On a plan, today only the down payment is charged.
+  const charge =
+    order.downPayment !== null
+      ? dec(order.downPayment.toString())
+      : plan.totals.total;
   return {
     lines,
     lineErrors: plan.lineErrors,
@@ -775,6 +894,7 @@ export async function previewFulfillment(
       : `IVA (${rate})`,
     tax: formatMoney(plan.totals.tax),
     total: formatMoney(plan.totals.total),
+    charge: formatMoney(charge),
     paymentNote:
       plan.going.length > 0
         ? paymentNote(
@@ -782,7 +902,7 @@ export async function previewFulfillment(
               0,
               SALE_MAX_PAYMENTS,
             ),
-            plan.totals.total,
+            charge,
           )
         : null,
   };

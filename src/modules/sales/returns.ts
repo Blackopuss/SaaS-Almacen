@@ -62,6 +62,8 @@ export type ReturnableSale = {
   paidWith: PaymentMethod[];
   /** The order it delivered (COT-07); null for a counter sale. */
   salesOrder: { id: string; number: number } | null;
+  /** Sold on installments (PAG-04): its returns wait for PAG-08. */
+  onInstallments: boolean;
   /** Returns so far, oldest first. */
   returns: {
     id: string;
@@ -82,6 +84,7 @@ async function loadSale(client: Client, saleId: string) {
       pricesIncludeTax: true,
       taxRate: true,
       salesOrder: { select: { id: true, number: true } },
+      receivable: { select: { id: true } },
       lines: {
         orderBy: { lineNumber: "asc" },
         select: {
@@ -174,6 +177,7 @@ export async function getReturnableSale(
     }),
     paidWith: [...new Set(sale.payments.map((p) => p.method as PaymentMethod))],
     salesOrder: sale.salesOrder,
+    onInstallments: sale.receivable !== null,
     returns: sale.returns.map((r) => ({
       id: r.id,
       refund: formatMoney(r.refund.toString()),
@@ -398,6 +402,17 @@ async function process(
           failure({
             reason: "not_allowed",
             formError: "Esta venta ya está cancelada.",
+          }),
+        );
+      }
+      // Its rules (what goes back of what was paid and what is owed) come
+      // with PAG-08; until then nothing of it comes back here.
+      if (sale.receivable) {
+        throw new Rejected(
+          failure({
+            reason: "not_allowed",
+            formError:
+              "Esta venta es a plazos: todavía no se puede devolver ni cancelar.",
           }),
         );
       }

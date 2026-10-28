@@ -250,6 +250,20 @@ export default async function PedidoPage({
               <dd className="text-2xl font-semibold">{order.total}</dd>
             </div>
           </dl>
+          {order.plan && (
+            <div className="space-y-1 border-t pt-3 text-sm">
+              <p className="font-medium">
+                A {order.plan.months} meses, {order.plan.interestText}
+              </p>
+              <p className="text-muted-foreground tabular-nums">
+                Enganche {order.plan.downPayment} y {order.plan.months}{" "}
+                mensualidades de {order.plan.installment}
+                {order.plan.lastInstallment &&
+                  ` (la última de ${order.plan.lastInstallment})`}
+                . Se entrega completo al pagar el enganche.
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </PageContainer>

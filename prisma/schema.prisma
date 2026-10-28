@@ -108,74 +108,76 @@ model TwoFactor {
 // cascade across tenants: removing data is an explicit, audited process.
 
 model Organization {
-  id                         String                      @id @db.Char(36)
-  name                       String                      @db.VarChar(120)
-  timeZone                   String                      @default("America/Mexico_City") @db.VarChar(64)
-  currency                   String                      @default("MXN") @db.Char(3)
+  id                          String                       @id @db.Char(36)
+  name                        String                       @db.VarChar(120)
+  timeZone                    String                       @default("America/Mexico_City") @db.VarChar(64)
+  currency                    String                       @default("MXN") @db.Char(3)
   /// Titular: the only account allowed to contract or cancel (USR-03).
-  ownerUserId                String                      @db.Char(36)
-  owner                      User                        @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdAt                  DateTime                    @default(now()) @db.DateTime(3)
-  updatedAt                  DateTime                    @updatedAt @db.DateTime(3)
-  memberships                Membership[]
-  memberRoles                MembershipRole[]
-  sessions                   Session[]
-  auditEvents                AuditEvent[]
-  ownershipTransfers         OwnershipTransfer[]
-  invitations                Invitation[]
-  subscriptions              Subscription[]
-  subscriptionItems          SubscriptionItem[]
-  entitlements               Entitlement[]
-  quotaUsages                QuotaUsage[]
-  products                   Product[]
-  productCategories          ProductCategory[]
-  productBrands              ProductBrand[]
-  productPresentations       ProductPresentation[]
-  presentationVersions       PresentationVersion[]
-  facilities                 Facility[]
-  locations                  Location[]
-  stockMovements             StockMovement[]
-  stockMovementLines         StockMovementLine[]
-  stockBalances              StockBalance[]
-  stockMinimums              StockMinimum[]
-  productCosts               ProductCost[]
-  salePrices                 SalePrice[]
-  salesSettings              SalesSettings?
-  stockCounts                StockCount[]
-  stockCountLines            StockCountLine[]
-  stockCountCaptures         StockCountCapture[]
-  jobs                       Job[]
-  storedFiles                StoredFile[]
-  productImports             ProductImport[]
-  productImportItems         ProductImportItem[]
-  exitImports                ExitImport[]
-  exitImportRows             ExitImportRow[]
-  contacts                   Contact[]
-  productSuppliers           ProductSupplier[]
-  purchaseOrders             PurchaseOrder[]
-  purchaseOrderLines         PurchaseOrderLine[]
-  purchaseOrderDeliveries    PurchaseOrderDelivery[]
-  purchaseReceipts           PurchaseReceipt[]
-  purchaseReceiptLines       PurchaseReceiptLine[]
-  purchaseReturns            PurchaseReturn[]
-  purchaseReturnLines        PurchaseReturnLine[]
-  manualPayments             ManualPayment[]
-  checkoutOrders             CheckoutOrder[]
-  supportAccesses            SupportAccess[]
-  sales                      Sale[]
-  saleLines                  SaleLine[]
-  salePayments               SalePayment[]
-  saleDiscountAuthorizations SaleDiscountAuthorization[]
-  cashSessions               CashSession[]
-  cashMovements              CashMovement[]
-  saleReturns                SaleReturn[]
-  saleReturnLines            SaleReturnLine[]
-  salesQuotes                SalesQuote[]
-  salesQuoteLines            SalesQuoteLine[]
-  salesQuoteDeliveries       SalesQuoteDelivery[]
-  salesOrders                SalesOrder[]
-  salesOrderLines            SalesOrderLine[]
-  salesInstallmentTerms      SalesInstallmentTerm[]
+  ownerUserId                 String                       @db.Char(36)
+  owner                       User                         @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime                     @default(now()) @db.DateTime(3)
+  updatedAt                   DateTime                     @updatedAt @db.DateTime(3)
+  memberships                 Membership[]
+  memberRoles                 MembershipRole[]
+  sessions                    Session[]
+  auditEvents                 AuditEvent[]
+  ownershipTransfers          OwnershipTransfer[]
+  invitations                 Invitation[]
+  subscriptions               Subscription[]
+  subscriptionItems           SubscriptionItem[]
+  entitlements                Entitlement[]
+  quotaUsages                 QuotaUsage[]
+  products                    Product[]
+  productCategories           ProductCategory[]
+  productBrands               ProductBrand[]
+  productPresentations        ProductPresentation[]
+  presentationVersions        PresentationVersion[]
+  facilities                  Facility[]
+  locations                   Location[]
+  stockMovements              StockMovement[]
+  stockMovementLines          StockMovementLine[]
+  stockBalances               StockBalance[]
+  stockMinimums               StockMinimum[]
+  productCosts                ProductCost[]
+  salePrices                  SalePrice[]
+  salesSettings               SalesSettings?
+  stockCounts                 StockCount[]
+  stockCountLines             StockCountLine[]
+  stockCountCaptures          StockCountCapture[]
+  jobs                        Job[]
+  storedFiles                 StoredFile[]
+  productImports              ProductImport[]
+  productImportItems          ProductImportItem[]
+  exitImports                 ExitImport[]
+  exitImportRows              ExitImportRow[]
+  contacts                    Contact[]
+  productSuppliers            ProductSupplier[]
+  purchaseOrders              PurchaseOrder[]
+  purchaseOrderLines          PurchaseOrderLine[]
+  purchaseOrderDeliveries     PurchaseOrderDelivery[]
+  purchaseReceipts            PurchaseReceipt[]
+  purchaseReceiptLines        PurchaseReceiptLine[]
+  purchaseReturns             PurchaseReturn[]
+  purchaseReturnLines         PurchaseReturnLine[]
+  manualPayments              ManualPayment[]
+  checkoutOrders              CheckoutOrder[]
+  supportAccesses             SupportAccess[]
+  sales                       Sale[]
+  saleLines                   SaleLine[]
+  salePayments                SalePayment[]
+  saleDiscountAuthorizations  SaleDiscountAuthorization[]
+  cashSessions                CashSession[]
+  cashMovements               CashMovement[]
+  saleReturns                 SaleReturn[]
+  saleReturnLines             SaleReturnLine[]
+  salesQuotes                 SalesQuote[]
+  salesQuoteLines             SalesQuoteLine[]
+  salesQuoteDeliveries        SalesQuoteDelivery[]
+  salesOrders                 SalesOrder[]
+  salesOrderLines             SalesOrderLine[]
+  salesInstallmentTerms       SalesInstallmentTerm[]
+  salesReceivables            SalesReceivable[]
+  salesReceivableInstallments SalesReceivableInstallment[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1530,6 +1532,7 @@ model Contact {
   sales            Sale[]
   salesQuotes      SalesQuote[]
   salesOrders      SalesOrder[]
+  salesReceivables SalesReceivable[]
 
   @@unique([organizationId, id])
   /// Orders and searches the list of suppliers (name and RFC) in one index.
@@ -1906,6 +1909,65 @@ model SalesInstallmentTerm {
   @@map("sales_installment_term")
 }
 
+enum SalesReceivableStatus {
+  /// Something is still owed.
+  OPEN
+  /// Everything was paid.
+  PAID
+  /// Undone with its sale (PAG-08).
+  CANCELLED
+}
+
+/// What a customer owes for a sale on installments (PAG-04, ADR 0030):
+/// born with the sale when the down payment is charged, with its calendar.
+/// owed = financed + interest; the installments add up to it.
+model SalesReceivable {
+  id              String                       @id @db.Char(36)
+  organizationId  String                       @db.Char(36)
+  organization    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Consecutive number of the company: 1, 2, 3…
+  number          Int
+  status          SalesReceivableStatus        @default(OPEN)
+  saleId          String                       @db.Char(36)
+  sale            Sale                         @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Restrict)
+  customerId      String                       @db.Char(36)
+  customer        Contact                      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  downPayment     Decimal                      @db.Decimal(14, 2)
+  financed        Decimal                      @db.Decimal(14, 2)
+  interestPercent Decimal                      @db.Decimal(5, 2)
+  interest        Decimal                      @db.Decimal(14, 2)
+  owed            Decimal                      @db.Decimal(14, 2)
+  months          Int
+  /// The day of the sale in the company's calendar.
+  startDay        DateTime                     @db.Date
+  createdAt       DateTime                     @default(now()) @db.DateTime(3)
+  installments    SalesReceivableInstallment[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, number])
+  @@unique([organizationId, saleId])
+  @@index([organizationId, customerId, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@map("sales_receivable")
+}
+
+/// One payment of the calendar: due on its day, for its amount.
+model SalesReceivableInstallment {
+  id             String          @id @db.Char(36)
+  organizationId String          @db.Char(36)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  receivableId   String          @db.Char(36)
+  receivable     SalesReceivable @relation(fields: [organizationId, receivableId], references: [organizationId, id], onDelete: Restrict)
+  number         Int
+  dueDay         DateTime        @db.Date
+  amount         Decimal         @db.Decimal(14, 2)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, receivableId, number])
+  @@index([organizationId, dueDay])
+  @@map("sales_receivable_installment")
+}
+
 enum SaleStatus {
   COMPLETED
   /// Undone with permission and a reason (VEN-21); its goods went back.
@@ -1969,6 +2031,8 @@ model Sale {
   lines                   SaleLine[]
   payments                SalePayment[]
   returns                 SaleReturn[]
+  /// What is still owed when it was sold on installments (PAG-04).
+  receivable              SalesReceivable?
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -2342,31 +2406,35 @@ enum SalesOrderStatus {
 /// becomes, with its prices, discount and VAT rule copied as they were
 /// accepted. It does not touch stock until it is fulfilled (COT-07).
 model SalesOrder {
-  id                String           @id @db.Char(36)
-  organizationId    String           @db.Char(36)
-  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                         String           @id @db.Char(36)
+  organizationId             String           @db.Char(36)
+  organization               Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive number of the company: 1, 2, 3…
-  number            Int
-  status            SalesOrderStatus @default(OPEN)
+  number                     Int
+  status                     SalesOrderStatus @default(OPEN)
   /// The accepted quote it comes from; one order per quote.
-  quoteId           String           @db.Char(36)
-  quote             SalesQuote       @relation(fields: [organizationId, quoteId], references: [organizationId, id], onDelete: Restrict)
-  customerId        String           @db.Char(36)
-  customer          Contact          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
-  pricesIncludeTax  Boolean
-  taxRate           Decimal          @db.Decimal(5, 2)
-  discountPercent   Decimal          @default(0) @db.Decimal(5, 2)
-  discountReason    String?          @db.VarChar(200)
-  notes             String?          @db.VarChar(1000)
-  createdByUserId   String           @db.Char(36)
-  createdAt         DateTime         @default(now()) @db.DateTime(3)
+  quoteId                    String           @db.Char(36)
+  quote                      SalesQuote       @relation(fields: [organizationId, quoteId], references: [organizationId, id], onDelete: Restrict)
+  customerId                 String           @db.Char(36)
+  customer                   Contact          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  pricesIncludeTax           Boolean
+  taxRate                    Decimal          @db.Decimal(5, 2)
+  discountPercent            Decimal          @default(0) @db.Decimal(5, 2)
+  discountReason             String?          @db.VarChar(200)
+  /// Payment plan as the quote was accepted (PAG-04); all null = cash.
+  installmentMonths          Int?
+  installmentInterestPercent Decimal?         @db.Decimal(5, 2)
+  downPayment                Decimal?         @db.Decimal(14, 2)
+  notes                      String?          @db.VarChar(1000)
+  createdByUserId            String           @db.Char(36)
+  createdAt                  DateTime         @default(now()) @db.DateTime(3)
   /// Cancelled (COT-09): what was missing is no longer delivered.
-  cancelledByUserId String?          @db.Char(36)
-  cancelledAt       DateTime?        @db.DateTime(3)
-  cancelReason      String?          @db.VarChar(500)
-  lines             SalesOrderLine[]
+  cancelledByUserId          String?          @db.Char(36)
+  cancelledAt                DateTime?        @db.DateTime(3)
+  cancelReason               String?          @db.VarChar(500)
+  lines                      SalesOrderLine[]
   /// What was fulfilled of it: each delivery is a sale (COT-07).
-  sales             Sale[]
+  sales                      Sale[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])

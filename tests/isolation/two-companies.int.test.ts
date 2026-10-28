@@ -482,11 +482,22 @@ beforeAll(async () => {
         createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    const customerId = newId();
+    await db.contact.create({
+      data: {
+        id: customerId,
+        organizationId,
+        name: "Constructora del Sur",
+        isCustomer: true,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     const saleId = newId();
     await db.sale.create({
       data: {
         id: saleId,
         organizationId,
+        customerId,
         number: 1,
         movementId: saleMovementId,
         pricesIncludeTax: true,
@@ -570,16 +581,6 @@ beforeAll(async () => {
       },
     });
     // A quote to a customer (COT-01) and its line.
-    const customerId = newId();
-    await db.contact.create({
-      data: {
-        id: customerId,
-        organizationId,
-        name: "Constructora del Sur",
-        isCustomer: true,
-        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
-      },
-    });
     const quoteId = newId();
     await db.salesQuote.create({
       data: {
@@ -633,6 +634,34 @@ beforeAll(async () => {
       },
     });
     const salesOrderId = newId();
+    // A sale on installments: its account and calendar (PAG-04).
+    const receivableId = newId();
+    await db.salesReceivable.create({
+      data: {
+        id: receivableId,
+        organizationId,
+        number: 1,
+        saleId,
+        customerId,
+        downPayment: "20",
+        financed: "100",
+        interestPercent: "0",
+        interest: "0",
+        owed: "100",
+        months: 1,
+        startDay: new Date("2026-10-28"),
+      },
+    });
+    await db.salesReceivableInstallment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        number: 1,
+        dueDay: new Date("2026-11-28"),
+        amount: "100",
+      },
+    });
     await db.salesOrder.create({
       data: {
         id: salesOrderId,

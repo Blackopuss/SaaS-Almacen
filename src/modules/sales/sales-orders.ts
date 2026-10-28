@@ -9,7 +9,9 @@ import { formatPercent } from "./discounts";
 import { quantityText } from "./line-text";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
+import { dayOfDate } from "./calendar";
 import { deliveredByLine } from "./order-fulfillment";
+import { storedPlanView, type QuotePlanView } from "./quote-plan";
 import type { SalesOrderStatus } from "./sales-order-states";
 import { formatTaxRate, saleTotals } from "./tax";
 
@@ -109,6 +111,9 @@ export async function convertQuoteToOrder(
           discountPercent: quote.discountPercent,
           discountReason: quote.discountReason,
           notes: quote.notes,
+          installmentMonths: quote.installmentMonths,
+          installmentInterestPercent: quote.installmentInterestPercent,
+          downPayment: quote.downPayment,
           createdByUserId: userId,
         },
       });
@@ -184,6 +189,8 @@ export type SalesOrderView = {
     /** «1 caja de 500 piezas»; null when nothing is missing. */
     missingText: string | null;
   }[];
+  /** Payment plan agreed (PAG-04); null = cash. */
+  plan: QuotePlanView | null;
   /** Who cancelled it, when and why (COT-09); null while it is not. */
   cancellation: { by: string | null; atText: string; reason: string } | null;
   /** Its deliveries: each one a sale (COT-07), oldest first. */
@@ -297,6 +304,7 @@ export async function getSalesOrder(
           : quantityText({ ...line, capturedQuantity: missing }),
       };
     }),
+    plan: storedPlanView(order, totals.total, dayOfDate(order.createdAt)),
     cancellation:
       order.status === "CANCELLED" && order.cancelledAt
         ? {

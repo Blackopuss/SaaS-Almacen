@@ -35,6 +35,12 @@ export {
   registerSale,
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
+export {
+  RECEIVABLE_STATUS_LABELS,
+  formatDueDay,
+  getReceivableOfSale,
+} from "./receivables";
+export type { ReceivableView } from "./receivables";
 export { addMonths, planInstallments } from "./installment-plan";
 export type { QuotePlanInput, QuotePlanView } from "./quote-plan";
 export type {

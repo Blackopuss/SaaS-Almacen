@@ -65,6 +65,8 @@ export const TENANT_MODELS = [
   "SalesQuoteDelivery",
   "SalesOrder",
   "SalesOrderLine",
+  "SalesReceivable",
+  "SalesReceivableInstallment",
   "PurchaseOrder",
   "PurchaseOrderDelivery",
   "PurchaseOrderLine",
@@ -288,6 +290,7 @@ const LOCKABLE = {
   sale: "sale",
   salesQuote: "sales_quote",
   salesOrder: "sales_order",
+  salesReceivable: "sales_receivable",
 } as const;
 
 /**

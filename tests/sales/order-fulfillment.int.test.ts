@@ -123,6 +123,7 @@ describe("fulfilling an order", () => {
       saleId: expect.any(String),
       number: 1,
       total: "$479.27",
+      charged: "$479.27",
       change: "$20.73",
       fulfilled: false,
     });
