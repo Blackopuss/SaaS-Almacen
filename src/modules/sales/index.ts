@@ -35,6 +35,8 @@ export {
   registerSale,
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
+export { QUOTE_REPORT_MAX, getQuoteReport } from "./quote-reports";
+export type { QuoteReport, QuoteTally } from "./quote-reports";
 export type { CancelOrderResult } from "./order-cancel";
 export {
   fulfillSalesOrder,

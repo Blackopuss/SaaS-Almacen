@@ -142,6 +142,16 @@ export default async function ReportesVentasPage({
     <PageContainer>
       {back}
       <PageHeader title="Reportes de ventas" />
+      {access.allows("sales.quote.read") && (
+        <p className="-mt-3">
+          <Link
+            href="/ventas/cotizaciones/reporte"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Reporte de cotizaciones
+          </Link>
+        </p>
+      )}
       {form}
       {report.sales === 0 ? (
         <EmptyState

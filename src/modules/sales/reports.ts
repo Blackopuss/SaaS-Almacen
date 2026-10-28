@@ -12,6 +12,7 @@ import { buildCsv, buildXlsx, type Cell } from "@/platform/files";
 import { forOrganization } from "@/server";
 
 import type { SalesActor } from "./prices";
+import { addDays, dayOf, timeZoneOf } from "./calendar";
 import { formatMoney } from "./pricing";
 
 /**
@@ -72,28 +73,45 @@ export type SalesReport =
     }
   | { ok: false; error: string };
 
-/** «2026-10-15» of a moment, in the calendar of the company. */
-function dayOf(moment: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(moment);
-}
+export type ReportPeriod =
+  | {
+      ok: true;
+      /** «2026-10-01». */
+      from: string;
+      to: string;
+      start: Date;
+      /** The first moment after the last day. */
+      end: Date;
+    }
+  | { ok: false; error: string };
 
-const nextDay = (day: string) => {
-  const date = new Date(`${day}T12:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return "";
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-};
-
-async function timeZoneOf(organizationId: string): Promise<string> {
-  const company = await forOrganization(organizationId).membership.findFirst({
-    select: { organization: { select: { timeZone: true } } },
-  });
-  return company?.organization.timeZone || "America/Mexico_City";
+/**
+ * Two days of the company's calendar, both included (by default, this
+ * month), as the moments a query reads between.
+ */
+export async function reportPeriod(
+  organizationId: string,
+  range: { from?: string; to?: string },
+): Promise<ReportPeriod> {
+  const timeZone = await timeZoneOf(organizationId);
+  const today = dayOf(new Date(), timeZone);
+  const fromDay = range.from?.trim() || `${today.slice(0, 8)}01`;
+  const toDay = range.to?.trim() || today;
+  const start = startOfDay(fromDay, timeZone);
+  const end = startOfDay(addDays(toDay, 1), timeZone);
+  if (!start || !end || !/^\d{4}-\d{2}-\d{2}$/.test(toDay)) {
+    return {
+      ok: false,
+      error: "Escribe las fechas como día de calendario: 2026-10-09.",
+    };
+  }
+  if (start >= end) {
+    return {
+      ok: false,
+      error: "La fecha inicial debe ser anterior o igual a la final.",
+    };
+  }
+  return { ok: true, from: fromDay, to: toDay, start, end };
 }
 
 type Acc = {
@@ -127,23 +145,9 @@ export async function getSalesReport(
   );
   const costsVisible = await mayReadInventoryCosts(actor);
   const timeZone = await timeZoneOf(actor.organizationId);
-  const today = dayOf(new Date(), timeZone);
-  const fromDay = range.from?.trim() || `${today.slice(0, 8)}01`;
-  const toDay = range.to?.trim() || today;
-  const start = startOfDay(fromDay, timeZone);
-  const end = startOfDay(nextDay(toDay), timeZone);
-  if (!start || !end || !/^\d{4}-\d{2}-\d{2}$/.test(toDay)) {
-    return {
-      ok: false,
-      error: "Escribe las fechas como día de calendario: 2026-10-09.",
-    };
-  }
-  if (start >= end) {
-    return {
-      ok: false,
-      error: "La fecha inicial debe ser anterior o igual a la final.",
-    };
-  }
+  const period = await reportPeriod(actor.organizationId, range);
+  if (!period.ok) return period;
+  const { from: fromDay, to: toDay, start, end } = period;
 
   const client = forOrganization(actor.organizationId);
   const rows = await client.sale.findMany({
