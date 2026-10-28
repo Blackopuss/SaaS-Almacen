@@ -20,6 +20,7 @@ El fundador decidió adelantar Ventas antes de los pilotos (el servidor actual e
 - **Sin factura (CFDI)** en esta etapa: ticket y cotización no fiscales. Lo fiscal sigue pendiente del fundador.
 - **Un pedido no aparta existencias** (COT-06, decidido por el fundador el 2026-10-28). Lo pedido sigue disponible para el mostrador hasta que se surte; al surtir se valida lo que hay en ese momento y, si no alcanza, se surte en parte y el resto queda pendiente. Es lo más simple y no deja existencias «atoradas» en pedidos que no se concretan; se revisará con los pilotos.
 - **Surtir un pedido es cobrarlo** (COT-07). Como no hay «fiado», lo que sale para el cliente se paga al salir: cada entrega de un pedido es una venta ligada a él (en la caja de quien la cobra), con los precios, descuento e IVA que el cliente aceptó y con la presentación como se pactó («2 cajas de 500» siguen siendo de 500). El descuento pactado se reparte sobre lo entregado como en el mostrador; entregado completo de una vez, suma exactamente el pedido. Lo entregado cuenta aunque después se devuelva o se cancele su venta: una devolución regresa mercancía, no reabre el pedido.
+- **Cancelar un pedido** (COT-09) cierra lo que falta por entregar, con motivo; lo hace quien cancela ventas (Encargado de caja, administrador, titular). No hay nada que liberar porque no se apartó nada; lo entregado sigue vendido y, si regresa, es una devolución de su venta.
 
 ## Lo que no se hace por ahora
 

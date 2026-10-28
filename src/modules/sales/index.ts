@@ -34,6 +34,8 @@ export {
   findSaleByKey,
   registerSale,
 } from "./sales";
+export { cancelSalesOrder } from "./order-cancel";
+export type { CancelOrderResult } from "./order-cancel";
 export {
   fulfillSalesOrder,
   getOrderToFulfill,

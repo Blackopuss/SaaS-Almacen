@@ -184,6 +184,8 @@ export type SalesOrderView = {
     /** «1 caja de 500 piezas»; null when nothing is missing. */
     missingText: string | null;
   }[];
+  /** Who cancelled it, when and why (COT-09); null while it is not. */
+  cancellation: { by: string | null; atText: string; reason: string } | null;
   /** Its deliveries: each one a sale (COT-07), oldest first. */
   sales: {
     id: string;
@@ -245,6 +247,12 @@ export async function getSalesOrder(
     where: { userId: order.createdByUserId },
     select: { user: { select: { name: true } } },
   });
+  const canceller = order.cancelledByUserId
+    ? await client.membership.findFirst({
+        where: { userId: order.cancelledByUserId },
+        select: { user: { select: { name: true } } },
+      })
+    : null;
   const totals = saleTotals(
     order.lines.map((line) => line.amount.toString()),
     {
@@ -289,6 +297,14 @@ export async function getSalesOrder(
           : quantityText({ ...line, capturedQuantity: missing }),
       };
     }),
+    cancellation:
+      order.status === "CANCELLED" && order.cancelledAt
+        ? {
+            by: canceller?.user.name ?? null,
+            atText: formatDateTime(order.cancelledAt, timeZone),
+            reason: order.cancelReason ?? "",
+          }
+        : null,
     sales: order.sales.map((sale) => ({
       id: sale.id,
       number: sale.number,

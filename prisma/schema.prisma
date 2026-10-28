@@ -2317,27 +2317,31 @@ enum SalesOrderStatus {
 /// becomes, with its prices, discount and VAT rule copied as they were
 /// accepted. It does not touch stock until it is fulfilled (COT-07).
 model SalesOrder {
-  id               String           @id @db.Char(36)
-  organizationId   String           @db.Char(36)
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                String           @id @db.Char(36)
+  organizationId    String           @db.Char(36)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Consecutive number of the company: 1, 2, 3…
-  number           Int
-  status           SalesOrderStatus @default(OPEN)
+  number            Int
+  status            SalesOrderStatus @default(OPEN)
   /// The accepted quote it comes from; one order per quote.
-  quoteId          String           @db.Char(36)
-  quote            SalesQuote       @relation(fields: [organizationId, quoteId], references: [organizationId, id], onDelete: Restrict)
-  customerId       String           @db.Char(36)
-  customer         Contact          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
-  pricesIncludeTax Boolean
-  taxRate          Decimal          @db.Decimal(5, 2)
-  discountPercent  Decimal          @default(0) @db.Decimal(5, 2)
-  discountReason   String?          @db.VarChar(200)
-  notes            String?          @db.VarChar(1000)
-  createdByUserId  String           @db.Char(36)
-  createdAt        DateTime         @default(now()) @db.DateTime(3)
-  lines            SalesOrderLine[]
+  quoteId           String           @db.Char(36)
+  quote             SalesQuote       @relation(fields: [organizationId, quoteId], references: [organizationId, id], onDelete: Restrict)
+  customerId        String           @db.Char(36)
+  customer          Contact          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  pricesIncludeTax  Boolean
+  taxRate           Decimal          @db.Decimal(5, 2)
+  discountPercent   Decimal          @default(0) @db.Decimal(5, 2)
+  discountReason    String?          @db.VarChar(200)
+  notes             String?          @db.VarChar(1000)
+  createdByUserId   String           @db.Char(36)
+  createdAt         DateTime         @default(now()) @db.DateTime(3)
+  /// Cancelled (COT-09): what was missing is no longer delivered.
+  cancelledByUserId String?          @db.Char(36)
+  cancelledAt       DateTime?        @db.DateTime(3)
+  cancelReason      String?          @db.VarChar(500)
+  lines             SalesOrderLine[]
   /// What was fulfilled of it: each delivery is a sale (COT-07).
-  sales            Sale[]
+  sales             Sale[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])

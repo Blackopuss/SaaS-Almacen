@@ -10,6 +10,7 @@ import {
   NO_CASH_SESSION,
   SALE_KEY_REUSED,
   acceptQuote,
+  cancelSalesOrder,
   convertQuoteToOrder,
   createQuote,
   fulfillSalesOrder,
@@ -19,6 +20,7 @@ import {
   previewFulfillment,
   setSalePrices,
 } from "@/modules/sales";
+import { listAuditTrail } from "@/platform/audit";
 import { createPresentation, createProduct } from "@/platform/catalog";
 import { createCustomer } from "@/platform/contacts";
 import { invalidateEntitlements } from "@/platform/entitlements";
@@ -379,10 +381,13 @@ describe("fulfilling an order", () => {
         data: { salesOrderId: second.orderId },
       }),
     ).rejects.toThrow(/only a completed sale can be cancelled/);
-    await db.salesOrder.update({
-      where: { id: first.orderId },
-      data: { status: "CANCELLED" },
-    });
+    await expect(
+      db.salesOrder.update({
+        where: { id: first.orderId },
+        data: { status: "CANCELLED" },
+      }),
+    ).rejects.toThrow(/sales_order_cancel_check/);
+    await cancelSalesOrder(first.actor, first.orderId, "Ya no lo quiere");
     await expect(
       db.salesOrder.update({
         where: { id: first.orderId },
@@ -448,5 +453,80 @@ describe("fulfilling an order", () => {
     await expect(getOrderToFulfill(consulta, orderId)).rejects.toBeInstanceOf(
       ForbiddenError,
     );
+  });
+});
+
+describe("cancelling an order (COT-09)", () => {
+  it("closes what is missing; what was delivered stays sold", async () => {
+    const { actor, orderId, boxLine, pieceLine } = await order();
+    await fulfillSalesOrder(actor, orderId, {
+      lines: [{ orderLineId: pieceLine, quantity: "3" }],
+      payments: cash("5"),
+      idempotencyKey: newId(),
+    });
+    expect(await cancelSalesOrder(actor, orderId, "")).toMatchObject({
+      ok: false,
+      reason: "invalid",
+    });
+    expect(await cancelSalesOrder(actor, orderId, "Ya no lo necesita")).toEqual(
+      { ok: true },
+    );
+    expect(await cancelSalesOrder(actor, orderId, "Otra vez")).toEqual({
+      ok: true,
+      repeated: true,
+    });
+    const view = await getSalesOrder(actor, orderId);
+    expect(view).toMatchObject({
+      status: "CANCELLED",
+      statusLabel: "Cancelado",
+      cancellation: { reason: "Ya no lo necesita" },
+    });
+    expect(view!.sales).toHaveLength(1);
+    expect(
+      await fulfillSalesOrder(actor, orderId, {
+        lines: [{ orderLineId: boxLine, quantity: "1" }],
+        payments: cash("500"),
+        idempotencyKey: newId(),
+      }),
+    ).toMatchObject({ ok: false, formError: "Este pedido está cancelado." });
+    const trail = await listAuditTrail(actor.organizationId, { limit: 10 });
+    expect(trail.map((entry) => entry.action)).toContain(
+      "sales.order_cancelled",
+    );
+    // The cancellation does not change afterwards.
+    await expect(
+      db.salesOrder.update({
+        where: { id: orderId },
+        data: { cancelReason: "Otro motivo" },
+      }),
+    ).rejects.toThrow(/cancellation cannot change/);
+  });
+
+  it("a fulfilled order has nothing to cancel; only who cancels sales may", async () => {
+    const { actor, orderId, productId, boxLine, pieceLine } = await order();
+    const cajera = await salesMember(actor.organizationId, "cashier");
+    await expect(
+      cancelSalesOrder(cajera, orderId, "No lo quiere"),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(
+      await cancelSalesOrder(await salesCompany(), orderId, "No lo quiere"),
+    ).toMatchObject({ ok: false, reason: "not_found" });
+    await registerEntry(actor, {
+      productId,
+      quantity: "1000",
+      unitCost: "0.90",
+    });
+    await fulfillSalesOrder(actor, orderId, {
+      lines: [
+        { orderLineId: boxLine, quantity: "2" },
+        { orderLineId: pieceLine, quantity: "3" },
+      ],
+      payments: cash("1000"),
+      idempotencyKey: newId(),
+    });
+    const encargada = await salesMember(actor.organizationId, "cash_manager");
+    expect(
+      await cancelSalesOrder(encargada, orderId, "No lo quiere"),
+    ).toMatchObject({ ok: false, reason: "invalid_state" });
   });
 });

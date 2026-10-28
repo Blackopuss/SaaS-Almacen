@@ -192,7 +192,7 @@ Agregada el 2026-10-27 con el fundador (ADR 0030). Ganancia y costos se ven solo
 | `sales.sale.read` | Consultar ventas, tickets e historial; VEN-15, VEN-22. | Sí | Sí | No | No | Sí | Sí | Sí |
 | `sales.customer.read` | Buscar y consultar clientes (la faceta cliente de Contactos); VEN-08. | Sí | Sí | No | No | Sí | Sí | Sí |
 | `sales.customer.create` | Registrar un cliente nuevo desde el mostrador o la cotización; VEN-08. | Sí | Sí | No | No | No | Sí | Sí |
-| `sales.sale.cancel` | Cancelar una venta con permiso, motivo y reversa; VEN-21. | Sí | Sí | No | No | No | No | Sí |
+| `sales.sale.cancel` | Cancelar una venta con permiso, motivo y reversa; VEN-21. También cancelar un pedido (COT-09). | Sí | Sí | No | No | No | No | Sí |
 | `sales.return.create` | Devolución total o parcial que reingresa a inventario y registra el reembolso; VEN-19/20. | Sí | Sí | No | No | No | No | Sí |
 | `sales.discount.authorize` | Autorizar en la misma pantalla un descuento arriba del tope de quien cobra, hasta el tope propio; VEN-14. | Sí | Sí | No | No | No | No | Sí |
 | `sales.below_cost.authorize` | Vender o descontar por debajo del costo promedio; VEN-14. | Sí | Sí | No | No | No | No | No |

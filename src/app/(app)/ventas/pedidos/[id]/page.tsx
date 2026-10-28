@@ -62,6 +62,10 @@ export default async function PedidoPage({
     access.allows("sales.sale.create") &&
     access.moduleState("sales") === "active" &&
     awaitsFulfillment(order.status);
+  const canCancel =
+    access.allows("sales.sale.cancel") &&
+    access.moduleState("sales") === "active" &&
+    awaitsFulfillment(order.status);
 
   return (
     <PageContainer>
@@ -86,6 +90,14 @@ export default async function PedidoPage({
         >
           Cotización {order.quote.number}
         </Link>
+        {canCancel && (
+          <Link
+            href={`/ventas/pedidos/${order.id}/cancelar`}
+            className={quietLink}
+          >
+            Cancelar pedido
+          </Link>
+        )}
       </p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
@@ -112,6 +124,16 @@ export default async function PedidoPage({
               Hecho por {order.createdBy ?? "alguien que ya no está"} el{" "}
               {order.createdAtText}
             </p>
+            {order.cancellation && (
+              <p>
+                Cancelado por{" "}
+                {order.cancellation.by ?? "alguien que ya no está"} el{" "}
+                {order.cancellation.atText} ·{" "}
+                <span className="[overflow-wrap:anywhere]">
+                  Motivo: {order.cancellation.reason}
+                </span>
+              </p>
+            )}
             {order.notes && (
               <p className="[overflow-wrap:anywhere] whitespace-pre-line">
                 {order.notes}
@@ -144,7 +166,9 @@ export default async function PedidoPage({
                     {line.deliveredText && (
                       <span className="block text-muted-foreground">
                         Entregado: {line.deliveredText}
-                        {line.missingText && ` · Falta: ${line.missingText}`}
+                        {line.missingText &&
+                          !order.cancellation &&
+                          ` · Falta: ${line.missingText}`}
                       </span>
                     )}
                   </p>
