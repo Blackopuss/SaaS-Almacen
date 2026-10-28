@@ -175,6 +175,7 @@ model Organization {
   salesQuoteDeliveries       SalesQuoteDelivery[]
   salesOrders                SalesOrder[]
   salesOrderLines            SalesOrderLine[]
+  salesInstallmentTerms      SalesInstallmentTerm[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1884,6 +1885,25 @@ model SalesSettings {
 
   @@unique([organizationId, id])
   @@map("sales_settings")
+}
+
+/// A term a company sells on installments (PAG-01): so many months, with
+/// an optional interest on what is financed (0 by default). A plan copies
+/// the interest when it is agreed, so changing a term never changes a
+/// plan already made.
+model SalesInstallmentTerm {
+  id              String       @id @db.Char(36)
+  organizationId  String       @db.Char(36)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// 1 to 60.
+  months          Int
+  /// Percent added once to what is financed, 0 to 100.
+  interestPercent Decimal      @default(0) @db.Decimal(5, 2)
+  createdAt       DateTime     @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, months])
+  @@map("sales_installment_term")
 }
 
 enum SaleStatus {

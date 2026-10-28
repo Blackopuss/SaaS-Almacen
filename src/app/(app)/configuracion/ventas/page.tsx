@@ -9,9 +9,14 @@ import {
   PageHeader,
   ReadOnlyNotice,
 } from "@/components";
-import { getSalesSettings } from "@/modules/sales";
+import {
+  MAX_INSTALLMENT_TERMS,
+  getInstallmentTerms,
+  getSalesSettings,
+} from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
+import { InstallmentTermsForm } from "./installment-terms-form";
 import { SalesSettingsForm } from "./sales-settings-form";
 
 export const metadata: Metadata = { title: "Ventas" };
@@ -52,10 +57,14 @@ export default async function VentasConfigPage() {
       </PageContainer>
     );
   }
-  const settings = await getSalesSettings({
+  const actor = {
     organizationId: access.organization.id,
     userId: access.user.id,
-  });
+  };
+  const [settings, terms] = await Promise.all([
+    getSalesSettings(actor),
+    getInstallmentTerms(actor),
+  ]);
 
   return (
     <PageContainer>
@@ -69,6 +78,13 @@ export default async function VentasConfigPage() {
           cash_manager: plain(settings.caps.cash_manager),
           administrator: plain(settings.caps.administrator),
         }}
+      />
+      <InstallmentTermsForm
+        terms={terms.map((term) => ({
+          months: String(term.months),
+          interest: plain(term.interestPercent),
+        }))}
+        maxTerms={MAX_INSTALLMENT_TERMS}
       />
     </PageContainer>
   );

@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { isAppError } from "@/lib";
-import { updateSalesSettings, type SalesSettingsField } from "@/modules/sales";
+import {
+  setInstallmentTerms,
+  updateSalesSettings,
+  type SalesSettingsField,
+} from "@/modules/sales";
 import { requireOrganizationContext } from "@/platform/tenancy";
 
 export type SalesSettingsFormState = {
@@ -65,4 +69,51 @@ export async function updateSalesSettingsAction(
   }
   revalidatePath("/configuracion/ventas");
   return { fieldErrors: {}, saved: true, values, answers };
+}
+
+export type InstallmentTermsFormState = {
+  /** By position of the row sent. */
+  rowErrors: Record<number, string>;
+  formError?: string;
+  saved?: boolean;
+  answers: number;
+};
+
+/**
+ * Saves the terms of sales on installments (PAG-01): months and interest
+ * of each. Only the titular: the service checks it.
+ */
+export async function updateInstallmentTermsAction(
+  prev: InstallmentTermsFormState,
+  formData: FormData,
+): Promise<InstallmentTermsFormState> {
+  const { user, organization } = await requireOrganizationContext();
+  const months = formData.getAll("months").slice(0, 20);
+  const interest = formData.getAll("interest").slice(0, 20);
+  const rows = months.map((value, index) => ({
+    months: String(value).slice(0, 8),
+    interest: String(interest[index] ?? "").slice(0, 16),
+  }));
+  const answers = prev.answers + 1;
+  let result;
+  try {
+    result = await setInstallmentTerms(
+      { organizationId: organization.id, userId: user.id },
+      rows,
+    );
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { rowErrors: {}, formError: error.message, answers };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    return {
+      rowErrors: result.rowErrors,
+      formError: result.formError,
+      answers,
+    };
+  }
+  revalidatePath("/configuracion/ventas");
+  return { rowErrors: {}, saved: true, answers };
 }

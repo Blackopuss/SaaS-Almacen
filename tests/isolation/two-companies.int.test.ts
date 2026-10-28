@@ -256,6 +256,13 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.salesInstallmentTerm.create({
+      data: {
+        id: newId(),
+        organizationId,
+        months: organizationId === orgA ? 6 : 12,
+      },
+    });
     await db.saleDiscountAuthorization.create({
       data: {
         id: newId(),

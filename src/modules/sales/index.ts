@@ -35,6 +35,17 @@ export {
   registerSale,
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
+export {
+  MAX_INSTALLMENT_MONTHS,
+  MAX_INSTALLMENT_TERMS,
+  describeTerms,
+  getInstallmentTerms,
+  setInstallmentTerms,
+} from "./installment-terms";
+export type {
+  InstallmentTerm,
+  InstallmentTermsResult,
+} from "./installment-terms";
 export { QUOTE_REPORT_MAX, getQuoteReport } from "./quote-reports";
 export type { QuoteReport, QuoteTally } from "./quote-reports";
 export type { CancelOrderResult } from "./order-cancel";

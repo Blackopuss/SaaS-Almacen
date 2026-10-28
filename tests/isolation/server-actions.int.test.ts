@@ -175,6 +175,12 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (getModuleAccess); productos, precios e IVA se leen solo de esa empresa; solo lee",
     coveredBy: "tests/sales/cart.int.test.ts",
   },
+  updateInstallmentTermsAction: {
+    input: "meses e interés de cada plazo",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); solo el titular (assertOwnerAction) y solo para su empresa",
+    coveredBy: "tests/sales/installment-terms.int.test.ts",
+  },
   updateSalesSettingsAction: {
     input: "modo de IVA (incluido o sumado) y tasa",
     identity:
