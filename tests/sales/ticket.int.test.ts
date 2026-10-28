@@ -114,7 +114,9 @@ describe("ticket", () => {
         `${other.actor.organizationId}.${other.saleId}.${sig}`,
       ),
     ).toBeNull();
-    expect(await getPublicTicket(`${token.slice(0, -1)}A`)).toBeNull();
+    // A different last character, whatever the signature ends in.
+    const flipped = token.endsWith("A") ? "B" : "A";
+    expect(await getPublicTicket(`${token.slice(0, -1)}${flipped}`)).toBeNull();
     expect(await getPublicTicket("nada")).toBeNull();
     expect(await getPublicTicket(`${token}.extra`)).not.toBeNull();
   });
