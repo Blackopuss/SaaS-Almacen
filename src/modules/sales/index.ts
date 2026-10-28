@@ -35,6 +35,12 @@ export {
   registerSale,
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
+export { addMonths, planInstallments } from "./installment-plan";
+export type {
+  InstallmentPlan,
+  InstallmentPlanInput,
+  InstallmentPlanResult,
+} from "./installment-plan";
 export {
   MAX_INSTALLMENT_MONTHS,
   MAX_INSTALLMENT_TERMS,
