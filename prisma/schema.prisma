@@ -179,6 +179,7 @@ model Organization {
   salesReceivables            SalesReceivable[]
   salesReceivableInstallments SalesReceivableInstallment[]
   salesReceivablePayments     SalesReceivablePayment[]
+  salesStatementDeliveries    SalesStatementDelivery[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1506,34 +1507,35 @@ model ExitImportRow {
 /// contact is for a module is a facet (`isSupplier`, `isCustomer`), and a
 /// contact always has at least one.
 model Contact {
-  id               String            @id @db.Char(36)
-  organizationId   String            @db.Char(36)
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                       String                   @id @db.Char(36)
+  organizationId           String                   @db.Char(36)
+  organization             Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// As the business knows it: «Ferretera del Norte».
-  name             String            @db.VarChar(160)
+  name                     String                   @db.VarChar(160)
   /// Legal name, when it differs: «Ferretera del Norte, S.A. de C.V.».
-  legalName        String?           @db.VarChar(200)
+  legalName                String?                  @db.VarChar(200)
   /// Mexican tax id, in capitals and without spaces; optional.
-  rfc              String?           @db.VarChar(13)
-  isSupplier       Boolean           @default(false)
-  isCustomer       Boolean           @default(false)
+  rfc                      String?                  @db.VarChar(13)
+  isSupplier               Boolean                  @default(false)
+  isCustomer               Boolean                  @default(false)
   /// Who to ask for there.
-  contactPerson    String?           @db.VarChar(120)
-  email            String?           @db.VarChar(254)
-  phone            String?           @db.VarChar(40)
-  address          String?           @db.VarChar(300)
-  notes            String?           @db.VarChar(500)
+  contactPerson            String?                  @db.VarChar(120)
+  email                    String?                  @db.VarChar(254)
+  phone                    String?                  @db.VarChar(40)
+  address                  String?                  @db.VarChar(300)
+  notes                    String?                  @db.VarChar(500)
   /// Set when it is no longer used; its documents keep pointing to it.
-  archivedAt       DateTime?         @db.DateTime(3)
-  createdByUserId  String            @db.Char(36)
-  createdAt        DateTime          @default(now()) @db.DateTime(3)
-  updatedAt        DateTime          @updatedAt @db.DateTime(3)
-  suppliedProducts ProductSupplier[]
-  purchaseOrders   PurchaseOrder[]
-  sales            Sale[]
-  salesQuotes      SalesQuote[]
-  salesOrders      SalesOrder[]
-  salesReceivables SalesReceivable[]
+  archivedAt               DateTime?                @db.DateTime(3)
+  createdByUserId          String                   @db.Char(36)
+  createdAt                DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt                DateTime                 @updatedAt @db.DateTime(3)
+  suppliedProducts         ProductSupplier[]
+  purchaseOrders           PurchaseOrder[]
+  sales                    Sale[]
+  salesQuotes              SalesQuote[]
+  salesOrders              SalesOrder[]
+  salesReceivables         SalesReceivable[]
+  salesStatementDeliveries SalesStatementDelivery[]
 
   @@unique([organizationId, id])
   /// Orders and searches the list of suppliers (name and RFC) in one index.
@@ -2426,6 +2428,31 @@ model SalesQuoteDelivery {
   @@index([organizationId, quoteId, requestedAt])
   @@index([organizationId, requestedAt])
   @@map("sales_quote_delivery")
+}
+
+/// Mailing a customer their statement of account (PAG-06, like COT-03):
+/// asked by a person, sent by the worker.
+model SalesStatementDelivery {
+  id                String                   @id @db.Char(36)
+  organizationId    String                   @db.Char(36)
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customerId        String                   @db.Char(36)
+  customer          Contact                  @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  /// The customer's address when it was asked for; never typed on the spot.
+  recipient         String                   @db.VarChar(254)
+  status            SalesQuoteDeliveryStatus @default(QUEUED)
+  jobId             String                   @db.Char(36)
+  requestedByUserId String                   @db.Char(36)
+  requestedAt       DateTime                 @default(now()) @db.DateTime(3)
+  sentAt            DateTime?                @db.DateTime(3)
+  failedAt          DateTime?                @db.DateTime(3)
+  failureReason     String?                  @db.VarChar(300)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, jobId])
+  @@index([organizationId, customerId, requestedAt])
+  @@index([organizationId, requestedAt])
+  @@map("sales_statement_delivery")
 }
 
 /// Where a sales order stands (COT-05): open until it is fulfilled or

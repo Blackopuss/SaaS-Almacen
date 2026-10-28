@@ -264,6 +264,42 @@ export function salesQuoteEmail(input: {
   };
 }
 
+/** A customer's statement of account, from the business (PAG-06). */
+export function salesStatementEmail(input: {
+  to: string;
+  greeting: string;
+  organizationName: string;
+  /** «$6,800.00». */
+  balance: string;
+  /** «28 nov 2026» and its amount; null when nothing is due. */
+  next: { dueText: string; amount: string } | null;
+  sender: { name: string; email: string };
+  pdf: EmailAttachment;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.sender.email,
+    subject: `Estado de cuenta de ${company}`,
+    attachments: [input.pdf],
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `${company} te envía tu estado de cuenta. Tu saldo es de ${oneLine(input.balance, 30)}.`,
+      ...(input.next
+        ? [
+            `Tu próximo pago es el ${oneLine(input.next.dueText, 40)} por ${oneLine(input.next.amount, 30)}.`,
+          ]
+        : []),
+      "Va adjunto en PDF, con tus pagos hechos y los próximos.",
+      "",
+      `Si tienes dudas, responde a este correo: le llega a ${oneLine(input.sender.name, 120)} (${input.sender.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}.`,
+    ].join("\n"),
+  };
+}
+
 /** Operations alert for whoever runs the server (PIL-04). */
 export function operationsAlertEmail(input: {
   to: string;

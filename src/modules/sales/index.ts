@@ -36,6 +36,22 @@ export {
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
 export {
+  STATEMENT_MAX_ACCOUNTS,
+  buildStatementPdf,
+  getCustomerStatement,
+} from "./statements";
+export type { CustomerStatement } from "./statements";
+export {
+  STATEMENT_DELIVERY_STATUS_LABELS,
+  deliverStatement,
+  getStatementDeliveries,
+  requestStatementDelivery,
+} from "./statement-delivery";
+export type {
+  RequestStatementDeliveryResult,
+  StatementDelivery,
+} from "./statement-delivery";
+export {
   RECEIVABLE_PAGE_SIZE,
   RECEIVABLE_STATUS_LABELS,
   formatDueDay,

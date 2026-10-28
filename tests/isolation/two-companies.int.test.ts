@@ -624,6 +624,17 @@ beforeAll(async () => {
         requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    // The customer's statement, by mail (PAG-06).
+    await db.salesStatementDelivery.create({
+      data: {
+        id: newId(),
+        organizationId,
+        customerId,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+        requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     // Accepted, it becomes an order (COT-05) with its line.
     await db.salesQuote.update({
       where: { id: quoteId },

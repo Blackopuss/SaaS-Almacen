@@ -62,6 +62,12 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "sales.order_created": "Convirtió una cotización en pedido",
   "sales.order_cancelled": "Canceló un pedido",
   "sales.installments_changed": "Cambió los plazos de venta a plazos",
+  "sales.statement_exported": "Descargó un estado de cuenta",
+  "sales.statement_delivery_requested":
+    "Pidió enviar un estado de cuenta por correo",
+  "sales.statement_delivered": "Se envió un estado de cuenta por correo",
+  "sales.statement_delivery_failed":
+    "No se pudo enviar un estado de cuenta por correo",
   "sales.quote_delivery_requested": "Pidió enviar una cotización por correo",
   "sales.quote_delivered": "Se envió una cotización por correo",
   "sales.quote_delivery_failed": "No se pudo enviar una cotización por correo",

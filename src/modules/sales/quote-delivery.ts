@@ -12,8 +12,13 @@ import { enqueueJob, type JobHandlers } from "@/platform/jobs";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
 import { companyToday, dayOfDate } from "./calendar";
+import { usableEmail } from "./email-address";
 import type { SalesActor } from "./prices";
 import { composeQuotePdf } from "./quote-pdf";
+import {
+  STATEMENT_DELIVERY_JOB_TYPE,
+  statementJobHandler,
+} from "./statement-delivery";
 
 /**
  * Sending a quote to its customer by mail (COT-03, like CMP-06B). A person
@@ -45,16 +50,10 @@ export const QUOTE_DELIVERY_STATUS_LABELS = {
 
 type DeliveryStatus = keyof typeof QUOTE_DELIVERY_STATUS_LABELS;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const FAILED_AFTER_RETRIES =
   "No se pudo entregar el correo después de varios intentos. Revisa el correo del cliente y vuelve a enviarla.";
 
-/** The address a customer can be written to, or null. */
-export function usableEmail(email: string | null): string | null {
-  const text = (email ?? "").trim().toLowerCase();
-  return text.length <= 254 && EMAIL.test(text) ? text : null;
-}
+export { usableEmail };
 
 const noEmail = (customer: string) =>
   `${customer} no tiene correo. Agrégalo para enviarle la cotización.`;
@@ -497,6 +496,7 @@ const deliveryIdOf = (payload: unknown) =>
 
 /** Background work of Ventas, by job type. */
 export const salesJobHandlers: JobHandlers = {
+  [STATEMENT_DELIVERY_JOB_TYPE]: statementJobHandler,
   [QUOTE_DELIVERY_JOB_TYPE]: {
     // The company is the one of the job, never one named in the payload.
     handle: (context) =>

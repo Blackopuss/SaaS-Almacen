@@ -102,6 +102,12 @@ export default async function CuentaPage({
           <Link href={`/ventas/${account.sale.id}`} className={quietLink}>
             Venta {account.sale.number}
           </Link>
+          <Link
+            href={`/ventas/cuentas/cliente/${account.customer.id}`}
+            className={quietLink}
+          >
+            Estado de cuenta
+          </Link>
         </p>
       </div>
       {receipt && receipt.account.id === account.id && (
