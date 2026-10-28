@@ -141,3 +141,16 @@ export {
 export type { StoredQuoteStatus } from "./quote-states";
 export { acceptQuote, markQuoteSent, rejectQuote } from "./quote-status";
 export type { QuoteStatusResult } from "./quote-status";
+export {
+  SALES_ORDER_PAGE_SIZE,
+  SALES_ORDER_STATUS_LABELS,
+  convertQuoteToOrder,
+  getSalesOrder,
+  listSalesOrders,
+} from "./sales-orders";
+export type {
+  ConvertQuoteResult,
+  SalesOrderStatus,
+  SalesOrderSummary,
+  SalesOrderView,
+} from "./sales-orders";

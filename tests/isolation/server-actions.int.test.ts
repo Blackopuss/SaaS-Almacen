@@ -80,6 +80,12 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa",
     coveredBy: "tests/sales/quote-status.int.test.ts",
   },
+  convertQuoteAction: {
+    input: "id de la cotización",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa",
+    coveredBy: "tests/sales/sales-orders.int.test.ts",
+  },
   returnSaleAction: {
     input:
       "id de la venta, cantidades por línea, motivo, forma de reembolso y referencia",

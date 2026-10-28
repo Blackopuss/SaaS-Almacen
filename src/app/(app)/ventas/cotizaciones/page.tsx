@@ -1,4 +1,10 @@
-import { ChevronLeft, ChevronRight, FilePlus, FileText } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FilePlus,
+  FileText,
+  PackageCheck,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -90,6 +96,15 @@ export default async function CotizacionesPage({
       {back}
       {moduleState === "read_only" && <ReadOnlyNotice module="Ventas" />}
       <PageHeader title="Cotizaciones" actions={create} />
+      <p className="-mt-2 flex flex-wrap gap-x-6">
+        <Link
+          href="/ventas/pedidos"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <PackageCheck aria-hidden="true" className="size-4" />
+          Pedidos
+        </Link>
+      </p>
       {list.items.length === 0 ? (
         <EmptyState
           icon={FileText}

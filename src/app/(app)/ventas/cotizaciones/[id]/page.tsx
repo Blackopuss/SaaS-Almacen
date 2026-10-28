@@ -15,6 +15,7 @@ import { formatDateTime } from "@/lib";
 import { getQuote, getQuoteDeliveries } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
+import { ConvertQuoteButton } from "./convert-button";
 import { QuoteDeliveryPanel } from "./delivery-panel";
 import { QuoteStatusActions } from "./status-actions";
 
@@ -83,6 +84,16 @@ export default async function CotizacionPage({
         />
       </>
     ) : undefined;
+  // An accepted quote becomes its order (COT-05); once it has one, it shows it.
+  const order = quote.order ? (
+    <Button asChild variant="outline">
+      <Link href={`/ventas/pedidos/${quote.order.id}`}>
+        Ver pedido {quote.order.number}
+      </Link>
+    </Button>
+  ) : quote.status === "ACCEPTED" && canAct ? (
+    <ConvertQuoteButton quoteId={quote.id} />
+  ) : undefined;
   const badge =
     quote.status === "ACCEPTED"
       ? "success"
@@ -95,7 +106,10 @@ export default async function CotizacionPage({
   return (
     <PageContainer>
       {back}
-      <PageHeader title={`Cotización ${quote.number}`} actions={edit} />
+      <PageHeader
+        title={`Cotización ${quote.number}`}
+        actions={edit ?? order}
+      />
       <p className="-mt-2 flex flex-wrap gap-x-6">
         <a
           href={`/api/ventas/cotizaciones/${quote.id}/pdf`}

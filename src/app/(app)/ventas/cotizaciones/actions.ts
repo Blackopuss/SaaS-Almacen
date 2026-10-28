@@ -7,6 +7,7 @@ import { isAppError } from "@/lib";
 import {
   QUOTE_MAX_LINES,
   acceptQuote,
+  convertQuoteToOrder,
   createQuote,
   findSaleProducts,
   getQuote,
@@ -259,4 +260,29 @@ export async function changeQuoteStatusAction(
     }
     throw error;
   }
+}
+
+export type ConvertQuoteState = { error?: string };
+
+/**
+ * Turns an accepted quote into its order (COT-05) and opens it. Converting
+ * it again opens the same order.
+ */
+export async function convertQuoteAction(
+  quoteId: string,
+): Promise<ConvertQuoteState> {
+  const actor = await actorOfSession();
+  let result;
+  try {
+    result = await convertQuoteToOrder(actor, String(quoteId).slice(0, 36));
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  if (!result.ok) return { error: result.error };
+  revalidatePath(`/ventas/cotizaciones/${idPath(quoteId)}`);
+  revalidatePath("/ventas/pedidos");
+  redirect(`/ventas/pedidos/${idPath(result.orderId)}`);
 }

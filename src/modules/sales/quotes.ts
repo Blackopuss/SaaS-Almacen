@@ -4,7 +4,6 @@ import { dec, formatDateTime, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { loadSubject } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
-import { getUnit, pluralizeName } from "@/platform/catalog";
 import {
   LOCKING_TRANSACTION,
   forOrganization,
@@ -14,6 +13,7 @@ import {
 
 import { addDays, companyToday, dateOfDay, dayOfDate, isDay } from "./calendar";
 import { SALE_MAX_LINES, priceLines, type CartLineInput } from "./cart";
+import { quantityText } from "./line-text";
 import { PERCENT_ERROR, formatPercent, parsePercent } from "./discounts";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
@@ -414,6 +414,8 @@ export type QuoteView = {
     by: string | null;
     rejectReason: string | null;
   } | null;
+  /** The order it became (COT-05). */
+  order: { id: string; number: number } | null;
   lines: {
     id: string;
     productId: string;
@@ -452,6 +454,7 @@ export async function getQuote(
     where: { id: String(quoteId).slice(0, 36) },
     include: {
       organization: { select: { timeZone: true } },
+      order: { select: { id: true, number: true } },
       customer: {
         select: { id: true, name: true, phone: true, rfc: true, email: true },
       },
@@ -511,8 +514,8 @@ export async function getQuote(
           rejectReason: quote.rejectReason,
         }
       : null,
+    order: quote.order,
     lines: quote.lines.map((line) => {
-      const unit = getUnit(line.unitCode);
       const captured = dec(line.capturedQuantity.toString());
       return {
         id: line.id,
@@ -521,9 +524,7 @@ export async function getQuote(
         sku: line.product.sku,
         capture: line.presentationId ? `p:${line.presentationId}` : "base",
         quantity: captured.toString(),
-        quantityText: line.presentation
-          ? `${captured.toString()} ${pluralizeName(line.presentation.name, captured)} de ${dec(line.factor.toString()).toString()} ${unit.plural}`
-          : `${captured.toString()} ${captured.equals(1) ? unit.name : unit.plural}`,
+        quantityText: quantityText(line),
         unitPrice: `${formatMoney(line.unitPrice.toString())} c/u`,
         amount: formatMoney(
           dec(line.amount.toString()).plus(line.discount.toString()),

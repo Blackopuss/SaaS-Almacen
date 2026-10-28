@@ -616,6 +616,43 @@ beforeAll(async () => {
         requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    // Accepted, it becomes an order (COT-05) with its line.
+    await db.salesQuote.update({
+      where: { id: quoteId },
+      data: {
+        status: "ACCEPTED",
+        decidedAt: new Date(),
+        decidedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const salesOrderId = newId();
+    await db.salesOrder.create({
+      data: {
+        id: salesOrderId,
+        organizationId,
+        number: 1,
+        quoteId,
+        customerId,
+        pricesIncludeTax: true,
+        taxRate: "16",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesOrderLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        orderId: salesOrderId,
+        lineNumber: 1,
+        productId,
+        capturedQuantity: "2",
+        factor: "1",
+        baseQuantity: "2",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "240",
+      },
+    });
     const exitImportId = newId();
     await db.exitImport.create({
       data: {

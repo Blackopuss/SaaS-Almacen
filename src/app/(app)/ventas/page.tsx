@@ -1,4 +1,10 @@
-import { FileBarChart, FileText, History, Wallet } from "lucide-react";
+import {
+  FileBarChart,
+  FileText,
+  History,
+  PackageCheck,
+  Wallet,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -80,6 +86,12 @@ export default async function VentasPage() {
         <Link href="/ventas/cotizaciones" className={linkClass}>
           <FileText aria-hidden="true" className="size-4" />
           Cotizaciones
+        </Link>
+      )}
+      {access.allows("sales.quote.read") && (
+        <Link href="/ventas/pedidos" className={linkClass}>
+          <PackageCheck aria-hidden="true" className="size-4" />
+          Pedidos
         </Link>
       )}
       {access.allows("sales.report.read") && (
