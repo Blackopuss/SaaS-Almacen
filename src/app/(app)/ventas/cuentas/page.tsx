@@ -207,16 +207,24 @@ export default async function CuentasPage({
           )}
         </section>
       )}
-      {!late && (
-        <p>
+      <p className="flex flex-wrap gap-x-6">
+        {!late && (
           <Link
             href={all ? "/ventas/cuentas" : "/ventas/cuentas?todas=1"}
             className="inline-flex min-h-11 items-center rounded-lg text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {all ? "Ver solo las abiertas" : "Ver también las pagadas"}
           </Link>
-        </p>
-      )}
+        )}
+        {access.can("sales.report.read") && (
+          <Link
+            href="/ventas/cuentas/reporte"
+            className="inline-flex min-h-11 items-center rounded-lg text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Reporte de cartera
+          </Link>
+        )}
+      </p>
     </PageContainer>
   );
 }

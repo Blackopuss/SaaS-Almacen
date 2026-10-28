@@ -51,6 +51,8 @@ export type {
   RequestStatementDeliveryResult,
   StatementDelivery,
 } from "./statement-delivery";
+export { getPortfolioReport } from "./portfolio";
+export type { PortfolioReport } from "./portfolio";
 export {
   REMINDERS_PER_DAY,
   getAccountReminders,

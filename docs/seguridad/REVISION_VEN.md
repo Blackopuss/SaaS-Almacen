@@ -1,4 +1,4 @@
-# Revisión de amenazas — Ventas (VEN-01 a VEN-23) y Cotizaciones (COT-01 a COT-12)
+# Revisión de amenazas — Ventas (VEN-01 a VEN-23), Cotizaciones (COT-01 a COT-12) y Ventas a plazos (PAG-01 a PAG-09)
 
 Fecha: 2026-10-28. Complementa `REVISION_PLT.md`, `REVISION_USR.md`, `REVISION_MOD.md`, `REVISION_INV.md`, `REVISION_IMP.md`, `REVISION_CMP.md` y `REVISION_PIL.md`. Hecha por la misma IA que implementó las etapas; **falta una revisión independiente** (como la que tuvo CMP). VEN-24..28 (hardware, piloto y cobro del módulo) quedan fuera.
 
@@ -8,6 +8,7 @@ Fecha: 2026-10-28. Complementa `REVISION_PLT.md`, `REVISION_USR.md`, `REVISION_M
 - Venta de mostrador: carrito, clientes, pagos en efectivo, tarjeta, transferencia o mixtos, ticket con enlace firmado para el cliente, caja con fondo, ingresos, egresos y corte a ciegas.
 - Devoluciones, cancelaciones, historial y reportes de ventas exportables (ganancia solo para quien ve costos, ADR 0031).
 - Cotizaciones con PDF y envío por correo, estados, pedidos, entregas parciales que se cobran como venta, cancelación de pedidos y reporte de conversión.
+- Ventas a plazos (PAG, 2026-10-28): plazos e interés por empresa, cotización con plan y enganche que cubre el costo, entrega cobrando el enganche con su cuenta por cobrar, abonos en caja con recibo, estado de cuenta en PDF y por correo, vencidos y recordatorios automáticos, devoluciones y cancelaciones que descuentan de la deuda, y reporte de cartera.
 
 ## Amenazas consideradas y control
 
@@ -25,6 +26,10 @@ Fecha: 2026-10-28. Complementa `REVISION_PLT.md`, `REVISION_USR.md`, `REVISION_M
 | Cambiar lo que el cliente aceptó (precios, descuento, IVA) | Cotización editable solo en borrador; el pedido copia lo aceptado y los disparadores impiden cambiarlo; estados con una sola tabla repetida en la base | `quote-schema.int.test.ts`, `quote-status.int.test.ts`, `sales-orders.int.test.ts` |
 | Cancelar pedidos o ventas sin permiso, o sin rastro | `sales.sale.cancel` (Encargado de caja, administrador, titular), motivo obligatorio, quién y cuándo guardados una vez (`CHECK` y disparador) y bitácora | `returns.int.test.ts`, `order-fulfillment.int.test.ts`, `quote-permissions.int.test.ts` |
 | Un rol de Ventas que mueve o ajusta inventario | Cajero y Encargado solo leen Inventario; las salidas salen de una venta en la misma transacción | `quote-permissions.int.test.ts` |
+| Vender a plazos con un enganche que no cubre el costo, o revelar el costo al cajero | `checkQuotePlan` valida en el servidor contra costo promedio × cantidad; a quien no tiene `inventory.cost.read` solo se le dice que no alcanza | `quote-plan.int.test.ts` |
+| Abonar dos veces o más de lo que se debe | Caja propia y cuenta bloqueadas; clave única con verificación de reintento; el saldo (debe − abonos − descuentos) se lee bajo el candado | `receivable-payments.int.test.ts` («dos a la vez nunca pagan dos veces») |
+| Una devolución a plazos que deja saldo negativo o reembolsa de más | Lo que regresa con su interés se descuenta primero del saldo leído bajo el candado de la cuenta; solo el excedente se devuelve; un disparador exige `goodsValue + interest = credited + refund` y que sea de la venta de esa cuenta; sin dinero de vuelta solo en ventas a plazos | `installment-returns.int.test.ts`, `installments-end-to-end.int.test.ts` |
+| Mandar estados de cuenta o recordatorios a otro correo, o de más | Destinatario de la ficha del cliente; topes diarios (3 por cliente y 100 por empresa; 100 recordatorios por empresa); recordatorios apagados por omisión, solo de día y uno por mensualidad (índice único); el worker vuelve a revisar permiso, que siga encendido y que siga vencido | `statements.int.test.ts`, `overdue-reminders.int.test.ts` |
 | Datos de otra empresa | `forOrganization`, llaves compuestas y `lockRows`; los ids del navegador se buscan solo en la empresa de la sesión | pruebas «de otra empresa» de cada servicio, `two-companies.int.test.ts`, `server-actions.int.test.ts` |
 
 ## Hallazgos
@@ -37,3 +42,7 @@ Fecha: 2026-10-28. Complementa `REVISION_PLT.md`, `REVISION_USR.md`, `REVISION_M
 | VEN-S04 | Informativa | Con IVA sumado, cada entrega de un pedido redondea su IVA por separado: entregado en partes, la suma puede diferir del total del pedido por centavos. Entregado completo de una vez coincide exacto. | Aceptado (ADR 0030); los totales de cada venta son los que se cobraron. |
 | VEN-S05 | Baja | Reportes de ventas y de cotizaciones leen hasta 5,000 documentos (lo avisan con `truncated`); no hay límite de frecuencia para descargarlos. | Pendiente con IMP-S05. |
 | VEN-S06 | Informativa | El reporte de cotizaciones calcula «pendiente hoy» con hasta 5,000 cotizaciones y pedidos abiertos, sin aviso si hay más. | Vigilar con datos del piloto. |
+| PAG-S01 | Baja | Durante PAG-08 una migración falló a medias en desarrollo y pruebas: un `CHECK` usaba `cashSessionId`, llave foránea con acción en cascada (MySQL lo rechaza, error 3823). | **Corregido** antes de subir: la regla pasó al disparador; las bases locales se repararon (`migrate resolve --rolled-back`). |
+| PAG-S02 | Informativa | La lista de vencidos y el reporte de cartera revisan todas las cuentas abiertas en cada consulta (sin tope); bien para un negocio pequeño, a vigilar con miles de cuentas. | Vigilar con datos del piloto. |
+| PAG-S03 | Informativa | Los recordatorios llevan como respuesta el correo del titular: el cliente lo ve. Es intencional (lo enciende el titular y lo dice la pantalla). | Aceptado (PAG-07). |
+| PAG-S04 | Informativa | Liquidar antes no descuenta el interés pactado. Es una decisión de negocio tomada por la IA. | **Por confirmar con el fundador** (ADR 0030). |
