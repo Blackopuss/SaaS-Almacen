@@ -3,6 +3,7 @@ import {
   FileText,
   History,
   PackageCheck,
+  HandCoins,
   Wallet,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -92,6 +93,12 @@ export default async function VentasPage() {
         <Link href="/ventas/pedidos" className={linkClass}>
           <PackageCheck aria-hidden="true" className="size-4" />
           Pedidos
+        </Link>
+      )}
+      {access.allows("sales.receivable.read") && (
+        <Link href="/ventas/cuentas" className={linkClass}>
+          <HandCoins aria-hidden="true" className="size-4" />
+          Cuentas por cobrar
         </Link>
       )}
       {access.allows("sales.report.read") && (

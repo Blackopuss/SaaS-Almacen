@@ -662,6 +662,20 @@ beforeAll(async () => {
         amount: "100",
       },
     });
+    await db.salesReceivablePayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        number: 1,
+        receivableId,
+        cashSessionId,
+        method: "CARD",
+        amount: "10",
+        reference: "AUT-1",
+        idempotencyKey: newId(),
+        receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
     await db.salesOrder.create({
       data: {
         id: salesOrderId,

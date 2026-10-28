@@ -132,6 +132,7 @@ describe("cash register", () => {
     expect(mine?.totals).toEqual({
       float: "$500.00",
       cashSales: "$100.00",
+      cashOnAccounts: "$0.00",
       cashIn: "$200.00",
       cashOut: "$50.00",
       cashRefunds: "$0.00",

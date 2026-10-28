@@ -108,3 +108,53 @@ export function planInstallments(
     },
   };
 }
+
+export type InstallmentState = {
+  number: number;
+  dueDay: string;
+  amount: Decimal;
+  /** What the payments covered of it. */
+  paid: Decimal;
+  /** What is still missing of it. */
+  left: Decimal;
+  status: "PAID" | "PARTIAL" | "DUE" | "OVERDUE";
+};
+
+/**
+ * Where the payments of an account went (PAG-05): their sum covers the
+ * installments oldest first. Derived each time, never stored. An unpaid
+ * installment whose day passed is overdue.
+ */
+export function applyPayments(
+  installments: readonly {
+    number: number;
+    dueDay: string;
+    amount: DecimalInput;
+  }[],
+  paidTotal: DecimalInput,
+  today: string,
+): InstallmentState[] {
+  let rest = dec(paidTotal);
+  return [...installments]
+    .sort((a, b) => a.number - b.number)
+    .map((installment) => {
+      const amount = dec(installment.amount);
+      const paid = Decimal.min(amount, Decimal.max(rest, 0));
+      rest = rest.minus(paid);
+      const left = amount.minus(paid);
+      return {
+        number: installment.number,
+        dueDay: installment.dueDay,
+        amount,
+        paid,
+        left,
+        status: left.isZero()
+          ? "PAID"
+          : installment.dueDay < today
+            ? "OVERDUE"
+            : paid.isZero()
+              ? "DUE"
+              : "PARTIAL",
+      };
+    });
+}

@@ -36,11 +36,28 @@ export {
 } from "./sales";
 export { cancelSalesOrder } from "./order-cancel";
 export {
+  RECEIVABLE_PAGE_SIZE,
   RECEIVABLE_STATUS_LABELS,
   formatDueDay,
+  getReceivable,
   getReceivableOfSale,
+  getReceivablePayment,
+  listReceivables,
 } from "./receivables";
-export type { ReceivableView } from "./receivables";
+export type {
+  ReceiptView,
+  ReceivableSummary,
+  ReceivableView,
+} from "./receivables";
+export {
+  findReceivablePaymentByKey,
+  registerReceivablePayment,
+} from "./receivable-payments";
+export type {
+  ReceivablePaymentInput,
+  ReceivablePaymentResult,
+} from "./receivable-payments";
+export { applyPayments } from "./installment-plan";
 export { addMonths, planInstallments } from "./installment-plan";
 export type { QuotePlanInput, QuotePlanView } from "./quote-plan";
 export type {

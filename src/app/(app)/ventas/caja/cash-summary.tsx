@@ -13,6 +13,9 @@ export function CashSummary({
   const rows = [
     ["Fondo", session.totals.float],
     ["Ventas en efectivo", session.totals.cashSales],
+    ...(session.totals.cashOnAccounts === "$0.00"
+      ? []
+      : [["Abonos en efectivo", session.totals.cashOnAccounts]]),
     ["Dinero que entró", session.totals.cashIn],
     ["Dinero que salió", out(session.totals.cashOut)],
     ...(session.totals.cashRefunds === "$0.00"

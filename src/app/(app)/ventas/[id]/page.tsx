@@ -173,11 +173,17 @@ export default async function VentaPage({
           className="max-w-xl space-y-3 rounded-xl border bg-card p-4 sm:p-5 print:hidden"
         >
           <h2 id="venta-a-plazos" className="font-medium">
-            Venta a plazos · Cuenta {account.number}
+            <Link
+              href={`/ventas/cuentas/${account.id}`}
+              className="rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Venta a plazos · Cuenta {account.number}
+            </Link>
           </h2>
           <p className="text-sm tabular-nums">
-            Enganche pagado {account.downPayment}. Resta {account.owed} en{" "}
-            {account.months} mensualidades ({account.interestText}).
+            Enganche pagado {account.downPayment}. Debe {account.balance} de{" "}
+            {account.owed} en {account.months} mensualidades (
+            {account.interestText}).
           </p>
           <ol className="divide-y rounded-lg border text-sm tabular-nums">
             {account.installments.map((installment) => (

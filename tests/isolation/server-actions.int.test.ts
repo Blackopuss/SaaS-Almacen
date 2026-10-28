@@ -80,6 +80,19 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); la cotización se bloquea solo en esa empresa",
     coveredBy: "tests/sales/quote-status.int.test.ts",
   },
+  registerPaymentAction: {
+    input:
+      "id de la cuenta, importe, forma de pago, recibido o referencia y clave",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la cuenta y la caja se bloquean solo en esa empresa y la caja es la de quien recibe",
+    coveredBy: "tests/sales/receivable-payments.int.test.ts",
+  },
+  checkPaymentAction: {
+    input: "clave de confirmación",
+    identity:
+      "sesión y empresa activa (getModuleAccess); solo encuentra abonos de esa persona en esa empresa",
+    coveredBy: "tests/sales/receivable-payments.int.test.ts",
+  },
   cancelOrderAction: {
     input: "id del pedido y motivo",
     identity:

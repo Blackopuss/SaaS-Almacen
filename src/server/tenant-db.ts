@@ -67,6 +67,7 @@ export const TENANT_MODELS = [
   "SalesOrderLine",
   "SalesReceivable",
   "SalesReceivableInstallment",
+  "SalesReceivablePayment",
   "PurchaseOrder",
   "PurchaseOrderDelivery",
   "PurchaseOrderLine",

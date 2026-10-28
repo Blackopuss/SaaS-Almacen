@@ -178,6 +178,7 @@ model Organization {
   salesInstallmentTerms       SalesInstallmentTerm[]
   salesReceivables            SalesReceivable[]
   salesReceivableInstallments SalesReceivableInstallment[]
+  salesReceivablePayments     SalesReceivablePayment[]
 
   @@index([ownerUserId])
   @@map("organization")
@@ -1942,6 +1943,7 @@ model SalesReceivable {
   startDay        DateTime                     @db.Date
   createdAt       DateTime                     @default(now()) @db.DateTime(3)
   installments    SalesReceivableInstallment[]
+  payments        SalesReceivablePayment[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, number])
@@ -1949,6 +1951,38 @@ model SalesReceivable {
   @@index([organizationId, customerId, createdAt])
   @@index([organizationId, status, createdAt])
   @@map("sales_receivable")
+}
+
+/// A payment to an account (PAG-05), taken at a register like a sale. It
+/// is applied to the oldest installment still due: that application is
+/// derived from the payments in order, never stored. Immutable.
+model SalesReceivablePayment {
+  id               String            @id @db.Char(36)
+  organizationId   String            @db.Char(36)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Consecutive receipt number of the company: 1, 2, 3…
+  number           Int
+  receivableId     String            @db.Char(36)
+  receivable       SalesReceivable   @relation(fields: [organizationId, receivableId], references: [organizationId, id], onDelete: Restrict)
+  cashSessionId    String            @db.Char(36)
+  cashSession      CashSession       @relation(fields: [organizationId, cashSessionId], references: [organizationId, id], onDelete: Restrict)
+  method           SalePaymentMethod
+  amount           Decimal           @db.Decimal(14, 2)
+  /// Cash only: what was handed over and the change.
+  received         Decimal?          @db.Decimal(14, 2)
+  changeGiven      Decimal?          @db.Decimal(14, 2)
+  /// Card or transfer.
+  reference        String?           @db.VarChar(60)
+  idempotencyKey   String            @db.VarChar(64)
+  receivedByUserId String            @db.Char(36)
+  createdAt        DateTime          @default(now()) @db.DateTime(3)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, number])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, receivableId, createdAt])
+  @@index([organizationId, cashSessionId])
+  @@map("sales_receivable_payment")
 }
 
 /// One payment of the calendar: due on its day, for its amount.
@@ -2146,29 +2180,30 @@ model SaleDiscountAuthorization {
 /// closes it counting what there is against what there should be (VEN-18).
 /// One open register per person; without one, nobody charges.
 model CashSession {
-  id               String         @id @db.Char(36)
-  organizationId   String         @db.Char(36)
-  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  openedByUserId   String         @db.Char(36)
+  id                 String                   @id @db.Char(36)
+  organizationId     String                   @db.Char(36)
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  openedByUserId     String                   @db.Char(36)
   /// Cash it starts with, to give change.
-  openingFloat     Decimal        @db.Decimal(14, 2)
-  openedAt         DateTime       @default(now()) @db.DateTime(3)
+  openingFloat       Decimal                  @db.Decimal(14, 2)
+  openedAt           DateTime                 @default(now()) @db.DateTime(3)
   /// True while open, NULL once closed (never false): one open per person.
-  isOpen           Boolean?       @default(true)
-  closedAt         DateTime?      @db.DateTime(3)
-  closedByUserId   String?        @db.Char(36)
+  isOpen             Boolean?                 @default(true)
+  closedAt           DateTime?                @db.DateTime(3)
+  closedByUserId     String?                  @db.Char(36)
   /// What should have been there at the close, by payment method.
-  expectedCash     Decimal?       @db.Decimal(14, 2)
-  expectedCard     Decimal?       @db.Decimal(14, 2)
-  expectedTransfer Decimal?       @db.Decimal(14, 2)
+  expectedCash       Decimal?                 @db.Decimal(14, 2)
+  expectedCard       Decimal?                 @db.Decimal(14, 2)
+  expectedTransfer   Decimal?                 @db.Decimal(14, 2)
   /// What was counted at the close.
-  countedCash      Decimal?       @db.Decimal(14, 2)
-  countedCard      Decimal?       @db.Decimal(14, 2)
-  countedTransfer  Decimal?       @db.Decimal(14, 2)
-  closeNote        String?        @db.VarChar(500)
-  sales            Sale[]
-  movements        CashMovement[]
-  saleReturns      SaleReturn[]
+  countedCash        Decimal?                 @db.Decimal(14, 2)
+  countedCard        Decimal?                 @db.Decimal(14, 2)
+  countedTransfer    Decimal?                 @db.Decimal(14, 2)
+  closeNote          String?                  @db.VarChar(500)
+  sales              Sale[]
+  movements          CashMovement[]
+  saleReturns        SaleReturn[]
+  receivablePayments SalesReceivablePayment[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, openedByUserId, isOpen])

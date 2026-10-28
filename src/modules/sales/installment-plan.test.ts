@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { dec } from "@/lib";
 
-import { addMonths, planInstallments } from "./installment-plan";
+import { addMonths, applyPayments, planInstallments } from "./installment-plan";
 
 const amounts = (result: ReturnType<typeof planInstallments>) =>
   result.ok
@@ -109,5 +109,39 @@ describe("payment calendar", () => {
     );
     // No down payment is a plan too.
     expect(planInstallments({ ...base, downPayment: "0" }).ok).toBe(true);
+  });
+});
+
+describe("applying payments", () => {
+  const calendar = [
+    { number: 1, dueDay: "2026-11-28", amount: "100.00" },
+    { number: 2, dueDay: "2026-12-28", amount: "100.00" },
+    { number: 3, dueDay: "2027-01-28", amount: "100.05" },
+  ];
+
+  it("covers the oldest installment first", () => {
+    const states = applyPayments(calendar, "150", "2026-11-01");
+    expect(
+      states.map((s) => [
+        s.number,
+        s.paid.toFixed(2),
+        s.left.toFixed(2),
+        s.status,
+      ]),
+    ).toEqual([
+      [1, "100.00", "0.00", "PAID"],
+      [2, "50.00", "50.00", "PARTIAL"],
+      [3, "0.00", "100.05", "DUE"],
+    ]);
+  });
+
+  it("an unpaid installment whose day passed is overdue", () => {
+    const states = applyPayments(calendar, "100", "2026-12-29");
+    expect(states.map((s) => s.status)).toEqual(["PAID", "OVERDUE", "DUE"]);
+    expect(
+      applyPayments(calendar, "300.05", "2027-06-01").every(
+        (s) => s.status === "PAID",
+      ),
+    ).toBe(true);
   });
 });

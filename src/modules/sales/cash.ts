@@ -30,9 +30,12 @@ export type CashTotals = {
   cashOut: Decimal;
   /** Cash handed back for returns from this register (VEN-19). */
   cashRefunds: Decimal;
+  /** Cash received as payments to accounts (PAG-05). */
+  cashOnAccounts: Decimal;
+  /** Card and transfer, from sales and payments to accounts. */
   card: Decimal;
   transfer: Decimal;
-  /** float + cash sales + in − out − cash refunds. */
+  /** float + cash sales + cash on accounts + in − out − cash refunds. */
   expectedCash: Decimal;
 };
 
@@ -41,7 +44,7 @@ export async function cashTotals(
   client: Client,
   sessionId: string,
 ): Promise<CashTotals> {
-  const [session, payments, movements, refunds] = await Promise.all([
+  const [session, payments, movements, refunds, accounts] = await Promise.all([
     client.cashSession.findFirst({
       where: { id: sessionId },
       select: { openingFloat: true },
@@ -60,10 +63,19 @@ export async function cashTotals(
       where: { cashSessionId: sessionId, refundMethod: "CASH" },
       _sum: { refund: true },
     }),
+    client.salesReceivablePayment.groupBy({
+      by: ["method"],
+      where: { cashSessionId: sessionId },
+      _sum: { amount: true },
+    }),
   ]);
   const paid = (method: string) =>
     dec(
       payments.find((p) => p.method === method)?._sum.amount?.toString() ?? 0,
+    );
+  const onAccounts = (method: string) =>
+    dec(
+      accounts.find((p) => p.method === method)?._sum.amount?.toString() ?? 0,
     );
   const moved = (direction: string) =>
     dec(
@@ -76,16 +88,19 @@ export async function cashTotals(
   const cashIn = moved("IN");
   const cashOut = moved("OUT");
   const cashRefunds = dec(refunds._sum.refund?.toString() ?? 0);
+  const cashOnAccounts = onAccounts("CASH");
   return {
     float,
     cashSales,
     cashIn,
     cashOut,
     cashRefunds,
-    card: paid("CARD"),
-    transfer: paid("TRANSFER"),
+    cashOnAccounts,
+    card: paid("CARD").plus(onAccounts("CARD")),
+    transfer: paid("TRANSFER").plus(onAccounts("TRANSFER")),
     expectedCash: float
       .plus(cashSales)
+      .plus(cashOnAccounts)
       .plus(cashIn)
       .minus(cashOut)
       .minus(cashRefunds),
@@ -106,6 +121,7 @@ export type CashSessionView = {
     cashIn: string;
     cashOut: string;
     cashRefunds: string;
+    cashOnAccounts: string;
     card: string;
     transfer: string;
     expectedCash: string;
@@ -166,6 +182,7 @@ async function viewOf(
       cashIn: money(totals.cashIn),
       cashOut: money(totals.cashOut),
       cashRefunds: money(totals.cashRefunds),
+      cashOnAccounts: money(totals.cashOnAccounts),
       card: money(totals.card),
       transfer: money(totals.transfer),
       expectedCash: money(totals.expectedCash),
