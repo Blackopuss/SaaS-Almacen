@@ -351,9 +351,11 @@ export default async function PlanPage() {
                       </Badge>
                     </span>
                     <span className="block text-sm text-muted-foreground tabular-nums">
-                      {order.planText} · {order.months}{" "}
-                      {order.months === 1 ? "mes" : "meses"} ·{" "}
-                      {formatMxn(order.total)} ·{" "}
+                      {order.planText} ·{" "}
+                      {order.months === 0
+                        ? "solo el cambio"
+                        : `${order.months} ${order.months === 1 ? "mes" : "meses"}`}{" "}
+                      · {formatMxn(order.total)} ·{" "}
                       {formatDateTime(
                         order.createdAt,
                         access.organization.timeZone,

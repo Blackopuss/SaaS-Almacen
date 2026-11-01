@@ -643,7 +643,13 @@ model CheckoutOrder {
   includedUsers    Int
   /// Modules bought, comma separated in registry order: "inventory,purchasing".
   modules          String           @db.VarChar(200)
+  /// 0 = only the difference until the current plan ends (BIL-08).
   months           Int
+  /// Changing plan while one is live: what the new plan costs more for the
+  /// days left of the current one (part of the subtotal; BIL-08/09).
+  prorated         Decimal          @default(0) @db.Decimal(12, 2)
+  /// The days left that `prorated` paid for; null when not a change.
+  proratedDays     Int?
   subtotal         Decimal          @db.Decimal(12, 2)
   discount         Decimal          @db.Decimal(12, 2)
   tax              Decimal          @db.Decimal(12, 2)

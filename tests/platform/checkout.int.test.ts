@@ -387,18 +387,7 @@ describe("modules (VEN-27)", () => {
       "inventory",
       "sales",
     ]);
-    // While live, only the same plan is renewed online.
-    expect(
-      await startCheckout(
-        actorOf(paid),
-        choice({ modules: ["sales", "purchasing"] }),
-        headers(),
-        paid.owner.email,
-      ),
-    ).toMatchObject({
-      ok: false,
-      formError: expect.stringMatching(/renovarlo igual/),
-    });
+    // Renewing the same plan while live: just its months.
     expect(
       await startCheckout(
         actorOf(paid),
@@ -407,6 +396,161 @@ describe("modules (VEN-27)", () => {
         paid.owner.email,
       ),
     ).toMatchObject({ ok: true });
+    expect(fake.createCalls.at(-1)?.total).toBe("598.00");
+  });
+});
+
+describe("changing a live plan (BIL-08..10)", () => {
+  /** A company with Inventario 100 bought for a month with a code. */
+  async function live() {
+    const c = await company();
+    const code = await newCode(100, 3);
+    const bought = await startCheckout(
+      actorOf(c),
+      choice({ code: code.code, provider: "" }),
+      headers(),
+      c.owner.email,
+    );
+    if (!bought.ok) throw new Error("setup failed");
+    const end = (
+      await db.entitlement.findFirstOrThrow({
+        where: { organizationId: c.org, key: "active_products" },
+      })
+    ).validUntil!;
+    // Whole days left in Mexico, as the server counts them.
+    const day = (at: Date) =>
+      Math.floor((at.getTime() - 6 * 3_600_000) / 86_400_000);
+    return { c, code, end, daysLeft: day(end) - day(new Date()) };
+  }
+
+  it("adding a module pays only the difference until the plan ends", async () => {
+    const { c, end, daysLeft } = await live();
+    const prorated = ((249 * daysLeft) / 30).toFixed(2);
+    expect(
+      await previewCode(
+        actorOf(c),
+        choice({
+          code: (await newCode(50, 1)).code,
+          modules: ["sales"],
+          months: 0,
+        }),
+        headers(),
+      ),
+    ).toMatchObject({
+      ok: true,
+      quote: { prorated, subtotal: prorated },
+    });
+    const code = await newCode(100, 1);
+    expect(
+      await startCheckout(
+        actorOf(c),
+        choice({
+          code: code.code,
+          modules: ["sales"],
+          months: 0,
+          provider: "",
+        }),
+        headers(),
+        c.owner.email,
+      ),
+    ).toMatchObject({ ok: true });
+    const order = await db.checkoutOrder.findFirstOrThrow({
+      where: { organizationId: c.org, months: 0 },
+    });
+    expect(order).toMatchObject({ status: "PAID", proratedDays: daysLeft });
+    expect(order.prorated.toFixed(2)).toBe(prorated);
+    // Ventas now, until the same end; nothing else moved.
+    const rights = await getFreshEntitlements(c.org);
+    expect([...rights.modules].sort()).toEqual(["inventory", "sales"]);
+    const sales = await db.entitlement.findFirstOrThrow({
+      where: { organizationId: c.org, key: "sales" },
+    });
+    expect(sales.validUntil?.getTime()).toBe(end.getTime());
+  });
+
+  it("a bigger plan adds the difference of the days left to its months", async () => {
+    const { c, daysLeft } = await live();
+    expect(
+      await startCheckout(
+        actorOf(c),
+        choice({ tier: "t500", months: 1 }),
+        headers(),
+        c.owner.email,
+      ),
+    ).toMatchObject({ ok: true });
+    // 649 for the month + (649 − 349) × days left ÷ 30.
+    const expected = (649 + (300 * daysLeft) / 30).toFixed(2);
+    expect(fake.createCalls.at(-1)?.total).toBe(expected);
+  });
+
+  it("a smaller plan starts when paid, keeps the days left and refunds nothing", async () => {
+    const c = await company();
+    const code = await newCode(100, 3);
+    await startCheckout(
+      actorOf(c),
+      choice({
+        code: code.code,
+        tier: "t500",
+        modules: ["sales"],
+        provider: "",
+      }),
+      headers(),
+      c.owner.email,
+    );
+    const before = (
+      await db.entitlement.findFirstOrThrow({
+        where: { organizationId: c.org, key: "active_products" },
+      })
+    ).validUntil!;
+    expect(
+      await previewCode(
+        actorOf(c),
+        choice({ code: code.code, tier: "t100" }),
+        headers(),
+      ),
+    ).toMatchObject({ quote: { prorated: "0.00", subtotal: "349.00" } });
+    await startCheckout(
+      actorOf(c),
+      choice({ code: code.code, tier: "t100", provider: "" }),
+      headers(),
+      c.owner.email,
+    );
+    const rights = await getFreshEntitlements(c.org);
+    expect([...rights.modules]).toEqual(["inventory"]);
+    expect(rights.limit("active_products")).toBe(100);
+    const after = (
+      await db.entitlement.findFirstOrThrow({
+        where: { organizationId: c.org, key: "active_products" },
+      })
+    ).validUntil!;
+    expect(after.getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it("only the change needs a live plan that costs more", async () => {
+    const fresh = await company();
+    expect(
+      await startCheckout(
+        actorOf(fresh),
+        choice({ modules: ["sales"], months: 0 }),
+        headers(),
+        fresh.owner.email,
+      ),
+    ).toMatchObject({
+      ok: false,
+      fieldErrors: { months: "Elige por cuántos meses." },
+    });
+    const { c } = await live();
+    expect(
+      await startCheckout(
+        actorOf(c),
+        choice({ months: 0 }),
+        headers(),
+        c.owner.email,
+      ),
+    ).toMatchObject({
+      ok: false,
+      fieldErrors: { months: expect.stringMatching(/no cuesta más/) },
+    });
   });
 });
 

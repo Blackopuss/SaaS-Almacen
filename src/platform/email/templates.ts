@@ -408,7 +408,9 @@ export function planPurchaseEmail(input: {
       "",
       `ID de transacción: ${input.transactionId}`,
       `Plan: ${input.planText}`,
-      `Meses: ${input.months}`,
+      input.months === 0
+        ? "Meses: ninguno, solo el cambio hasta el fin de tu plan"
+        : `Meses: ${input.months}`,
       `Subtotal: ${input.subtotal}`,
       ...(input.discount ? [`Descuento: −${input.discount}`] : []),
       ...(input.tax ? [`IVA (16%): ${input.tax}`] : []),

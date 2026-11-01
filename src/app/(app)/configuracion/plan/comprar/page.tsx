@@ -69,7 +69,7 @@ export default async function BuyPlanPage({
   });
   const { current } = options;
   // Every combination priced on the server; the browser only looks up.
-  const quotes = quoteTable(0);
+  const quotes = quoteTable(0, options.carry);
   const tiers: TierCard[] = options.tiers.map((tier) => ({
     id: tier.id,
     products: tier.productLimit.toLocaleString("es-MX"),
@@ -87,11 +87,11 @@ export default async function BuyPlanPage({
     summary: ADD_ON_SUMMARIES[module],
   }));
 
-  // While the plan is live it can only be renewed as it is (the service decides).
-  const renewalOnly = current?.live === true && current.validUntil !== null;
-  const unlimited = current?.live === true && current.validUntil === null;
-  // A live plan offers only itself: the other tiers would just be refused.
-  const lockedTier = renewalOnly ? (current?.tierId ?? null) : null;
+  // A live plan can be renewed or changed (BIL-08..10); one with no end or
+  // made by hand by staff is not bought online (the service decides too).
+  const live = current?.live === true;
+  const unlimited = live && current?.validUntil === null;
+  const special = live && current?.validUntil !== null && !current?.tierId;
   const currentText =
     current && current.productLimit !== null
       ? planText(current.productLimit, current.addOns)
@@ -125,35 +125,37 @@ export default async function BuyPlanPage({
 
       {unlimited ? (
         <Note>Tu plan no tiene fecha de término: no necesitas comprarlo.</Note>
-      ) : renewalOnly && !lockedTier ? (
+      ) : special ? (
         <Note>
           Tu plan es especial y no se renueva en línea. Escríbenos a{" "}
           {CONTACT_EMAIL} para renovarlo.
         </Note>
       ) : (
         <>
-          {renewalOnly && (
+          {options.carry && (
             <Note>
-              Mientras tu plan esté vigente puedes renovarlo igual; los meses
-              nuevos empiezan al terminar los que ya tienes. Para cambiar de
-              nivel o de módulos escríbenos a {CONTACT_EMAIL}.
+              Puedes renovar o cambiar tu plan. Los meses que compres se suman a
+              los días que te quedan. Si eliges un plan mayor, empieza al pagar
+              y pagas la diferencia de esos días; si eliges uno menor, también
+              empieza al pagar y la diferencia no se devuelve.
             </Note>
           )}
           <CheckoutForm
-            tiers={
-              lockedTier ? tiers.filter((t) => t.id === lockedTier) : tiers
-            }
+            tiers={tiers}
             addOns={addOns}
-            lockAddOns={renewalOnly}
+            changeUntil={
+              options.carry && current?.validUntil
+                ? formatDate(current.validUntil)
+                : null
+            }
             months={[...options.months]}
             quotes={quotes}
             providers={options.providers}
             refundTerms={[...options.refundTerms]}
             initial={{
-              tier:
-                (renewalOnly && current?.tierId) || options.tiers[0]?.id || "",
+              tier: (live && current?.tierId) || options.tiers[0]?.id || "",
               months: "1",
-              modules: renewalOnly ? [...current!.addOns] : [],
+              modules: live && current ? [...current.addOns] : [],
               code: "",
             }}
           />

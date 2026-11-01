@@ -18,5 +18,6 @@ export const REFUND_TERMS: readonly string[] = [
   "Si lo pides en ese plazo te devolvemos el importe completo; después, solo los meses completos que todavía no empiezan.",
   "El reembolso se hace por el mismo medio con el que pagaste, en un plazo de hasta 20 días hábiles. Al reembolsarse, la vigencia del plan se ajusta a lo que sí se pagó.",
   "Las compras pagadas por completo con un código de descuento no tienen reembolso.",
+  "Si cambias a un plan menor mientras el tuyo está vigente, el cambio empieza al pagar y la diferencia de los días que te quedaban no se devuelve.",
   "Tus datos no se borran por pedir un reembolso: al terminar la vigencia, la empresa queda en solo lectura y puedes exportarlos.",
 ];

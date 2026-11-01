@@ -76,7 +76,7 @@ export async function checkoutAction(
       applied: {
         code: result.code,
         percentOff: result.percentOff,
-        quotes: quoteTable(result.percentOff),
+        quotes: quoteTable(result.percentOff, result.carry),
       },
       answers,
     };

@@ -112,7 +112,7 @@ export default async function OrderPage({
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Meses</dt>
-            <dd>{order.months}</dd>
+            <dd>{order.months === 0 ? "Solo el cambio" : order.months}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Subtotal</dt>

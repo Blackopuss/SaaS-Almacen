@@ -55,12 +55,15 @@ export function CheckoutForm({
   refundTerms,
   initial,
   addOns,
-  lockAddOns = false,
+  changeUntil = null,
 }: {
   /** Modules that can be added on top of Inventario. */
   addOns: AddOnOption[];
-  /** Renewal of a live plan: the modules stay as they are. */
-  lockAddOns?: boolean;
+  /**
+   * End of the live plan («15 dic 2026»): offers paying only the change
+   * until then (0 months, BIL-08). Null without a live plan.
+   */
+  changeUntil?: string | null;
   tiers: TierCard[];
   months: number[];
   quotes: Record<string, ShownQuote>;
@@ -96,7 +99,7 @@ export function CheckoutForm({
         refundTerms={refundTerms}
         busy={busy}
         addOns={addOns}
-        lockAddOns={lockAddOns}
+        changeUntil={changeUntil}
       />
     </form>
   );
@@ -127,10 +130,10 @@ function Choices({
   refundTerms,
   busy,
   addOns,
-  lockAddOns,
+  changeUntil,
 }: {
   addOns: AddOnOption[];
-  lockAddOns: boolean;
+  changeUntil: string | null;
   state: CheckoutState;
   values: CheckoutValues;
   tiers: TierCard[];
@@ -220,56 +223,52 @@ function Choices({
           </div>
         </fieldset>
 
-        {lockAddOns ? (
-          modules.map((module) => (
-            <input key={module} type="hidden" name="modules" value={module} />
-          ))
-        ) : (
-          <fieldset className="space-y-3">
-            <legend className="text-lg font-semibold">Módulos</legend>
-            {addOns.map((option) => (
-              <label
-                key={option.id}
-                className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
-              >
-                <input
-                  type="checkbox"
-                  name="modules"
-                  value={option.id}
-                  defaultChecked={modules.includes(option.id)}
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setModules((chosen) =>
-                      checked
-                        ? [...chosen, option.id]
-                        : chosen.filter((id) => id !== option.id),
-                    );
-                  }}
-                  className="mt-0.5 size-5 accent-primary"
-                />
-                <span>
-                  <span className="block font-medium">
-                    Agregar {option.name}{" "}
-                    <span className="font-normal text-muted-foreground tabular-nums">
-                      (+{chosenTier?.addOnMonthly[option.id]} al mes)
-                    </span>
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    {option.summary}
+        <fieldset className="space-y-3">
+          <legend className="text-lg font-semibold">Módulos</legend>
+          {addOns.map((option) => (
+            <label
+              key={option.id}
+              className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+            >
+              <input
+                type="checkbox"
+                name="modules"
+                value={option.id}
+                defaultChecked={modules.includes(option.id)}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setModules((chosen) =>
+                    checked
+                      ? [...chosen, option.id]
+                      : chosen.filter((id) => id !== option.id),
+                  );
+                }}
+                className="mt-0.5 size-5 accent-primary"
+              />
+              <span>
+                <span className="block font-medium">
+                  Agregar {option.name}{" "}
+                  <span className="font-normal text-muted-foreground tabular-nums">
+                    (+{chosenTier?.addOnMonthly[option.id]} al mes)
                   </span>
                 </span>
-              </label>
-            ))}
-          </fieldset>
-        )}
+                <span className="block text-sm text-muted-foreground">
+                  {option.summary}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
 
         <fieldset className="space-y-3">
           <legend className="text-lg font-semibold">¿Por cuántos meses?</legend>
           {errors.months && (
             <p className="text-sm text-destructive">{errors.months}</p>
           )}
-          <div className="grid grid-cols-4 gap-1 rounded-xl border bg-muted p-1 sm:inline-grid">
-            {months.map((each) => (
+          <div
+            className={`grid gap-1 rounded-xl border bg-muted p-1 sm:inline-grid ${changeUntil ? "grid-cols-5" : "grid-cols-4"}`}
+          >
+            {(changeUntil ? [0, ...months] : months).map((each) => (
               <label
                 key={each}
                 className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:px-4"
@@ -282,7 +281,9 @@ function Choices({
                   onChange={() => setLength(String(each))}
                   className="sr-only"
                 />
-                {each} {each === 1 ? "mes" : "meses"}
+                {each === 0
+                  ? "Solo el cambio"
+                  : `${each} ${each === 1 ? "mes" : "meses"}`}
               </label>
             ))}
           </div>
@@ -374,10 +375,20 @@ function Choices({
                 .filter((option) => modules.includes(option.id))
                 .map((option) => ` + ${option.name}`)
                 .join("")}{" "}
-              · {length} {length === "1" ? "mes" : "meses"}
+              {length !== "0" &&
+                ` · ${length} ${length === "1" ? "mes" : "meses"}`}
             </dt>
-            <dd>{shown?.subtotal}</dd>
+            <dd>{shown?.forMonths ?? ""}</dd>
           </div>
+          {shown?.prorated && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">
+                Diferencia por los días que te quedan
+                {changeUntil ? ` (hasta el ${changeUntil})` : ""}
+              </dt>
+              <dd>{shown.prorated}</dd>
+            </div>
+          )}
           {shown?.discount && (
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Descuento</dt>

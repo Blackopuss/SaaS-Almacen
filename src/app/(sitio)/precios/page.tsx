@@ -35,6 +35,11 @@ const FAQ = [
       "Sí. Nada se borra: tus órdenes, ventas, cotizaciones y cuentas quedan para consultar y exportar, y si lo vuelves a activar sigues donde te quedaste.",
   },
   {
+    question: "¿Puedo cambiar de plan a medio mes?",
+    answer:
+      "Sí. Si subes de nivel o agregas un módulo, empieza en cuanto pagas y solo pagas la diferencia de los días que te quedan. Si bajas, también empieza al pagar y conservas tus días, pero la diferencia no se devuelve.",
+  },
+  {
     question: "¿Hay permanencia?",
     answer:
       "No. Pagas por adelantado 1, 3, 6 o 12 meses y nada se cobra solo. Si no renuevas, tu cuenta queda en modo consulta para que veas y descargues tu información.",

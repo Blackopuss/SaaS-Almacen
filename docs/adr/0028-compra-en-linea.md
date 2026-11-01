@@ -19,6 +19,8 @@ El fundador pidió que los planes se puedan comprar en línea con los medios má
 - **La base cuida lo cobrado:** disparadores impiden cambiar importes, plan o proveedor de una orden, sacarla de un estado final o borrarla; `CHECK` de meses (1/3/6/12), importes (`total = subtotal − descuento + IVA`) y moneda.
 - **Bitácora:** `plan.purchased` con el titular como autor.
 
+- **Cambiar de plan mientras está vigente (BIL-08..10, 2026-11-01).** Ya no hace falta escribirnos: el titular puede renovar igual, subir o bajar de nivel y agregar o quitar módulos. Regla única: el plan nuevo empieza al pagar y conserva los días que quedan (los meses comprados se suman al final). Si cuesta más al mes, se cobra la diferencia por esos días: (precio nuevo − precio actual) × días ÷ 30, a centavos; si cuesta menos, la diferencia no se devuelve (aviso en pantalla y en `REFUND_TERMS`). «Solo el cambio» (0 meses) paga únicamente esa diferencia hasta el fin del plan actual, y solo existe cuando hay diferencia que pagar. El precio actual se calcula con la lista de hoy (`monthlyPrice`), no con lo que se pagó. Bajar de nivel no borra nada: lo que pase del cupo nuevo se queda y solo se bloquean altas nuevas. Un plan sin fecha de término o hecho a mano por el personal sigue sin cambiarse en línea. La orden guarda `prorated` y `proratedDays` (inmutables).
+
 ## Lo que no se hace (todavía)
 
 - Reembolsos desde el sistema: se hacen en el panel del proveedor y el personal ajusta la vigencia con una anulación manual (ADR 0027). Un registro de reembolso propio vendrá con BIL-12/13.

@@ -37,6 +37,8 @@ const { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_IDS } =
   await import("@/platform/legal/documents");
 const { registerEntry, registerExit, registerInitialBalance } =
   await import("@/modules/inventory");
+const { openCashSession, registerSale, setSalePrices } =
+  await import("@/modules/sales");
 const { chromium } = await import("playwright");
 
 const BASE = process.env.LOAD_BASE_URL ?? "http://localhost:3100";
@@ -71,6 +73,8 @@ type Company = {
   organizationId: string;
   email: string;
   productIds: string[];
+  /** Sales made at the counter, for the screens of Ventas. */
+  saleIds: string[];
 };
 
 /** The company of a previous run, with a new password for its reader. */
@@ -94,15 +98,23 @@ async function reuse(size: number): Promise<Company | null> {
     where: { organizationId },
     select: { id: true },
   });
+  const sales = await db.sale.findMany({
+    where: { organizationId },
+    select: { id: true },
+  });
   return {
     size,
     organizationId,
     email: reader.email,
     productIds: products.map((p) => p.id),
+    saleIds: sales.map((sale) => sale.id),
   };
 }
 
-/** A company with Inventario, a titular and a person of Almacén. */
+/**
+ * A company with Inventario and Ventas, a titular, and a person of Almacén
+ * who also charges at the counter (Cajero), with their register open.
+ */
 async function seed(size: number): Promise<Company> {
   const ownerId = newId();
   const organizationId = newId();
@@ -127,6 +139,7 @@ async function seed(size: number): Promise<Company> {
   });
   for (const grant of [
     { kind: "MODULE" as const, key: "inventory", value: null },
+    { kind: "MODULE" as const, key: "sales", value: null },
     { kind: "LIMIT" as const, key: "active_products", value: size },
     { kind: "LIMIT" as const, key: "users", value: 5 },
   ]) {
@@ -167,8 +180,13 @@ async function seed(size: number): Promise<Company> {
   await db.membership.create({
     data: { id: membershipId, organizationId, userId },
   });
-  await db.membershipRole.create({
-    data: { id: newId(), organizationId, membershipId, role: "warehouse" },
+  await db.membershipRole.createMany({
+    data: (["warehouse", "cashier"] as const).map((role) => ({
+      id: newId(),
+      organizationId,
+      membershipId,
+      role,
+    })),
   });
 
   // Products in bulk (the catalog does not depend on how they were made);
@@ -217,7 +235,33 @@ async function seed(size: number): Promise<Company> {
     }
     n++;
   }
-  return { size, organizationId, email, productIds };
+
+  // Ventas: prices for part of the catalog and a history of counter sales
+  // charged through the real service (one in ten products, up to 300).
+  const sold = productIds.filter((_, i) => i % 10 === 0).slice(0, 300);
+  for (const productId of sold) {
+    await must(
+      setSalePrices(actor, productId, {
+        unitPrice: "25.50",
+        presentations: {},
+      }),
+    );
+  }
+  await must(openCashSession(actor, { openingFloat: "500" }));
+  await must(
+    openCashSession({ organizationId, userId }, { openingFloat: "500" }),
+  );
+  const saleIds: string[] = [];
+  for (const productId of sold) {
+    const sale = await registerSale(actor, {
+      lines: [{ productId, capture: "base", quantity: "2" }],
+      payments: [{ method: "CASH" }],
+      idempotencyKey: newId(),
+    });
+    if (!sale.ok) throw new Error(JSON.stringify(sale));
+    saleIds.push(sale.saleId);
+  }
+  return { size, organizationId, email, productIds, saleIds };
 }
 
 /** Signs in through the real form and returns the session cookie header. */
@@ -256,6 +300,12 @@ function screens(company: Company) {
     Movimientos: () => "/movimientos",
     "Movimientos de un producto": () =>
       `/movimientos?producto=${pick(company.productIds)}`,
+    "Ventas (mostrador)": () => "/ventas",
+    "Historial de ventas": () => "/ventas/historial",
+    Venta: () => `/ventas/${pick(company.saleIds)}`,
+    Caja: () => "/ventas/caja",
+    Cotizaciones: () => "/ventas/cotizaciones",
+    "Cuentas por cobrar": () => "/ventas/cuentas",
   };
 }
 

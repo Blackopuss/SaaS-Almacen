@@ -67,11 +67,13 @@ export {
   addOnKey,
   addOnsOf,
   isAddOnModule,
+  monthlyPrice,
   planText,
   quote,
 } from "./prices";
 export type {
   AddOnModule,
+  CurrentPlanCarry,
   PlanTier,
   PurchaseMonths,
   Quote,

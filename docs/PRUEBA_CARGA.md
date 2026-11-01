@@ -47,6 +47,22 @@ en `solo` o `real`, o si alguna respuesta no es 200.
 
 Ninguna respuesta con error en ninguna corrida.
 
+### Con Ventas (2026-11-01)
+
+Las empresas de prueba tienen además Ventas: precio en uno de cada diez productos (hasta 300), una caja abierta y una venta cobrada por cada uno de esos productos; quien lee es Almacén y Cajero. Con 20 personas con pausas (p95 en ms):
+
+| Pantalla | 100 · real | 1,000 · real | 10,000 · real |
+| --- | ---: | ---: | ---: |
+| Inventario, otra página | 218 | 156 | 312 |
+| Ventas (mostrador) | 117 | 140 | 160 |
+| Historial de ventas | 120 | 161 | 152 |
+| Venta | 170 | 121 | 207 |
+| Caja | 124 | 123 | 94 |
+| Cotizaciones | 114 | 120 | 102 |
+| Cuentas por cobrar | 154 | 100 | 108 |
+
+Todas las pantallas quedaron por debajo de 500 ms en p95 y sin respuestas con error.
+
 ## Esfuerzo (20 personas sin pausa)
 
 Sin pausas, un proceso de Node atiende de 22 a 30 lecturas por segundo y el

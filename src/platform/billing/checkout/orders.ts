@@ -30,16 +30,18 @@ import {
   addOnsOf,
   findTier,
   isPurchaseMonths,
+  monthlyPrice,
   planText,
   quote,
   type PlanTier,
   type AddOnModule,
+  type CurrentPlanCarry,
   type PurchaseMonths,
   type Quote,
   type SoldModule,
 } from "../prices";
 import { setEntitlement } from "../provisioning";
-import { extendValidity } from "../validity";
+import { extendValidity, mexicoDay } from "../validity";
 import { CODE_REJECTED, findUsableCode, redeemCode } from "./codes";
 import type { PaymentProvider, ProviderId, WebhookRequest } from "./provider";
 import { enabledProviders, findProvider } from "./providers";
@@ -186,21 +188,97 @@ async function readPlan(
   };
 }
 
-/** Why this purchase cannot be made over the current plan, if it cannot. */
-function planConflict(
-  plan: CurrentPlan | null,
-  tier: PlanTier,
-  addOns: readonly AddOnModule[],
-): string | null {
-  if (!plan || !plan.live) return null;
-  if (plan.validUntil === null) {
+/**
+ * Why a purchase cannot be made over the current plan, if it cannot. While
+ * a plan is live it can be renewed or changed (BIL-08..10): the new plan
+ * starts at the payment and keeps the days left. A plan with no end, or one
+ * staff made by hand, is not bought online.
+ */
+function planConflict(plan: CurrentPlan | null, months: number): string | null {
+  const live = plan?.live === true;
+  if (live && plan!.validUntil === null) {
     return "Tu plan no tiene fecha de término: no necesitas comprarlo.";
   }
-  if (plan.tierId !== tier.id || addOnKey(plan.addOns) !== addOnKey(addOns)) {
-    // shortcut: changing tier or modules mid-period needs prorating (BIL-08/09); until then only renewals of the same plan.
-    return `Mientras tu plan esté vigente puedes renovarlo igual. Para cambiar de nivel o de módulos escríbenos a ${CONTACT_EMAIL}.`;
+  if (live && plan!.tierId === null) {
+    return `Tu plan es especial y no se cambia en línea. Escríbenos a ${CONTACT_EMAIL}.`;
   }
+  if (!live && months === 0) return MONTHS_NEEDED;
   return null;
+}
+
+const MONTHS_NEEDED = "Elige por cuántos meses.";
+
+/** The live plan a purchase changes: what it costs a month and days left. */
+function carryOf(plan: CurrentPlan | null, now: Date): CurrentPlanCarry | null {
+  if (!plan?.live || !plan.validUntil || !plan.tierId) return null;
+  const tier = findTier(plan.tierId);
+  if (!tier) return null;
+  return {
+    monthly: monthlyPrice(tier, plan.addOns).toFixed(2),
+    daysLeft: Math.max(
+      0,
+      Math.round(
+        (mexicoDay(plan.validUntil).getTime() - mexicoDay(now).getTime()) /
+          86_400_000,
+      ),
+    ),
+  };
+}
+
+/** Same plan as when it was priced: tier, modules and end. */
+const samePlan = (a: CurrentPlan | null, b: CurrentPlan | null) =>
+  (a?.live ?? false) === (b?.live ?? false) &&
+  (a?.tierId ?? null) === (b?.tierId ?? null) &&
+  addOnKey(a?.addOns ?? []) === addOnKey(b?.addOns ?? []) &&
+  (a?.validUntil?.getTime() ?? null) === (b?.validUntil?.getTime() ?? null);
+
+/**
+ * The price of a choice over the company's plan now; a choice of 0 months
+ * that costs nothing more is not a purchase.
+ */
+async function priceOf(
+  organizationId: string,
+  choice: { tier: PlanTier; modules: AddOnModule[]; months: number },
+  percentOff: number,
+  now: Date,
+): Promise<
+  | {
+      ok: true;
+      plan: CurrentPlan | null;
+      carry: CurrentPlanCarry | null;
+      price: Quote;
+    }
+  | { ok: false; result: Fail }
+> {
+  const plan = await readPlan(db, organizationId, now);
+  const conflict = planConflict(plan, choice.months);
+  if (conflict) {
+    return {
+      ok: false,
+      result:
+        conflict === MONTHS_NEEDED
+          ? fail(undefined, { months: conflict })
+          : fail(conflict),
+    };
+  }
+  const carry = carryOf(plan, now);
+  const price = quote(
+    choice.tier,
+    choice.modules,
+    choice.months,
+    percentOff,
+    carry,
+  );
+  if (choice.months === 0 && price.prorated === "0.00") {
+    return {
+      ok: false,
+      result: fail(undefined, {
+        months:
+          "Ese cambio no cuesta más por los días que te quedan: elige por cuántos meses.",
+      }),
+    };
+  }
+  return { ok: true, plan, carry, price };
 }
 
 // ── What the titular can choose ─────────────────────────────────────────
@@ -216,6 +294,8 @@ export type CheckoutOptions = {
   months: readonly PurchaseMonths[];
   providers: { id: ProviderId; label: string }[];
   current: CurrentPlan | null;
+  /** The live plan a purchase would change (BIL-08); null if none. */
+  carry: CurrentPlanCarry | null;
   refundTerms: readonly string[];
 };
 
@@ -223,6 +303,8 @@ export async function getCheckoutOptions(
   actor: Actor,
 ): Promise<CheckoutOptions> {
   await assertOwnerAction(actor.organizationId, actor.userId, PERMISSION);
+  const now = new Date();
+  const current = await readPlan(db, actor.organizationId, now);
   return {
     tiers: PLAN_TIERS.map((tier) => ({
       id: tier.id,
@@ -235,7 +317,8 @@ export async function getCheckoutOptions(
     })),
     months: PURCHASE_MONTHS,
     providers: enabledProviders().map(({ id, label }) => ({ id, label })),
-    current: await readPlan(db, actor.organizationId, new Date()),
+    current,
+    carry: current?.live && current.tierId ? carryOf(current, now) : null,
     refundTerms: REFUND_TERMS,
   };
 }
@@ -252,9 +335,12 @@ const choiceSchema = z.object({
     return tier;
   }),
   modules: z.array(z.string().max(20)).max(10).transform(addOnsOf),
-  months: z.coerce.number().refine(isPurchaseMonths, {
-    message: "Elige 1, 3, 6 o 12 meses.",
-  }) as z.ZodType<PurchaseMonths>,
+  // 0 = only the difference until the live plan ends (BIL-08).
+  months: z.coerce
+    .number()
+    .refine((value) => value === 0 || isPurchaseMonths(value), {
+      message: "Elige 1, 3, 6 o 12 meses.",
+    }) as z.ZodType<PurchaseMonths | 0>,
   code: z
     .string()
     .trim()
@@ -328,7 +414,15 @@ export async function previewCode(
   input: Omit<CheckoutInput, "provider">,
   headers: Headers,
 ): Promise<
-  { ok: true; code: string; percentOff: number; quote: Quote } | Fail
+  | {
+      ok: true;
+      code: string;
+      percentOff: number;
+      quote: Quote;
+      /** The live plan it was priced over, for the rest of the table. */
+      carry: CurrentPlanCarry | null;
+    }
+  | Fail
 > {
   await assertOwnerAction(actor.organizationId, actor.userId, PERMISSION);
   const choice = parseChoice({ ...input, provider: "" });
@@ -339,11 +433,19 @@ export async function previewCode(
   if (wait > 0) return fail(tooManyAttemptsMessage(wait));
   const usable = await findUsableCode(db, code);
   if (!usable) return fail(undefined, { code: CODE_REJECTED });
+  const priced = await priceOf(
+    actor.organizationId,
+    { tier, modules, months },
+    usable.percentOff,
+    new Date(),
+  );
+  if (!priced.ok) return priced.result;
   return {
     ok: true,
     code: usable.code,
     percentOff: usable.percentOff,
-    quote: quote(tier, modules, months, usable.percentOff),
+    quote: priced.price,
+    carry: priced.carry,
   };
 }
 
@@ -367,7 +469,14 @@ export async function startCheckout(
 
   const usable = code ? await findUsableCode(db, code) : null;
   if (code && !usable) return fail(undefined, { code: CODE_REJECTED });
-  const price = quote(tier, modules, months, usable?.percentOff ?? 0);
+  const priced = await priceOf(
+    actor.organizationId,
+    { tier, modules, months },
+    usable?.percentOff ?? 0,
+    new Date(),
+  );
+  if (!priced.ok) return priced.result;
+  const { price, carry } = priced;
   const free = dec(price.total).isZero();
 
   let provider: PaymentProvider | null = null;
@@ -384,12 +493,16 @@ export async function startCheckout(
   try {
     await db.$transaction(async (tx) => {
       await lockCompany(tx, actor.organizationId);
-      const conflict = planConflict(
-        await readPlan(tx, actor.organizationId, now),
-        tier,
-        modules,
-      );
-      if (conflict) throw new Rejected(fail(conflict));
+      // Priced over the plan as it was a moment ago: it must still be so.
+      if (
+        !samePlan(await readPlan(tx, actor.organizationId, now), priced.plan)
+      ) {
+        throw new Rejected(
+          fail(
+            "Tu plan acaba de cambiar. Vuelve a cargar la página y elige otra vez.",
+          ),
+        );
+      }
       const pending = await tx.checkoutOrder.count({
         where: {
           organizationId: actor.organizationId,
@@ -415,6 +528,8 @@ export async function startCheckout(
           includedUsers: tier.users,
           modules: ["inventory", ...modules].join(","),
           months,
+          prorated: price.prorated,
+          proratedDays: price.prorated === "0.00" ? null : carry!.daysLeft,
           subtotal: price.subtotal,
           discount: price.discount,
           // VAT charged on top: none, the prices already include it.

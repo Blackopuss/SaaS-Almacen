@@ -1,4 +1,4 @@
-import { dec, type Decimal } from "@/lib";
+import { Decimal, dec } from "@/lib";
 
 /**
  * Price list of the online purchase (ADR 0028). The single source of the
@@ -117,7 +117,13 @@ export function isPurchaseMonths(value: number): value is PurchaseMonths {
 export type Quote = {
   /** Monthly price of what was chosen, VAT included. */
   monthly: string;
-  /** monthly × months. */
+  /**
+   * Changing plan while the current one is live (BIL-08/09): what the new
+   * plan costs more for the days left of the current one. "0.00" when it
+   * costs the same or less (a smaller plan is not refunded).
+   */
+  prorated: string;
+  /** monthly × months, plus `prorated`. */
   subtotal: string;
   /** Discount of a code, taken from the subtotal. */
   discount: string;
@@ -125,29 +131,70 @@ export type Quote = {
   total: string;
 };
 
+/** The plan a change starts from: its monthly price and days left. */
+export type CurrentPlanCarry = {
+  /** «598.00»: today's price of the tier and modules it has. */
+  monthly: string;
+  /** Whole calendar days until it ends; 0 = it ends today. */
+  daysLeft: number;
+};
+
+/** A month of the price list, for prorating days (BIL-08). */
+export const DAYS_PER_MONTH = 30;
+
 const money = (value: Decimal) => value.toDecimalPlaces(2).toFixed(2);
+
+/** The monthly price of a tier with its modules. */
+export function monthlyPrice(
+  tier: PlanTier,
+  modules: readonly SoldModule[],
+): Decimal {
+  const chosen = new Set<SoldModule>(["inventory", ...modules]);
+  let monthly = dec(0);
+  for (const sold of chosen) monthly = monthly.plus(tier.prices[sold]);
+  return monthly;
+}
 
 /**
  * What a purchase costs: the monthly price of the tier and its modules
  * times the months, minus a code's discount (a whole percentage). Prices
  * include VAT, so nothing is added on top. Rounded to cents, half up.
+ *
+ * Over a live plan (`carry`), the new plan applies from the payment: what
+ * it costs more per month is charged for the days left (difference ×
+ * days ÷ 30), and those days are kept. A plan that costs less is not
+ * refunded. Months may be 0 then: only the difference until the current
+ * end.
  */
 export function quote(
   tier: PlanTier,
   modules: readonly SoldModule[],
-  months: PurchaseMonths,
+  months: number,
   percentOff = 0,
+  carry: CurrentPlanCarry | null = null,
 ): Quote {
   if (!Number.isInteger(percentOff) || percentOff < 0 || percentOff > 100) {
     throw new Error(`percentOff must be 0..100, got ${percentOff}`);
   }
-  const chosen = new Set<SoldModule>(["inventory", ...modules]);
-  let monthly = dec(0);
-  for (const sold of chosen) monthly = monthly.plus(tier.prices[sold]);
-  const subtotal = monthly.times(months);
+  if (!Number.isInteger(months) || months < 0 || months > 12) {
+    throw new Error(`months must be 0..12, got ${months}`);
+  }
+  const monthly = monthlyPrice(tier, modules);
+  const difference = carry
+    ? Decimal.max(monthly.minus(carry.monthly), 0)
+    : dec(0);
+  const prorated = dec(
+    money(
+      difference
+        .times(Math.max(0, carry?.daysLeft ?? 0))
+        .dividedBy(DAYS_PER_MONTH),
+    ),
+  );
+  const subtotal = monthly.times(months).plus(prorated);
   const discount = dec(money(subtotal.times(percentOff).dividedBy(100)));
   return {
     monthly: money(monthly),
+    prorated: money(prorated),
     subtotal: money(subtotal),
     discount: money(discount),
     total: money(subtotal.minus(discount)),
