@@ -71,7 +71,12 @@ export default async function SalidaRapidaPage({
       {back}
       <PageHeader
         title="Registrar salida"
-        description="Lo que se vendió o se usó. No cobra ni genera ticket."
+        description={
+          // VEN-25: with Ventas, a sale charged there already left the stock.
+          access.moduleState("sales") === "none"
+            ? "Lo que se vendió o se usó. No cobra ni genera ticket."
+            : "Lo que se usó o se perdió. Lo que cobras en Ventas ya salió solo: no lo registres aquí."
+        }
       />
       <QuickExitForm
         idempotencyKey={newId()}

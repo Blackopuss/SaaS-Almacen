@@ -17,6 +17,7 @@ import {
   listExitImportFailures,
   reviewExitImport,
 } from "@/modules/inventory";
+import { countSalesBetween } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 
 import { CancelExitImport, ConfirmExitImport } from "./exit-import-buttons";
@@ -109,6 +110,18 @@ export default async function SalidasImportadasPage({
     access.allows("inventory.import.cancel");
   const failures =
     progress.failedRows > 0 ? await listExitImportFailures(actor, id) : [];
+  // VEN-25: with Ventas, what was charged there already left the stock;
+  // the same sales coming from another system would leave twice.
+  const withSales =
+    status === "READY" &&
+    Boolean(check?.ready && check.firstDay && check.lastDay) &&
+    access.moduleState("sales") !== "none";
+  const salesInDays =
+    withSales && check?.firstDay && check.lastDay
+      ? access.can("sales.sale.read")
+        ? await countSalesBetween(actor, check.firstDay, check.lastDay)
+        : null
+      : 0;
   const pending =
     progress.totalRows -
     progress.appliedRows -
@@ -174,6 +187,36 @@ export default async function SalidasImportadasPage({
               )}
             </p>
           </div>
+
+          {withSales && salesInDays !== 0 && (
+            <p
+              role="status"
+              className="flex max-w-3xl items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm"
+            >
+              <CircleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-warning"
+              />
+              <span>
+                {salesInDays === null ? (
+                  <span className="font-medium">
+                    Tu empresa cobra en Ventas:
+                  </span>
+                ) : (
+                  <span className="font-medium">
+                    En esas fechas se cobraron{" "}
+                    {salesInDays === 1
+                      ? "1 venta"
+                      : `${count(salesInDays)} ventas`}{" "}
+                    en Ventas:
+                  </span>
+                )}{" "}
+                eso ya salió de tu inventario. Si este archivo trae esas mismas
+                ventas desde otro sistema, se descontarían dos veces: quítalas
+                del archivo antes de confirmar.
+              </span>
+            </p>
+          )}
 
           {check.alreadyImported > 0 && (
             <p

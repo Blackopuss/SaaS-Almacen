@@ -211,3 +211,37 @@ export async function listSaleCashiers(
     .map((member) => ({ userId: member.userId, name: member.user.name }))
     .sort((a, b) => a.name.localeCompare(b.name, "es-MX"));
 }
+
+/**
+ * How many sales (not cancelled) were charged between two days of the
+ * company's calendar, both included (VEN-25): an import of exits for those
+ * days may bring the same sales from another system and discount them twice.
+ */
+export async function countSalesBetween(
+  actor: SalesActor,
+  fromDay: string,
+  toDay: string,
+): Promise<number> {
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "sales.sale.read",
+  );
+  const client = forOrganization(actor.organizationId);
+  const organization = await client.membership.findFirst({
+    select: { organization: { select: { timeZone: true } } },
+  });
+  const timeZone = organization?.organization.timeZone ?? "America/Mexico_City";
+  const from = startOfDay(fromDay, timeZone);
+  const toStart = startOfDay(toDay, timeZone);
+  if (!from || !toStart) return 0;
+  return client.sale.count({
+    where: {
+      status: "COMPLETED",
+      createdAt: {
+        gte: from,
+        lt: new Date(toStart.getTime() + 24 * 60 * 60 * 1000),
+      },
+    },
+  });
+}

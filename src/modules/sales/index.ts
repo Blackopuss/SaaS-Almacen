@@ -174,7 +174,12 @@ export type {
   ReturnableLine,
   ReturnableSale,
 } from "./returns";
-export { SALE_PAGE_SIZE, listSaleCashiers, listSales } from "./history";
+export {
+  SALE_PAGE_SIZE,
+  countSalesBetween,
+  listSaleCashiers,
+  listSales,
+} from "./history";
 export type { SaleFilters, SalePage, SaleSummary } from "./history";
 export {
   SALES_REPORT_KINDS,
