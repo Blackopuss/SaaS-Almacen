@@ -100,7 +100,7 @@ const headers = () =>
 
 const choice = (change: Partial<CheckoutInput> = {}): CheckoutInput => ({
   tier: "t100",
-  purchasing: false,
+  modules: [],
   months: 1,
   code: "",
   provider: "stripe",
@@ -147,7 +147,7 @@ describe("startCheckout with a provider", () => {
     const c = await company();
     const result = await startCheckout(
       actorOf(c),
-      choice({ purchasing: true, months: 3 }),
+      choice({ modules: ["purchasing"], months: 3 }),
       headers(),
       c.owner.email,
     );
@@ -357,19 +357,77 @@ describe("confirming the payment", () => {
   });
 });
 
+describe("modules (VEN-27)", () => {
+  it("Ventas is bought like the others; renewing keeps the same modules", async () => {
+    const c = await company();
+    const result = await startCheckout(
+      actorOf(c),
+      choice({ modules: ["sales", "purchasing", "sales", "crm"], months: 1 }),
+      headers(),
+      c.owner.email,
+    );
+    expect(result).toMatchObject({ ok: true });
+    // 349 + 179 + 249, VAT included; unknown modules are ignored.
+    expect(fake.createCalls.at(-1)?.total).toBe("777.00");
+    expect(
+      await db.checkoutOrder.findFirst({ where: { organizationId: c.org } }),
+    ).toMatchObject({ modules: "inventory,purchasing,sales" });
+
+    const paid = await company();
+    const code = await newCode(100, 1);
+    expect(
+      await startCheckout(
+        actorOf(paid),
+        choice({ code: code.code, modules: ["sales"], provider: "" }),
+        headers(),
+        paid.owner.email,
+      ),
+    ).toMatchObject({ ok: true });
+    expect([...(await getFreshEntitlements(paid.org)).modules].sort()).toEqual([
+      "inventory",
+      "sales",
+    ]);
+    // While live, only the same plan is renewed online.
+    expect(
+      await startCheckout(
+        actorOf(paid),
+        choice({ modules: ["sales", "purchasing"] }),
+        headers(),
+        paid.owner.email,
+      ),
+    ).toMatchObject({
+      ok: false,
+      formError: expect.stringMatching(/renovarlo igual/),
+    });
+    expect(
+      await startCheckout(
+        actorOf(paid),
+        choice({ modules: ["sales"] }),
+        headers(),
+        paid.owner.email,
+      ),
+    ).toMatchObject({ ok: true });
+  });
+});
+
 describe("codes", () => {
   it("a 100% code buys the plan at once, without a provider", async () => {
     const c = await company();
     const code = await newCode(100, 1);
     const preview = await previewCode(
       actorOf(c),
-      choice({ code: code.code.toLowerCase(), purchasing: true }),
+      choice({ code: code.code.toLowerCase(), modules: ["purchasing"] }),
       headers(),
     );
     expect(preview).toMatchObject({ ok: true, quote: { total: "0.00" } });
     const result = await startCheckout(
       actorOf(c),
-      choice({ code: code.code, purchasing: true, months: 12, provider: "" }),
+      choice({
+        code: code.code,
+        modules: ["purchasing"],
+        months: 12,
+        provider: "",
+      }),
       headers(),
       c.owner.email,
     );

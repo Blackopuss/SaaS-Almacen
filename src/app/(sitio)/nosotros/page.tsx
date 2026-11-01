@@ -62,7 +62,7 @@ export default function AboutPage() {
             </p>
             <p>
               Almacén nace de ese hueco: un inventario que hace bien lo
-              esencial, al que se le agregan módulos (Compras hoy; Ventas y
+              esencial, al que se le agregan módulos (Compras y Ventas hoy;
               clientes después) solo cuando tu negocio los necesita.
             </p>
           </div>

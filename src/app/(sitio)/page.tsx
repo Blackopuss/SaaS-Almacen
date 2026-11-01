@@ -83,7 +83,7 @@ export default function LandingPage() {
         />
         <div className="relative mx-auto grid max-w-6xl items-center gap-6 px-4 pt-10 pb-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-4 lg:pt-16 lg:pb-24">
           <div className="space-y-6 motion-safe:animate-in motion-safe:duration-700 motion-safe:fade-in motion-safe:slide-in-from-bottom-3">
-            <Eyebrow>Inventario + Compras para pymes</Eyebrow>
+            <Eyebrow>Inventario, Compras y Ventas para pymes</Eyebrow>
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               Tu almacén, <span className="text-primary">bajo control</span>.
             </h1>
@@ -246,8 +246,9 @@ export default function LandingPage() {
               Paga solo por lo que usas
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Inventario es la base. Compras se agrega cuando lo necesites, y se
-              quita sin perder nada: tus datos quedan para consultar y exportar.
+              Inventario es la base. Compras y Ventas se agregan cuando los
+              necesites, y se quitan sin perder nada: tus datos quedan para
+              consultar y exportar.
             </p>
             <Button asChild variant="outline" className="mt-6">
               <Link href="/precios">
@@ -262,8 +263,7 @@ export default function LandingPage() {
             <ModuleCard
               icon={ClipboardCheck}
               name="Ventas"
-              state="Próximamente"
-              soon
+              state="Disponible"
             />
             <ModuleCard
               icon={PackageSearch}

@@ -23,13 +23,17 @@ import { enqueueJob, type JobHandlers } from "@/platform/jobs";
 import { LOCKING_TRANSACTION, db, forOrganization } from "@/server";
 
 import {
+  ADD_ON_MODULES,
   PLAN_TIERS,
   PURCHASE_MONTHS,
+  addOnKey,
+  addOnsOf,
   findTier,
   isPurchaseMonths,
   planText,
   quote,
   type PlanTier,
+  type AddOnModule,
   type PurchaseMonths,
   type Quote,
   type SoldModule,
@@ -122,17 +126,21 @@ function newTransactionId(): string {
 export const formatMxn = (amount: { toString(): string } | string) =>
   `$${formatDecimal(dec(amount.toString()), { minScale: 2, maxScale: 2 })}`;
 
-const parseModules = (text: string): SoldModule[] =>
-  text
-    .split(",")
-    .filter((m): m is SoldModule => m === "inventory" || m === "purchasing");
+const parseModules = (text: string): SoldModule[] => {
+  const listed = text.split(",");
+  return [
+    ...(listed.includes("inventory") ? (["inventory"] as const) : []),
+    ...addOnsOf(listed),
+  ];
+};
 
 // ── The plan the company has now ────────────────────────────────────────
 
 type CurrentPlan = {
   tierId: string | null;
   productLimit: number | null;
-  purchasing: boolean;
+  /** The modules on top of Inventario that end with the plan. */
+  addOns: AddOnModule[];
   /** Null = no end date (granted by staff). */
   validUntil: Date | null;
   live: boolean;
@@ -159,18 +167,20 @@ async function readPlan(
   if (!products) return null;
   const end = products.validUntil;
   // The modules of the plan end when it ends; one removed earlier does not.
-  const purchasing = rows.some(
-    (row) =>
-      row.kind === "MODULE" &&
-      row.key === "purchasing" &&
-      (row.validUntil?.getTime() ?? null) === (end?.getTime() ?? null),
+  const addOns = ADD_ON_MODULES.filter((module) =>
+    rows.some(
+      (row) =>
+        row.kind === "MODULE" &&
+        row.key === module &&
+        (row.validUntil?.getTime() ?? null) === (end?.getTime() ?? null),
+    ),
   );
   return {
     tierId:
       PLAN_TIERS.find((tier) => tier.productLimit === products.value)?.id ??
       null,
     productLimit: products.value,
-    purchasing,
+    addOns,
     validUntil: end,
     live: products.validFrom <= now && (end === null || end > now),
   };
@@ -180,13 +190,13 @@ async function readPlan(
 function planConflict(
   plan: CurrentPlan | null,
   tier: PlanTier,
-  purchasing: boolean,
+  addOns: readonly AddOnModule[],
 ): string | null {
   if (!plan || !plan.live) return null;
   if (plan.validUntil === null) {
     return "Tu plan no tiene fecha de término: no necesitas comprarlo.";
   }
-  if (plan.tierId !== tier.id || plan.purchasing !== purchasing) {
+  if (plan.tierId !== tier.id || addOnKey(plan.addOns) !== addOnKey(addOns)) {
     // shortcut: changing tier or modules mid-period needs prorating (BIL-08/09); until then only renewals of the same plan.
     return `Mientras tu plan esté vigente puedes renovarlo igual. Para cambiar de nivel o de módulos escríbenos a ${CONTACT_EMAIL}.`;
   }
@@ -200,12 +210,8 @@ export type CheckoutOptions = {
     id: string;
     productLimit: number;
     users: number;
-    /** Quote of each length, without and with Compras. */
-    quotes: {
-      months: PurchaseMonths;
-      inventory: Quote;
-      withPurchasing: Quote;
-    }[];
+    /** Monthly price of each add-on in this tier. */
+    addOnMonthly: Record<AddOnModule, string>;
   }[];
   months: readonly PurchaseMonths[];
   providers: { id: ProviderId; label: string }[];
@@ -222,11 +228,10 @@ export async function getCheckoutOptions(
       id: tier.id,
       productLimit: tier.productLimit,
       users: tier.users,
-      quotes: PURCHASE_MONTHS.map((months) => ({
-        months,
-        inventory: quote(tier, [], months),
-        withPurchasing: quote(tier, ["purchasing"], months),
-      })),
+      addOnMonthly: {
+        purchasing: tier.prices.purchasing,
+        sales: tier.prices.sales,
+      },
     })),
     months: PURCHASE_MONTHS,
     providers: enabledProviders().map(({ id, label }) => ({ id, label })),
@@ -246,7 +251,7 @@ const choiceSchema = z.object({
     }
     return tier;
   }),
-  purchasing: z.boolean(),
+  modules: z.array(z.string().max(20)).max(10).transform(addOnsOf),
   months: z.coerce.number().refine(isPurchaseMonths, {
     message: "Elige 1, 3, 6 o 12 meses.",
   }) as z.ZodType<PurchaseMonths>,
@@ -259,7 +264,8 @@ const choiceSchema = z.object({
 
 export type CheckoutInput = {
   tier: string;
-  purchasing: boolean;
+  /** Add-ons on top of Inventario («purchasing», «sales»); others ignored. */
+  modules: readonly string[];
   months: number | string;
   code: string;
   /** Provider id; ignored when a code makes it free. */
@@ -293,7 +299,7 @@ const fail = (
 function parseChoice(input: CheckoutInput) {
   const parsed = choiceSchema.safeParse({
     tier: String(input.tier ?? ""),
-    purchasing: input.purchasing === true,
+    modules: Array.isArray(input.modules) ? input.modules.map(String) : [],
     months: input.months,
     code: String(input.code ?? ""),
   });
@@ -327,7 +333,7 @@ export async function previewCode(
   await assertOwnerAction(actor.organizationId, actor.userId, PERMISSION);
   const choice = parseChoice({ ...input, provider: "" });
   if (!choice.ok) return choice.result;
-  const { tier, purchasing, months, code } = choice.data;
+  const { tier, modules, months, code } = choice.data;
   if (!code) return fail(undefined, { code: "Escribe el código." });
   const wait = await reserveAttempt(attemptKeys(actor, headers));
   if (wait > 0) return fail(tooManyAttemptsMessage(wait));
@@ -337,12 +343,7 @@ export async function previewCode(
     ok: true,
     code: usable.code,
     percentOff: usable.percentOff,
-    quote: quote(
-      tier,
-      purchasing ? ["purchasing"] : [],
-      months,
-      usable.percentOff,
-    ),
+    quote: quote(tier, modules, months, usable.percentOff),
   };
 }
 
@@ -359,14 +360,13 @@ export async function startCheckout(
   await assertOwnerAction(actor.organizationId, actor.userId, PERMISSION);
   const choice = parseChoice(input);
   if (!choice.ok) return choice.result;
-  const { tier, purchasing, months, code } = choice.data;
+  const { tier, modules, months, code } = choice.data;
 
   const wait = await reserveAttempt(attemptKeys(actor, headers));
   if (wait > 0) return fail(tooManyAttemptsMessage(wait));
 
   const usable = code ? await findUsableCode(db, code) : null;
   if (code && !usable) return fail(undefined, { code: CODE_REJECTED });
-  const modules: SoldModule[] = purchasing ? ["purchasing"] : [];
   const price = quote(tier, modules, months, usable?.percentOff ?? 0);
   const free = dec(price.total).isZero();
 
@@ -387,7 +387,7 @@ export async function startCheckout(
       const conflict = planConflict(
         await readPlan(tx, actor.organizationId, now),
         tier,
-        purchasing,
+        modules,
       );
       if (conflict) throw new Rejected(fail(conflict));
       const pending = await tx.checkoutOrder.count({

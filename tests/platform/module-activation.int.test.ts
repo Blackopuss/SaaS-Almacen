@@ -84,7 +84,7 @@ describe("activateModule", () => {
     expect(await activeModules(org)).toEqual([]);
   });
 
-  it.each(["sales", "crm"])(
+  it.each(["crm"])(
     "refuses %s: announced but not available",
     async (moduleId) => {
       const { org } = await newCompany();

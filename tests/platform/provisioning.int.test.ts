@@ -243,7 +243,6 @@ describe("provisionCompany", () => {
   it.each([
     [["purchasing"], "Compras necesita Inventario."],
     [[], "Inventario es la base y siempre va incluido."],
-    [["inventory", "sales"], "Ventas todavía no está disponible."],
     [["inventory", "crm"], "CRM todavía no está disponible."],
     [["inventory", "payroll"], "Uno de los módulos no existe."],
   ])("rejects the modules %j", async (modules, message) => {

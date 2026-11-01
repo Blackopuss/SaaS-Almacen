@@ -6,15 +6,17 @@ import { NoAccessState, PageContainer, PageHeader } from "@/components";
 import { formatDate } from "@/lib";
 import { getAccess } from "@/platform/authorization";
 import {
+  ADD_ON_MODULES,
+  ADD_ON_SUMMARIES,
   CONTACT_EMAIL,
-  PLAN_TIERS,
+  SOLD_MODULE_NAMES,
   formatMxn,
   getCheckoutOptions,
   planText,
 } from "@/platform/billing";
 
 import { CheckoutForm, type TierCard } from "./checkout-form";
-import { quoteKey, showQuote, type ShownQuote } from "./quotes";
+import { quoteTable } from "./quotes";
 
 export const metadata: Metadata = { title: "Comprar plan" };
 
@@ -66,22 +68,23 @@ export default async function BuyPlanPage({
     userId: access.user.id,
   });
   const { current } = options;
-  const quotes: Record<string, ShownQuote> = {};
-  for (const tier of options.tiers) {
-    for (const each of tier.quotes) {
-      quotes[quoteKey(tier.id, each.months, false)] = showQuote(each.inventory);
-      quotes[quoteKey(tier.id, each.months, true)] = showQuote(
-        each.withPurchasing,
-      );
-    }
-  }
+  // Every combination priced on the server; the browser only looks up.
+  const quotes = quoteTable(0);
   const tiers: TierCard[] = options.tiers.map((tier) => ({
     id: tier.id,
     products: tier.productLimit.toLocaleString("es-MX"),
     users: tier.users,
-    purchasingMonthly: formatMxn(
-      PLAN_TIERS.find((t) => t.id === tier.id)?.prices.purchasing ?? "0",
+    addOnMonthly: Object.fromEntries(
+      ADD_ON_MODULES.map((module) => [
+        module,
+        formatMxn(tier.addOnMonthly[module]),
+      ]),
     ),
+  }));
+  const addOns = ADD_ON_MODULES.map((module) => ({
+    id: module,
+    name: SOLD_MODULE_NAMES[module],
+    summary: ADD_ON_SUMMARIES[module],
   }));
 
   // While the plan is live it can only be renewed as it is (the service decides).
@@ -91,7 +94,7 @@ export default async function BuyPlanPage({
   const lockedTier = renewalOnly ? (current?.tierId ?? null) : null;
   const currentText =
     current && current.productLimit !== null
-      ? planText(current.productLimit, current.purchasing ? ["purchasing"] : [])
+      ? planText(current.productLimit, current.addOns)
       : null;
 
   return (
@@ -140,7 +143,8 @@ export default async function BuyPlanPage({
             tiers={
               lockedTier ? tiers.filter((t) => t.id === lockedTier) : tiers
             }
-            lockPurchasing={renewalOnly}
+            addOns={addOns}
+            lockAddOns={renewalOnly}
             months={[...options.months]}
             quotes={quotes}
             providers={options.providers}
@@ -149,7 +153,7 @@ export default async function BuyPlanPage({
               tier:
                 (renewalOnly && current?.tierId) || options.tiers[0]?.id || "",
               months: "1",
-              purchasing: renewalOnly ? current!.purchasing : false,
+              modules: renewalOnly ? [...current!.addOns] : [],
               code: "",
             }}
           />

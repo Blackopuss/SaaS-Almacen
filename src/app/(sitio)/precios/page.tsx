@@ -10,7 +10,7 @@ import { PriceCalculator } from "./price-calculator";
 export const metadata: Metadata = {
   title: "Precios",
   description:
-    "Precio mensual según cuántos productos manejas. Inventario incluido; Compras opcional. Sin permanencia.",
+    "Precio mensual según cuántos productos manejas. Inventario incluido; Compras y Ventas opcionales. Sin permanencia.",
 };
 
 const TIERS = PROPOSED_TIERS.map((tier, index) => ({
@@ -30,9 +30,9 @@ const FAQ = [
       "Puedes seguir trabajando con lo que ya tienes; para dar de alta más productos cambias al siguiente nivel o archivas lo que ya no vendes.",
   },
   {
-    question: "¿Puedo quitar Compras después?",
+    question: "¿Puedo quitar Compras o Ventas después?",
     answer:
-      "Sí. Nada se borra: tus órdenes y proveedores quedan para consultar y exportar, y si lo vuelves a activar sigues donde te quedaste.",
+      "Sí. Nada se borra: tus órdenes, ventas, cotizaciones y cuentas quedan para consultar y exportar, y si lo vuelves a activar sigues donde te quedaste.",
   },
   {
     question: "¿Hay permanencia?",
@@ -49,8 +49,8 @@ export default function PricingPage() {
   return (
     <>
       <PageHero eyebrow="Precios" title="Pagas según el tamaño de tu catálogo">
-        Inventario siempre incluido. Agrega Compras cuando lo necesites. Sin
-        permanencia y con tus datos siempre exportables.
+        Inventario siempre incluido. Agrega Compras o Ventas cuando los
+        necesites. Sin permanencia y con tus datos siempre exportables.
       </PageHero>
 
       <Section className="pt-12 sm:pt-16">
@@ -73,7 +73,7 @@ export default function PricingPage() {
           className="mt-8 overflow-x-auto rounded-2xl border bg-card"
           data-reveal
         >
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">
               Precio mensual por nivel de productos activos
             </caption>
@@ -92,7 +92,10 @@ export default function PricingPage() {
                   + Compras
                 </th>
                 <th scope="col" className="px-5 py-3 text-right font-medium">
-                  Ambos
+                  + Ventas
+                </th>
+                <th scope="col" className="px-5 py-3 text-right font-medium">
+                  Todo
                 </th>
               </tr>
             </thead>
@@ -112,8 +115,11 @@ export default function PricingPage() {
                   <td className="px-5 py-4 text-right">
                     {formatMoney(tier.purchasing)}
                   </td>
+                  <td className="px-5 py-4 text-right">
+                    {formatMoney(tier.sales)}
+                  </td>
                   <td className="px-5 py-4 text-right font-semibold">
-                    {formatMoney(tier.inventory + tier.purchasing)}
+                    {formatMoney(tier.inventory + tier.purchasing + tier.sales)}
                   </td>
                 </tr>
               ))}
