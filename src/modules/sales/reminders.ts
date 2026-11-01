@@ -62,6 +62,11 @@ export async function getOverdueReminders(actor: SalesActor): Promise<boolean> {
     actor.userId,
     "sales.settings.update",
   );
+  await assertModulePermission(
+    actor.organizationId,
+    actor.userId,
+    "sales.settings.update",
+  );
   return readOverdueReminders(forOrganization(actor.organizationId));
 }
 

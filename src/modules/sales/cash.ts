@@ -1,6 +1,6 @@
 import "server-only";
 
-import { dec, newId, type Decimal } from "@/lib";
+import { ForbiddenError, dec, newId, type Decimal } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { listTeamMembers } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
@@ -240,27 +240,43 @@ export async function getMyCashSession(
   return open ? viewOf(actor.organizationId, open.id) : null;
 }
 
+/**
+ * A register already closed is history (VEN-26): with Ventas ended it can
+ * still be seen by whoever could see it; the role is checked as always.
+ */
+async function assertCashHistory(
+  actor: SalesActor,
+  permission: "sales.cash.operate" | "sales.cash.close",
+) {
+  try {
+    await assertModulePermission(
+      actor.organizationId,
+      actor.userId,
+      permission,
+    );
+  } catch (error) {
+    // The role passed (it is checked first): only the module ended.
+    if (error instanceof ForbiddenError && error.code === "module_read_only") {
+      return;
+    }
+    throw error;
+  }
+}
+
 /** A register, for a cash manager or for whoever opened it. */
 export async function getCashSession(
   actor: SalesActor,
   sessionId: string,
 ): Promise<CashSessionView | null> {
-  await assertModulePermission(
-    actor.organizationId,
-    actor.userId,
-    "sales.cash.operate",
-  );
+  await assertCashHistory(actor, "sales.cash.operate");
   const view = await viewOf(
     actor.organizationId,
     String(sessionId).slice(0, 36),
   );
   if (!view) return null;
-  if (view.openedByUserId === actor.userId) return view;
-  await assertModulePermission(
-    actor.organizationId,
-    actor.userId,
-    "sales.cash.close",
-  );
+  if (view.openedByUserId !== actor.userId) {
+    await assertCashHistory(actor, "sales.cash.close");
+  }
   return view;
 }
 

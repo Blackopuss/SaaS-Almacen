@@ -252,3 +252,4 @@ export type {
   SalesOrderSummary,
   SalesOrderView,
 } from "./sales-orders";
+export { salesOpenWork } from "./deactivation";

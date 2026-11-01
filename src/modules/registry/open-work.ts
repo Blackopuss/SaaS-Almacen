@@ -1,4 +1,5 @@
 import { purchasingOpenWork } from "@/modules/purchasing";
+import { salesOpenWork } from "@/modules/sales";
 
 /**
  * What each module would leave halfway if a company stopped having it
@@ -10,6 +11,7 @@ import { purchasingOpenWork } from "@/modules/purchasing";
 const OPEN_WORK: Record<string, (organizationId: string) => Promise<string[]>> =
   {
     purchasing: purchasingOpenWork,
+    sales: salesOpenWork,
   };
 
 export async function moduleOpenWork(

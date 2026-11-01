@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import {
   NoAccessState,
   NoModuleState,
+  ReadOnlyNotice,
   PageContainer,
   PageHeader,
 } from "@/components";
@@ -120,6 +121,12 @@ export default async function CorteCajaPage({
               </p>
             )}
           </section>
+          <CashSummary session={session} timeZone={timeZone} />
+        </div>
+      ) : access.moduleState("sales") === "read_only" ? (
+        // VEN-26: with Ventas ended a register can be seen, not closed.
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          <ReadOnlyNotice module="Ventas" />
           <CashSummary session={session} timeZone={timeZone} />
         </div>
       ) : (
