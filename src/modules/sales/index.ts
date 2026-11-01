@@ -56,12 +56,14 @@ export type { PortfolioReport } from "./portfolio";
 export {
   REMINDERS_PER_DAY,
   getAccountReminders,
+  MANUAL_REMINDERS_PER_DAY,
   getOverdueReminders,
+  requestPaymentReminder,
   readOverdueReminders,
   scheduleOverdueReminders,
   setOverdueReminders,
 } from "./reminders";
-export type { AccountReminder } from "./reminders";
+export type { AccountReminder, RequestReminderResult } from "./reminders";
 export { setSalesClock } from "./calendar";
 export {
   RECEIVABLE_PAGE_SIZE,

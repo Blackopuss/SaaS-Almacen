@@ -14,6 +14,7 @@ import {
   markQuoteSent,
   readOverdueReminders,
   registerReceivablePayment,
+  requestPaymentReminder,
   scheduleOverdueReminders,
   setInstallmentTerms,
   setOverdueReminders,
@@ -247,5 +248,95 @@ describe("reminders of overdue payments", () => {
     // Another company never sees them.
     const other = await salesCompany();
     expect(await getAccountReminders(other, receivableId)).toEqual([]);
+  });
+});
+
+describe("reminders sent by hand", () => {
+  it("go to the customer's card, once a day, even with the round off", async () => {
+    const { titular, cajera, organizationId, customerId, receivableId } =
+      await account();
+    // Nothing overdue yet: it reminds the next payment.
+    expect(await requestPaymentReminder(cajera, receivableId)).toMatchObject({
+      ok: false,
+      reason: "no_recipient",
+    });
+    const to = `cliente.${++mails}.${stamp}@obra.example`;
+    await setCustomerEmail(titular, customerId, to);
+    expect(await requestPaymentReminder(cajera, receivableId)).toEqual({
+      ok: true,
+      recipient: to,
+    });
+    expect(await requestPaymentReminder(cajera, receivableId)).toMatchObject({
+      ok: true,
+      repeated: true,
+    });
+    await drain();
+    const [mail] = memoryOutboxFor(to);
+    expect(mail!.subject).toContain("Recordatorio de pago");
+    expect(mail!.text).toContain("tu próximo pago");
+    expect(mail!.text).toContain("$500.00");
+    const cajeraEmail = (
+      await db.user.findFirstOrThrow({
+        where: { id: cajera.userId },
+        select: { email: true },
+      })
+    ).email;
+    expect(mail!.replyTo).toBe(cajeraEmail);
+    expect(await requestPaymentReminder(cajera, receivableId)).toMatchObject({
+      ok: false,
+      reason: "limit",
+    });
+
+    // Days later, overdue: the round still sends its own (once per
+    // installment), and a person can remind again.
+    travel(75);
+    await setOverdueReminders(titular, true);
+    expect(await scheduleOverdueReminders(organizationId)).toEqual({
+      queued: 1,
+    });
+    await drain();
+    expect(await requestPaymentReminder(cajera, receivableId)).toMatchObject({
+      ok: true,
+    });
+    await drain();
+    const sent = memoryOutboxFor(to);
+    expect(sent).toHaveLength(3);
+    expect(sent[2]!.text).toContain("$500.00 vencidos");
+    expect(
+      (await getAccountReminders(cajera, receivableId)).map((r) => [
+        r.manual,
+        r.status,
+      ]),
+    ).toEqual([
+      [true, "SENT"],
+      [false, "SENT"],
+      [true, "SENT"],
+    ]);
+  });
+
+  it("only who may mail customers; nothing for a paid account or another company", async () => {
+    const { titular, cajera, customerId, receivableId } = await account();
+    await setCustomerEmail(
+      titular,
+      customerId,
+      `cliente.${++mails}.${stamp}@obra.example`,
+    );
+    const consulta = await salesMember(titular.organizationId, "viewer");
+    await expect(
+      requestPaymentReminder(consulta, receivableId),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(
+      await requestPaymentReminder(await salesCompany(), receivableId),
+    ).toMatchObject({ ok: false, reason: "not_found" });
+    await registerReceivablePayment(cajera, receivableId, {
+      amount: "2500",
+      method: "CARD",
+      reference: "AUT-2",
+      idempotencyKey: newId(),
+    });
+    expect(await requestPaymentReminder(cajera, receivableId)).toMatchObject({
+      ok: false,
+      reason: "nothing_owed",
+    });
   });
 });

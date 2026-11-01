@@ -7,6 +7,7 @@ import { isAppError } from "@/lib";
 import {
   findReceivablePaymentByKey,
   registerReceivablePayment,
+  requestPaymentReminder,
 } from "@/modules/sales";
 import { getModuleAccess } from "@/platform/billing";
 import { requireOrganizationContext } from "@/platform/tenancy";
@@ -94,4 +95,37 @@ export async function checkPaymentAction(
     { organizationId: access.organization.id, userId: access.user.id },
     String(key ?? ""),
   );
+}
+
+/**
+ * Mails the customer of an account a reminder of their payment, by hand
+ * (founder, 2026-11-01). The address is the one of the customer's card;
+ * the account is looked for in the company of the session.
+ */
+export async function remindPaymentAction(
+  receivableId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const { user, organization } = await requireOrganizationContext();
+  const id = String(receivableId)
+    .replace(/[^0-9a-f-]/gi, "")
+    .slice(0, 36);
+  try {
+    const result = await requestPaymentReminder(
+      { organizationId: organization.id, userId: user.id },
+      id,
+    );
+    if (!result.ok) return { ok: false, error: result.message };
+    revalidatePath(`/ventas/cuentas/${id}`);
+    return {
+      ok: true,
+      message: result.repeated
+        ? `Ya hay un recordatorio en camino a ${result.recipient}.`
+        : `El recordatorio va en camino a ${result.recipient}.`,
+    };
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }

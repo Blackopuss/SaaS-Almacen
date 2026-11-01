@@ -1,6 +1,6 @@
 import "server-only";
 
-import { formatDateTime, newId } from "@/lib";
+import { formatDateTime, isAppError, newId } from "@/lib";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertOwnerAction } from "@/platform/authorization";
 import { assertModulePermission } from "@/platform/billing";
@@ -11,13 +11,18 @@ import {
 } from "@/platform/email";
 import { getFreshEntitlements } from "@/platform/entitlements";
 import { enqueueJob, type JobHandler } from "@/platform/jobs";
-import { LOCKING_TRANSACTION, forOrganization, type TenantDb } from "@/server";
+import {
+  LOCKING_TRANSACTION,
+  forOrganization,
+  lockRows,
+  type TenantDb,
+} from "@/server";
 
 import { dayOf, salesNow, timeZoneOf } from "./calendar";
 import { usableEmail } from "./email-address";
 import type { SalesActor } from "./prices";
 import { formatMoney } from "./pricing";
-import { findOverdue, formatDueDay, overdueOf } from "./receivables";
+import { findOverdue, formatDueDay, paymentStateOf } from "./receivables";
 
 /**
  * Reminders of overdue payments (PAG-07, ADR 0030): when the titular turns
@@ -151,18 +156,25 @@ export async function scheduleOverdueReminders(
   const overdue = await findOverdue(client, dayOf(now, timeZone));
   if (overdue.length === 0) return { queued: 0 };
   const reminded = await client.salesReceivableReminder.findMany({
-    where: { receivableId: { in: overdue.map((row) => row.receivableId) } },
-    select: { receivableId: true, installmentNumber: true },
+    where: {
+      receivableId: { in: overdue.map((row) => row.receivableId) },
+      autoInstallment: { not: null },
+    },
+    select: { receivableId: true, autoInstallment: true },
   });
+  // Only the round's own reminders count: one sent by hand does not.
   const done = new Set(
-    reminded.map((row) => `${row.receivableId}:${row.installmentNumber}`),
+    reminded.map((row) => `${row.receivableId}:${row.autoInstallment}`),
   );
   const pending = overdue.filter(
     (row) => !done.has(`${row.receivableId}:${row.latestDue}`),
   );
   if (pending.length === 0) return { queued: 0 };
   const sentToday = await client.salesReceivableReminder.count({
-    where: { requestedAt: { gte: new Date(now.getTime() - DAY_MS) } },
+    where: {
+      requestedByUserId: null,
+      requestedAt: { gte: new Date(now.getTime() - DAY_MS) },
+    },
   });
   const room = Math.max(0, REMINDERS_PER_DAY - sentToday);
   const accounts = await client.salesReceivable.findMany({
@@ -212,12 +224,154 @@ export async function scheduleOverdueReminders(
   return { queued };
 }
 
+/** Reminders sent by hand: one a day per account, so many a day per company. */
+export const MANUAL_REMINDERS_PER_DAY = 100;
+
+export type RequestReminderResult =
+  | { ok: true; recipient: string; repeated?: true }
+  | {
+      ok: false;
+      reason: "not_found" | "nothing_owed" | "no_recipient" | "limit";
+      message: string;
+    };
+
+/**
+ * Sends a customer a reminder by hand from their account (founder,
+ * 2026-11-01): what is overdue or, if nothing is, the next payment. Whoever
+ * mails statements may send it, whether automatic reminders are on or not.
+ */
+export async function requestPaymentReminder(
+  actor: SalesActor,
+  receivableId: string,
+): Promise<RequestReminderResult> {
+  const { organizationId, userId } = actor;
+  await assertModulePermission(organizationId, userId, "sales.receivable.read");
+  await assertModulePermission(organizationId, userId, "sales.customer.create");
+  const id = String(receivableId).slice(0, 36);
+  const timeZone = await timeZoneOf(organizationId);
+  return forOrganization(organizationId).$transaction(async (tx) => {
+    const [locked] = await lockRows(tx, "salesReceivable", [id]);
+    const account = locked
+      ? await tx.salesReceivable.findFirst({
+          where: { id: locked },
+          select: {
+            id: true,
+            number: true,
+            customer: { select: { name: true, email: true } },
+          },
+        })
+      : null;
+    if (!account) {
+      return {
+        ok: false as const,
+        reason: "not_found" as const,
+        message: "Esa cuenta ya no existe.",
+      };
+    }
+    const pending = await tx.salesReceivableReminder.findFirst({
+      where: { receivableId: account.id, status: "QUEUED" },
+      select: { recipient: true },
+    });
+    if (pending) {
+      return {
+        ok: true as const,
+        recipient: pending.recipient,
+        repeated: true as const,
+      };
+    }
+    const state = await paymentStateOf(
+      tx,
+      account.id,
+      dayOf(salesNow(), timeZone),
+    );
+    if (!state) {
+      return {
+        ok: false as const,
+        reason: "nothing_owed" as const,
+        message: "Esta cuenta ya no debe nada.",
+      };
+    }
+    const recipient = usableEmail(account.customer.email);
+    if (!recipient) {
+      return {
+        ok: false as const,
+        reason: "no_recipient" as const,
+        message: `${account.customer.name} no tiene correo en su ficha.`,
+      };
+    }
+    const since = new Date(salesNow().getTime() - DAY_MS);
+    const [ofAccount, ofCompany] = await Promise.all([
+      tx.salesReceivableReminder.count({
+        where: {
+          receivableId: account.id,
+          requestedByUserId: { not: null },
+          requestedAt: { gte: since },
+        },
+      }),
+      tx.salesReceivableReminder.count({
+        where: {
+          requestedByUserId: { not: null },
+          requestedAt: { gte: since },
+        },
+      }),
+    ]);
+    if (ofAccount > 0) {
+      return {
+        ok: false as const,
+        reason: "limit" as const,
+        message:
+          "A este cliente ya se le recordó hoy. Puedes volver a hacerlo mañana.",
+      };
+    }
+    if (ofCompany >= MANUAL_REMINDERS_PER_DAY) {
+      return {
+        ok: false as const,
+        reason: "limit" as const,
+        message:
+          "Tu empresa llegó al límite de recordatorios por correo de hoy. Inténtalo mañana.",
+      };
+    }
+    const reminderId = newId();
+    const { jobId } = await enqueueJob(tx, organizationId, {
+      type: REMINDER_JOB_TYPE,
+      payload: { reminderId },
+      createdByUserId: userId,
+      maxAttempts: MAX_ATTEMPTS,
+    });
+    await tx.salesReceivableReminder.create({
+      data: {
+        id: reminderId,
+        organizationId,
+        receivableId: account.id,
+        installmentNumber: state.installmentNumber,
+        recipient,
+        jobId,
+        requestedByUserId: userId,
+      },
+    });
+    await recordAuditEvent(tx, {
+      organizationId,
+      actorUserId: userId,
+      action: "sales.reminder_requested",
+      target: { type: "sales_receivable", id: account.id },
+      metadata: {
+        cuenta: account.number,
+        cliente: account.customer.name,
+        correo: recipient,
+      },
+    });
+    return { ok: true as const, recipient };
+  }, LOCKING_TRANSACTION);
+}
+
 export type AccountReminder = {
   id: string;
   installmentNumber: number;
   recipient: string;
   status: "QUEUED" | "SENT" | "FAILED";
   statusLabel: string;
+  /** Sent by a person from the account, not by the automatic round. */
+  manual: boolean;
   requestedAt: Date;
   /** «28 oct 2026, 10:05», the company's time. */
   requestedAtText: string;
@@ -254,10 +408,12 @@ export async function getAccountReminders(
       status: true,
       requestedAt: true,
       failureReason: true,
+      requestedByUserId: true,
     },
   });
-  return rows.map((row) => ({
+  return rows.map(({ requestedByUserId, ...row }) => ({
     ...row,
+    manual: requestedByUserId !== null,
     statusLabel: REMINDER_STATUS_LABELS[row.status],
     requestedAtText: formatDateTime(row.requestedAt, timeZone),
   }));
@@ -304,7 +460,13 @@ export async function deliverReminder(
   const client = forOrganization(organizationId);
   const reminder = await client.salesReceivableReminder.findFirst({
     where: { id: String(reminderId).slice(0, 36) },
-    select: { id: true, receivableId: true, recipient: true, status: true },
+    select: {
+      id: true,
+      receivableId: true,
+      recipient: true,
+      status: true,
+      requestedByUserId: true,
+    },
   });
   if (!reminder) return { sent: false, reason: "El aviso ya no existe." };
   if (reminder.status !== "QUEUED") {
@@ -314,7 +476,29 @@ export async function deliverReminder(
     await failReminder(client, organizationId, reminder.id, reason);
     return { sent: false, reason };
   };
-  if (!(await remindersMayGo(organizationId))) {
+  // Sent by a person: they must still be allowed to; automatic: the
+  // reminders must still be on.
+  const by = reminder.requestedByUserId;
+  let sender: { name: string; email: string } | null = null;
+  if (by) {
+    try {
+      await assertModulePermission(organizationId, by, "sales.customer.create");
+    } catch (error) {
+      if (isAppError(error) && error.kind === "forbidden") {
+        return stop(
+          "Quien pidió el recordatorio ya no puede enviarlo en esta empresa. No se mandó.",
+        );
+      }
+      throw error;
+    }
+    const member = await client.membership.findFirst({
+      where: { userId: by },
+      select: { user: { select: { name: true, email: true } } },
+    });
+    if (!member)
+      return stop("Quien pidió el recordatorio ya no está en la empresa.");
+    sender = member.user;
+  } else if (!(await remindersMayGo(organizationId))) {
     return stop("Los recordatorios se apagaron antes de enviarlo.");
   }
   const account = await client.salesReceivable.findFirst({
@@ -334,13 +518,18 @@ export async function deliverReminder(
   });
   if (!account) return stop("La cuenta ya no existe.");
   const timeZone = account.organization.timeZone || "America/Mexico_City";
-  const state = await overdueOf(
+  const state = await paymentStateOf(
     client,
     reminder.receivableId,
     dayOf(salesNow(), timeZone),
   );
-  if (!state) {
-    return stop("Ya no tenía pagos vencidos cuando tocaba enviarlo.");
+  // The round reminds only what is overdue; a person, any open balance.
+  if (!state || (!by && !state.since)) {
+    return stop(
+      by
+        ? "Ya no debía nada cuando tocaba enviarlo."
+        : "Ya no tenía pagos vencidos cuando tocaba enviarlo.",
+    );
   }
   try {
     await sendEmail(
@@ -348,10 +537,20 @@ export async function deliverReminder(
         to: reminder.recipient,
         greeting: account.customer.name,
         organizationName: account.organization.name,
-        overdue: formatMoney(state.overdue),
-        sinceText: formatDueDay(state.since),
+        overdue: state.since
+          ? {
+              amount: formatMoney(state.overdue),
+              sinceText: formatDueDay(state.since),
+            }
+          : null,
+        next: state.next
+          ? {
+              amount: formatMoney(state.next.left),
+              dueText: formatDueDay(state.next.dueDay),
+            }
+          : null,
         balance: formatMoney(state.balance),
-        replyTo: account.organization.owner,
+        replyTo: sender ?? account.organization.owner,
       }),
     );
   } catch (error) {
@@ -370,7 +569,7 @@ export async function deliverReminder(
     if (closed.count === 0) return;
     await recordAuditEvent(tx, {
       organizationId,
-      actorUserId: null,
+      actorUserId: by,
       action: "sales.reminder_sent",
       target: { type: "sales_receivable", id: reminder.receivableId },
       metadata: {

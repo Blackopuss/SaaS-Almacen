@@ -18,6 +18,8 @@ import {
   getPlanOverview,
   listOrders,
   orderPath,
+  renewalDaysLeft,
+  renewalText,
   usageLevel,
   usagePercent,
   type PlanModule,
@@ -151,6 +153,8 @@ export default async function PlanPage() {
     ? "Renuévalo en «Comprar o renovar»."
     : "El titular puede renovarlo.";
   const { products, seats } = plan;
+  const daysLeft =
+    plan.status === "active" ? renewalDaysLeft(plan.validUntil) : null;
   const pending =
     seats.pendingInvitations === 0
       ? undefined
@@ -180,6 +184,22 @@ export default async function PlanPage() {
           El plan es de toda la empresa: lo compra el titular y todo el equipo
           usa el mismo plan.
         </p>
+      )}
+
+      {daysLeft !== null && plan.validUntil && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm sm:p-5"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className={`mt-0.5 size-4 shrink-0 ${daysLeft === 0 ? "text-destructive" : "text-warning"}`}
+          />
+          <p>
+            {renewalText(daysLeft, plan.validUntil)}{" "}
+            {buyer ? "" : "El titular puede renovarlo."}
+          </p>
+        </div>
       )}
 
       {plan.status === "read_only" && (

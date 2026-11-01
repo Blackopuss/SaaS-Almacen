@@ -86,6 +86,12 @@ const REVIEWED: Record<string, Review> = {
       "sesión y empresa activa (requireOrganizationContext); el cliente se busca solo en esa empresa y el correo sale de su ficha",
     coveredBy: "tests/sales/statements.int.test.ts",
   },
+  remindPaymentAction: {
+    input: "id de la cuenta",
+    identity:
+      "sesión y empresa activa (requireOrganizationContext); la cuenta se bloquea solo en esa empresa y el correo sale de la ficha del cliente",
+    coveredBy: "tests/sales/overdue-reminders.int.test.ts",
+  },
   registerPaymentAction: {
     input:
       "id de la cuenta, importe, forma de pago, recibido o referencia y clave",

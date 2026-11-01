@@ -21,6 +21,7 @@ import { getModuleAccess } from "@/platform/billing";
 
 import { PrintButton } from "../../../../ticket/print-button";
 import { PaymentForm } from "./payment-form";
+import { RemindButton } from "./remind-button";
 
 export const metadata: Metadata = { title: "Cuenta por cobrar" };
 
@@ -83,6 +84,12 @@ export default async function CuentaPage({
     typeof abono === "string" ? getReceivablePayment(actor, abono) : null,
     getAccountReminders(actor, account.id),
   ]);
+  // Remind by mail by hand (founder, 2026-11-01): whoever mails statements.
+  const mayRemind =
+    account.status === "OPEN" &&
+    account.balance !== "$0.00" &&
+    moduleState === "active" &&
+    access.allows("sales.customer.create");
   const mayCharge =
     account.status === "OPEN" &&
     moduleState === "active" &&
@@ -266,17 +273,22 @@ export default async function CuentaPage({
               </ul>
             </section>
           )}
-          {reminders.length > 0 && (
+          {(reminders.length > 0 || mayRemind) && (
             <section
               aria-labelledby="recordatorios"
               className="rounded-xl border bg-card print:hidden"
             >
-              <h2
-                id="recordatorios"
-                className="border-b p-4 font-medium sm:px-5"
-              >
-                Recordatorios por correo
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 sm:px-5">
+                <h2 id="recordatorios" className="font-medium">
+                  Recordatorios por correo
+                </h2>
+                {mayRemind && (
+                  <RemindButton
+                    receivableId={account.id}
+                    inProgress={reminders.some((r) => r.status === "QUEUED")}
+                  />
+                )}
+              </div>
               <ul className="divide-y">
                 {reminders.map((reminder) => (
                   <li
@@ -285,7 +297,8 @@ export default async function CuentaPage({
                   >
                     <p className="flex flex-wrap justify-between gap-x-4">
                       <span>
-                        Mensualidad {reminder.installmentNumber} ·{" "}
+                        {reminder.manual ? "Enviado a mano" : "Automático"} ·
+                        mensualidad {reminder.installmentNumber} ·{" "}
                         {reminder.requestedAtText}
                       </span>
                       <span

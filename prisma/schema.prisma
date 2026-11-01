@@ -2501,12 +2501,18 @@ model SalesReceivableReminder {
   organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   receivableId      String                   @db.Char(36)
   receivable        SalesReceivable          @relation(fields: [organizationId, receivableId], references: [organizationId, id], onDelete: Restrict)
-  /// The latest installment already due when it was asked.
+  /// The latest installment already due when it was asked (or, sent by a
+  /// person before any is due, the next one).
   installmentNumber Int
   /// The customer's address when it was asked.
   recipient         String                   @db.VarChar(254)
   status            SalesQuoteDeliveryStatus @default(QUEUED)
   jobId             String                   @db.Char(36)
+  /// Who sent it by hand from the account; null = the worker's round.
+  requestedByUserId String?                  @db.Char(36)
+  /// The installment of an automatic reminder (a trigger copies it), so
+  /// the round reminds once per installment; null when sent by a person.
+  autoInstallment   Int?
   requestedAt       DateTime                 @default(now()) @db.DateTime(3)
   sentAt            DateTime?                @db.DateTime(3)
   failedAt          DateTime?                @db.DateTime(3)
@@ -2514,7 +2520,8 @@ model SalesReceivableReminder {
 
   @@unique([organizationId, id])
   @@unique([organizationId, jobId])
-  @@unique([organizationId, receivableId, installmentNumber])
+  @@unique([organizationId, receivableId, autoInstallment])
+  @@index([organizationId, receivableId, requestedAt])
   @@index([organizationId, requestedAt])
   @@map("sales_receivable_reminder")
 }

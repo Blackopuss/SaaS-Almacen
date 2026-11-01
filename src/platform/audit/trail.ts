@@ -69,8 +69,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "sales.statement_delivery_failed":
     "No se pudo enviar un estado de cuenta por correo",
   "sales.reminders_changed": "Cambió los recordatorios de pagos vencidos",
-  "sales.reminder_sent": "Se envió un recordatorio de pago vencido",
-  "sales.reminder_failed": "No se pudo enviar un recordatorio de pago vencido",
+  "sales.reminder_sent": "Se envió un recordatorio de pago",
+  "sales.reminder_requested": "Pidió enviar un recordatorio de pago",
+  "sales.reminder_failed": "No se pudo enviar un recordatorio de pago",
   "sales.quote_delivery_requested": "Pidió enviar una cotización por correo",
   "sales.quote_delivered": "Se envió una cotización por correo",
   "sales.quote_delivery_failed": "No se pudo enviar una cotización por correo",

@@ -300,28 +300,37 @@ export function salesStatementEmail(input: {
   };
 }
 
-/** A reminder of an overdue payment, from the business (PAG-07). */
+/**
+ * A reminder of a payment, from the business (PAG-07): what is overdue and
+ * since when or, sent by a person before anything is due, the next payment.
+ */
 export function overdueReminderEmail(input: {
   to: string;
   greeting: string;
   organizationName: string;
-  /** «$1,000.00». */
-  overdue: string;
-  /** «28 nov 2026»: the oldest installment still unpaid. */
-  sinceText: string;
+  /** «$1,000.00» overdue since «28 nov 2026»; null when nothing is. */
+  overdue: { amount: string; sinceText: string } | null;
+  /** The next payment, when nothing is overdue. */
+  next: { amount: string; dueText: string } | null;
   balance: string;
-  /** The titular: answers go to them. */
+  /** Who answers: the titular, or the person who sent it. */
   replyTo: { name: string; email: string };
 }): EmailMessage {
   const company = oneLine(input.organizationName, 100);
   return {
     to: input.to,
     replyTo: input.replyTo.email,
-    subject: `Tienes un pago vencido con ${company}`,
+    subject: input.overdue
+      ? `Tienes un pago vencido con ${company}`
+      : `Recordatorio de pago de ${company}`,
     text: [
       `Hola, ${oneLine(input.greeting, 120)}:`,
       "",
-      `Te recordamos que tienes ${oneLine(input.overdue, 30)} vencidos con ${company}, desde el ${oneLine(input.sinceText, 40)}.`,
+      input.overdue
+        ? `Te recordamos que tienes ${oneLine(input.overdue.amount, 30)} vencidos con ${company}, desde el ${oneLine(input.overdue.sinceText, 40)}.`
+        : input.next
+          ? `Te recordamos que tu próximo pago con ${company} es de ${oneLine(input.next.amount, 30)} el ${oneLine(input.next.dueText, 40)}.`
+          : `Te recordamos tu saldo con ${company}.`,
       `Tu saldo total es de ${oneLine(input.balance, 30)}.`,
       "",
       "Si ya pagaste, no hagas caso de este aviso.",

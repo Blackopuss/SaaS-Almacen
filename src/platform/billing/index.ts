@@ -43,6 +43,7 @@ export type {
   ProvisionResult,
 } from "./provisioning";
 export { getPlanOverview, usageLevel, usagePercent } from "./overview";
+export { RENEWAL_NOTICE_DAYS, renewalDaysLeft, renewalText } from "./validity";
 export type { PlanModule, PlanOverview } from "./overview";
 export {
   listManualPayments,

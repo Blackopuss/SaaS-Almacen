@@ -21,6 +21,8 @@ import { moduleRegistry } from "@/modules/registry";
 import {
   getModuleAccess,
   getPlanOverview,
+  renewalDaysLeft,
+  renewalText,
   usageLevel,
 } from "@/platform/billing";
 
@@ -95,15 +97,20 @@ export default async function InicioPage() {
   const nothing = !low && !movements && !plan;
   const products = plan?.products;
   const level = products ? usageLevel(products.used, products.limit) : "ok";
-  // Day to day the plan is noise: it shows up only when it needs attention.
+  // Day to day the plan is noise: it shows up only when it needs attention,
+  // and in its last 15 days (founder, 2026-11-01).
+  const daysLeft =
+    plan?.status === "active" ? renewalDaysLeft(plan.validUntil) : null;
   const planNotice =
     plan?.status === "read_only"
       ? "Tu plan ya no está vigente: todo queda en solo lectura."
-      : products && products.limit !== null && level !== "ok"
-        ? level === "full"
-          ? `Llegaste al límite de tu plan: ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos.`
-          : `Ya usas ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos de tu plan.`
-        : null;
+      : daysLeft !== null && plan?.validUntil
+        ? renewalText(daysLeft, plan.validUntil)
+        : products && products.limit !== null && level !== "ok"
+          ? level === "full"
+            ? `Llegaste al límite de tu plan: ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos.`
+            : `Ya usas ${products.used.toLocaleString("es-MX")} de ${products.limit.toLocaleString("es-MX")} productos de tu plan.`
+          : null;
 
   return (
     <PageContainer>
@@ -121,7 +128,7 @@ export default async function InicioPage() {
         >
           <CircleAlert
             aria-hidden="true"
-            className={`mt-0.5 size-4 shrink-0 ${level === "full" || plan?.status === "read_only" ? "text-destructive" : "text-warning"}`}
+            className={`mt-0.5 size-4 shrink-0 ${level === "full" || plan?.status === "read_only" || daysLeft === 0 ? "text-destructive" : "text-warning"}`}
           />
           <span className="flex-1">{planNotice}</span>
           <span className="font-medium text-primary">Ver mi plan</span>

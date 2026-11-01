@@ -316,14 +316,24 @@ export async function findOverdue(
 }
 
 /**
- * What one open account has past its day, since when and what it owes in
- * all; null when it is up to date (or not open).
+ * Where one open account stands today: what is past its day and since
+ * when, the next payment still owed and the whole balance. Null when it is
+ * not open or nothing is owed.
  */
-export async function overdueOf(
+export async function paymentStateOf(
   client: Client,
   receivableId: string,
   today: string,
-): Promise<{ overdue: Decimal; since: Date; balance: Decimal } | null> {
+): Promise<{
+  overdue: Decimal;
+  /** The oldest installment unpaid and past its day; null if none. */
+  since: Date | null;
+  /** The first installment still owed that is not past its day. */
+  next: { number: number; left: Decimal; dueDay: Date } | null;
+  /** The latest installment past its day, or the next one. */
+  installmentNumber: number;
+  balance: Decimal;
+} | null> {
   const account = await client.salesReceivable.findFirst({
     where: { id: receivableId, status: "OPEN" },
     select: {
@@ -342,6 +352,8 @@ export async function overdueOf(
     dec(0),
   );
   const credited = creditedOf(account.credits);
+  const balance = dec(account.owed.toString()).minus(paid).minus(credited);
+  if (!balance.greaterThan(0)) return null;
   const states = applyPayments(
     account.installments.map((installment) => ({
       number: installment.number,
@@ -352,15 +364,41 @@ export async function overdueOf(
     today,
     credited,
   );
-  const first = states.findIndex((state) => state.status === "OVERDUE");
-  if (first < 0) return null;
+  const late = states.filter((state) => state.status === "OVERDUE");
+  const upcoming = states.find(
+    (state) => state.status === "DUE" || state.status === "PARTIAL",
+  );
+  const dueOf = (number: number) =>
+    account.installments.find((i) => i.number === number)!.dueDay;
   return {
-    overdue: states
-      .filter((state) => state.status === "OVERDUE")
-      .reduce((sum, state) => sum.plus(state.left), dec(0)),
-    since: account.installments[first]!.dueDay,
-    balance: dec(account.owed.toString()).minus(paid).minus(credited),
+    overdue: late.reduce((sum, state) => sum.plus(state.left), dec(0)),
+    since: late.length > 0 ? dueOf(late[0]!.number) : null,
+    next: upcoming
+      ? {
+          number: upcoming.number,
+          left: upcoming.left,
+          dueDay: dueOf(upcoming.number),
+        }
+      : null,
+    installmentNumber:
+      late.length > 0 ? late[late.length - 1]!.number : (upcoming?.number ?? 1),
+    balance,
   };
+}
+
+/**
+ * What one open account has past its day, since when and what it owes in
+ * all; null when it is up to date (or not open).
+ */
+export async function overdueOf(
+  client: Client,
+  receivableId: string,
+  today: string,
+): Promise<{ overdue: Decimal; since: Date; balance: Decimal } | null> {
+  const state = await paymentStateOf(client, receivableId, today);
+  return state?.since
+    ? { overdue: state.overdue, since: state.since, balance: state.balance }
+    : null;
 }
 
 /**
