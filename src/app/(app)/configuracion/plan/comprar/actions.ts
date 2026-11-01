@@ -15,7 +15,8 @@ import { quoteTable, type ShownQuote } from "./quotes";
 export type CheckoutValues = {
   tier: string;
   months: string;
-  purchasing: boolean;
+  /** Add-ons chosen on top of Inventario. */
+  modules: string[];
   code: string;
 };
 
@@ -51,7 +52,10 @@ export async function checkoutAction(
   const values: CheckoutValues = {
     tier: String(formData.get("tier") ?? ""),
     months: String(formData.get("months") ?? ""),
-    purchasing: formData.get("purchasing") === "1",
+    modules: formData
+      .getAll("modules")
+      .slice(0, 10)
+      .map((value) => String(value).slice(0, 20)),
     code: String(formData.get("code") ?? ""),
   };
   const answers = prev.answers + 1;

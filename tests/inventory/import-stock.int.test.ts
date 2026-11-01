@@ -525,6 +525,72 @@ describe("a presentation named in a later row", () => {
   });
 });
 
+describe("cost of the stock in the file (VAL-03B)", () => {
+  it("enters at its cost per unit and moves the average", async () => {
+    const actor = await company(10);
+    await shelf(actor);
+    const importId = await confirmed(actor, [
+      row("CLA-2", {
+        presentation: "Caja",
+        presentationContent: "100",
+        initialStock: "3",
+        initialStockIn: "Caja",
+        location: "Zona A › Estante 3",
+        unitCost: "0.85",
+      }),
+      row("CLA-2", { initialStock: "100", unitCost: "1.25" }),
+      row("SIN-3", { initialStock: "5" }),
+    ]);
+    const saved = await db.productImport.findUniqueOrThrow({
+      where: { id: importId },
+      select: { requiredPermissions: true },
+    });
+    expect(saved.requiredPermissions).toContain("inventory.cost.record");
+    expect(await applyImport(actor.organizationId, importId)).toMatchObject({
+      ok: true,
+      status: "DONE",
+    });
+    const clavo = await db.product.findFirstOrThrow({
+      where: { organizationId: actor.organizationId, sku: "CLA-2" },
+      select: { id: true, cost: true },
+    });
+    // 300 at $0.85 + 100 at $1.25 = $380 for 400 pieces: $0.95 each.
+    expect(clavo.cost?.averageCost.toFixed(2)).toBe("0.95");
+    expect(clavo.cost?.stockValue.toFixed(2)).toBe("380.00");
+    const sinCosto = await db.product.findFirstOrThrow({
+      where: { organizationId: actor.organizationId, sku: "SIN-3" },
+      select: { cost: true },
+    });
+    expect(sinCosto.cost).toBeNull();
+    expect(await reconcileStock(actor.organizationId)).toEqual([]);
+  });
+
+  it("a cost without stock, or that is not a cost, is a problem of its row", async () => {
+    const actor = await company(10);
+    const started = await startImport(actor, {
+      name: "costos.csv",
+      bytes: buildCsv(
+        [
+          HEADERS,
+          ...[
+            row("A-1", { unitCost: "10" }),
+            row("B-2", { initialStock: "2", unitCost: "diez" }),
+          ].map((line) => KEYS.map((key) => line[key] ?? "")),
+        ],
+        { neutralize: false },
+      ),
+    });
+    if (!started.ok) throw new Error(started.error);
+    await saveImportMapping(actor, {
+      importId: started.importId,
+      mapping: MAPPING,
+      decimalSeparator: ".",
+    });
+    const result = await confirmImport(actor, started.importId);
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe("what a file needs to be confirmed", () => {
   it("each operation of the file asks for the permission of doing it by hand", async () => {
     const actor = await company(10);
@@ -601,6 +667,7 @@ describe("what a file needs to be confirmed", () => {
         inPresentation: false,
         locationId: "x",
         locationPath: "General",
+        unitCost: null,
       },
     };
     expect(

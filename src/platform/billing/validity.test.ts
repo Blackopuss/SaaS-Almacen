@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { endOfMexicoDay, extendValidity, shortenValidity } from "./validity";
+import {
+  endOfMexicoDay,
+  extendValidity,
+  renewalDaysLeft,
+  renewalText,
+  shortenValidity,
+} from "./validity";
 
 // PIL-11: a payment moves the end of the plan by calendar months, at the
 // end of the day in central Mexico.
@@ -56,6 +62,27 @@ describe("plan validity", () => {
     // A plan that already ended stays where it was.
     expect(shortenValidity(end("2026-09-30"), now, 1)).toEqual(
       end("2026-09-30"),
+    );
+  });
+});
+
+describe("renewal warning", () => {
+  const now = new Date("2026-11-01T18:00:00Z");
+
+  it("warns in the last 15 calendar days, not before nor after the end", () => {
+    expect(renewalDaysLeft(end("2026-11-01"), now)).toBe(0);
+    expect(renewalDaysLeft(end("2026-11-02"), now)).toBe(1);
+    expect(renewalDaysLeft(end("2026-11-16"), now)).toBe(15);
+    expect(renewalDaysLeft(end("2026-11-17"), now)).toBeNull();
+    expect(renewalDaysLeft(end("2026-10-31"), now)).toBeNull();
+    expect(renewalDaysLeft(null, now)).toBeNull();
+  });
+
+  it("says when, in words", () => {
+    expect(renewalText(0, end("2026-11-01"))).toMatch(/^Tu plan vence hoy\./);
+    expect(renewalText(1, end("2026-11-02"))).toContain("mañana (2 nov 2026)");
+    expect(renewalText(5, end("2026-11-06"))).toContain(
+      "en 5 días (el 6 nov 2026)",
     );
   });
 });

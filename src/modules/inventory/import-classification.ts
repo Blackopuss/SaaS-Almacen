@@ -121,6 +121,10 @@ export function importPermissions(
     }
     if (first.minimum) needed.add("inventory.minimum.update");
     if (rows.some((line) => line.stock)) needed.add("inventory.opening.create");
+    // VAL-03B: a cost in the file moves the average cost.
+    if (rows.some((line) => line.stock?.unitCost)) {
+      needed.add("inventory.cost.record");
+    }
   }
   return [...needed].sort();
 }

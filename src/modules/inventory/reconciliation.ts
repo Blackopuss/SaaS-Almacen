@@ -67,6 +67,63 @@ export async function reconcileStock(
   return drift;
 }
 
+export type ValueDrift = {
+  productId: string;
+  /** All the stock of the product, every location. */
+  quantity: string;
+  averageCost: string;
+  /** What `product_cost` says it is worth. */
+  stockValue: string;
+  /** quantity × averageCost. */
+  expected: string;
+};
+
+/**
+ * VAL-04 (ADR 0031): the value kept for each product must be its stock
+ * times its average cost, up to the rounding of six decimals per
+ * movement. Empty when they agree; a difference is a defect to
+ * investigate, like one in the stock.
+ */
+export async function reconcileValue(
+  organizationId: string,
+): Promise<ValueDrift[]> {
+  const client = forOrganization(organizationId);
+  const [costs, stock] = await Promise.all([
+    client.productCost.findMany({
+      select: { productId: true, averageCost: true, stockValue: true },
+    }),
+    client.stockBalance.groupBy({
+      by: ["productId"],
+      _sum: { quantity: true },
+    }),
+  ]);
+  const onHand = new Map(
+    stock.map((row) => [
+      row.productId,
+      dec((row._sum.quantity ?? 0).toString()),
+    ]),
+  );
+  const drift: ValueDrift[] = [];
+  for (const cost of costs) {
+    const quantity = onHand.get(cost.productId) ?? dec(0);
+    const average = dec(cost.averageCost.toString());
+    const value = dec(cost.stockValue.toString());
+    const expected = quantity.times(average);
+    // Half a millionth per unit of rounding, and a cent of slack.
+    const slack = quantity.times("0.000001").plus("0.01");
+    if (value.minus(expected).abs().greaterThan(slack)) {
+      drift.push({
+        productId: cost.productId,
+        quantity: quantity.toString(),
+        averageCost: average.toString(),
+        stockValue: value.toString(),
+        expected: expected.toString(),
+      });
+    }
+  }
+  return drift;
+}
+
 export type ReconciliationReport = {
   organizationId: string;
   /** Product–location pairs that were compared. */
@@ -79,6 +136,8 @@ export type ReconciliationReport = {
     /** balance − fromMovements: what the balance has too much (or too little). */
     difference: string;
   })[];
+  /** Products whose stored value is not stock × average cost (VAL-04). */
+  valueDrift: (ValueDrift & { sku: string; productName: string })[];
 };
 
 /**
@@ -90,11 +149,15 @@ export async function reconcileCompany(
   organizationId: string,
 ): Promise<ReconciliationReport> {
   const client = forOrganization(organizationId);
-  const [drift, pairs] = await Promise.all([
+  const [drift, pairs, values] = await Promise.all([
     reconcileStock(organizationId),
     client.stockBalance.count(),
+    reconcileValue(organizationId),
   ]);
-  if (drift.length === 0) return { organizationId, pairs, drift: [] };
+  const valueDrift = await named(organizationId, values.slice(0, 500));
+  if (drift.length === 0) {
+    return { organizationId, pairs, drift: [], valueDrift };
+  }
 
   const shown = drift.slice(0, 500);
   const [products, locations] = await Promise.all([
@@ -121,5 +184,21 @@ export async function reconcileCompany(
       locationName: locationOf.get(row.locationId) ?? "?",
       difference: dec(row.balance).minus(row.fromMovements).toString(),
     })),
+    valueDrift,
   };
+}
+
+/** Value differences with the product a person can go and look at. */
+async function named(organizationId: string, rows: ValueDrift[]) {
+  if (rows.length === 0) return [];
+  const products = await forOrganization(organizationId).product.findMany({
+    where: { id: { in: rows.map((row) => row.productId) } },
+    select: { id: true, sku: true, name: true },
+  });
+  const productOf = new Map(products.map((product) => [product.id, product]));
+  return rows.map((row) => ({
+    ...row,
+    sku: productOf.get(row.productId)?.sku ?? "?",
+    productName: productOf.get(row.productId)?.name ?? "?",
+  }));
 }

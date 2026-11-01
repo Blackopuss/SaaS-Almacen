@@ -14,6 +14,7 @@ import {
 
 import { EXIT_IMPORT_JOB_TYPE, exitKey, formatExitDay } from "./exit-import";
 import { formatStock } from "./movements";
+import { lineCost, openCostBook } from "./valuation";
 
 /**
  * Registering the exits of a confirmed file, in the worker (IMP-10). The
@@ -180,6 +181,9 @@ async function registerRow(
   const unitCode = resolved.product.unitCode;
   const base = conversion.baseQuantity;
 
+  // VAL-04: read before the balance changes, under the product's lock.
+  const costs = await openCostBook(tx, actor.organizationId, [product.id]);
+
   // One statement checks and takes: a location never gives more than it
   // holds (MOV-01); the CHECK of the table is the last defense.
   const taken = await tx.stockBalance.updateMany({
@@ -203,6 +207,9 @@ async function registerRow(
         : `Solo hay ${formatStock(there.toString(), unitCode)} de ${product.sku} en ${location.name}: no pueden salir ${formatStock(base.toString(), unitCode)}. Corrige el inventario y sube el archivo de nuevo.`,
     };
   }
+
+  // It leaves at the average cost.
+  const unitCost = costs.exit(product.id, base);
 
   const movementId = newId();
   await tx.stockMovement.create({
@@ -232,8 +239,10 @@ async function registerRow(
       factor: conversion.factor.toString(),
       baseQuantity: base.toString(),
       unitCode,
+      unitCost: lineCost(unitCost),
     },
   });
+  await costs.save();
   return { kind: "done", movementId };
 }
 

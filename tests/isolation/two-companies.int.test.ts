@@ -230,6 +230,51 @@ beforeAll(async () => {
         updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
       },
     });
+    await db.productCost.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        averageCost: "85",
+        stockValue: "850",
+      },
+    });
+    await db.salePrice.create({
+      data: {
+        id: newId(),
+        organizationId,
+        productId,
+        price: "120",
+        updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesSettings.create({
+      data: {
+        id: newId(),
+        organizationId,
+        pricesIncludeTax: organizationId === orgA,
+        updatedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesInstallmentTerm.create({
+      data: {
+        id: newId(),
+        organizationId,
+        months: organizationId === orgA ? 6 : 12,
+      },
+    });
+    await db.saleDiscountAuthorization.create({
+      data: {
+        id: newId(),
+        organizationId,
+        sellerUserId: organizationId === orgA ? ids.ana : ids.beto,
+        authorizerUserId: organizationId === orgA ? ids.ana : ids.beto,
+        percent: "10",
+        belowCost: false,
+        reason: "Compra grande",
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
     const storedFileId = newId();
     await db.storedFile.create({
       data: {
@@ -405,6 +450,291 @@ beforeAll(async () => {
         factor: "1",
         baseQuantity: "1",
         unitCode: "piece",
+      },
+    });
+    // A counter sale (VEN-05): its movement, the sale, a line and a payment.
+    const saleMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: saleMovementId,
+        organizationId,
+        type: "SALE",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const cashSessionId = newId();
+    await db.cashSession.create({
+      data: {
+        id: cashSessionId,
+        organizationId,
+        openedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+        openingFloat: "500",
+      },
+    });
+    await db.cashMovement.create({
+      data: {
+        id: newId(),
+        organizationId,
+        sessionId: cashSessionId,
+        direction: "IN",
+        amount: "100",
+        reason: "Cambio del banco",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const customerId = newId();
+    await db.contact.create({
+      data: {
+        id: customerId,
+        organizationId,
+        name: "Constructora del Sur",
+        isCustomer: true,
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const saleId = newId();
+    await db.sale.create({
+      data: {
+        id: saleId,
+        organizationId,
+        customerId,
+        number: 1,
+        movementId: saleMovementId,
+        pricesIncludeTax: true,
+        taxRate: "16",
+        subtotal: "103.45",
+        tax: "16.55",
+        total: "120",
+        idempotencyKey: newId(),
+        soldByUserId: organizationId === orgA ? ids.ana : ids.beto,
+        cashSessionId,
+      },
+    });
+    const saleLineId = newId();
+    await db.saleLine.create({
+      data: {
+        id: saleLineId,
+        organizationId,
+        saleId,
+        lineNumber: 1,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "1",
+        factor: "1",
+        baseQuantity: "1",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "120",
+      },
+    });
+    await db.salePayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        saleId,
+        lineNumber: 1,
+        method: "CASH",
+        amount: "120",
+        received: "200",
+        changeGiven: "80",
+      },
+    });
+    // A return of it (VEN-19): its stock entry, the return and its line.
+    const saleReturnMovementId = newId();
+    await db.stockMovement.create({
+      data: {
+        id: saleReturnMovementId,
+        organizationId,
+        type: "SALE_RETURN",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const saleReturnId = newId();
+    await db.saleReturn.create({
+      data: {
+        id: saleReturnId,
+        organizationId,
+        saleId,
+        movementId: saleReturnMovementId,
+        refundMethod: "CASH",
+        refund: "120",
+        cashSessionId,
+        reason: "No le quedó",
+        idempotencyKey: newId(),
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.saleReturnLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        returnId: saleReturnId,
+        lineNumber: 1,
+        saleLineId,
+        productId,
+        locationId: location.id,
+        capturedQuantity: "1",
+        factor: "1",
+        baseQuantity: "1",
+        unitCode: "piece",
+        refund: "120",
+      },
+    });
+    // A quote to a customer (COT-01) and its line.
+    const quoteId = newId();
+    await db.salesQuote.create({
+      data: {
+        id: quoteId,
+        organizationId,
+        number: 1,
+        customerId,
+        validUntil: new Date("2026-11-30"),
+        pricesIncludeTax: true,
+        taxRate: "16",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesQuoteLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        quoteId,
+        lineNumber: 1,
+        productId,
+        capturedQuantity: "2",
+        factor: "1",
+        baseQuantity: "2",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "240",
+      },
+    });
+    // Sent by mail (COT-03): the quote leaves the draft first.
+    await db.salesQuote.update({
+      where: { id: quoteId },
+      data: { status: "SENT", sentAt: new Date() },
+    });
+    await db.salesQuoteDelivery.create({
+      data: {
+        id: newId(),
+        organizationId,
+        quoteId,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+        requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    // The customer's statement, by mail (PAG-06).
+    await db.salesStatementDelivery.create({
+      data: {
+        id: newId(),
+        organizationId,
+        customerId,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+        requestedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    // Accepted, it becomes an order (COT-05) with its line.
+    await db.salesQuote.update({
+      where: { id: quoteId },
+      data: {
+        status: "ACCEPTED",
+        decidedAt: new Date(),
+        decidedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    const salesOrderId = newId();
+    // A sale on installments: its account and calendar (PAG-04).
+    const receivableId = newId();
+    await db.salesReceivable.create({
+      data: {
+        id: receivableId,
+        organizationId,
+        number: 1,
+        saleId,
+        customerId,
+        downPayment: "20",
+        financed: "100",
+        interestPercent: "0",
+        interest: "0",
+        owed: "100",
+        months: 1,
+        startDay: new Date("2026-10-28"),
+      },
+    });
+    await db.salesReceivableInstallment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        number: 1,
+        dueDay: new Date("2026-11-28"),
+        amount: "100",
+      },
+    });
+    await db.salesReceivablePayment.create({
+      data: {
+        id: newId(),
+        organizationId,
+        number: 1,
+        receivableId,
+        cashSessionId,
+        method: "CARD",
+        amount: "10",
+        reference: "AUT-1",
+        idempotencyKey: newId(),
+        receivedByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    // What a return of the sale took off its account (PAG-08).
+    await db.salesReceivableCredit.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        returnId: saleReturnId,
+        goodsValue: "120",
+        interest: "0",
+        credited: "0",
+      },
+    });
+    // A reminder of an overdue payment (PAG-07).
+    await db.salesReceivableReminder.create({
+      data: {
+        id: newId(),
+        organizationId,
+        receivableId,
+        installmentNumber: 1,
+        recipient: "compras@constructora.example",
+        jobId: newId(),
+      },
+    });
+    await db.salesOrder.create({
+      data: {
+        id: salesOrderId,
+        organizationId,
+        number: 1,
+        quoteId,
+        customerId,
+        pricesIncludeTax: true,
+        taxRate: "16",
+        createdByUserId: organizationId === orgA ? ids.ana : ids.beto,
+      },
+    });
+    await db.salesOrderLine.create({
+      data: {
+        id: newId(),
+        organizationId,
+        orderId: salesOrderId,
+        lineNumber: 1,
+        productId,
+        capturedQuantity: "2",
+        factor: "1",
+        baseQuantity: "2",
+        unitCode: "piece",
+        unitPrice: "120",
+        amount: "240",
       },
     });
     const exitImportId = newId();

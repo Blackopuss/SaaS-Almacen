@@ -9,12 +9,12 @@ import { z } from "zod";
  */
 export const LEGAL_DOCUMENTS = {
   terms: {
-    version: "2026-10-26",
+    version: "2026-11-01",
     title: "Términos y condiciones",
     href: "/terminos",
   },
   privacy: {
-    version: "2026-10-26",
+    version: "2026-11-01",
     title: "Aviso de privacidad",
     href: "/privacidad",
   },

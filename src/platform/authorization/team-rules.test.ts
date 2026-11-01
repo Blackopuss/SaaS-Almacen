@@ -97,7 +97,7 @@ describe("an administrator cannot raise privileges", () => {
     });
   });
 
-  it("manages Almacén, Comprador and Consulta of other people", () => {
+  it("manages every role but Administrador of other people", () => {
     expect(
       checkTeamChange(admin, viewer, {
         kind: "assign_roles",
@@ -107,7 +107,13 @@ describe("an administrator cannot raise privileges", () => {
     expect(checkTeamChange(admin, warehouse, { kind: "disable" })).toEqual({
       ok: true,
     });
-    expect(assignableRoles(admin)).toEqual(["warehouse", "buyer", "viewer"]);
+    expect(assignableRoles(admin)).toEqual([
+      "warehouse",
+      "buyer",
+      "viewer",
+      "cashier",
+      "cash_manager",
+    ]);
   });
 
   it("cannot invite an administrator; the titular can", () => {

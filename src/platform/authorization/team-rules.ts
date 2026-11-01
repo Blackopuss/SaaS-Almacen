@@ -8,7 +8,7 @@
  * - An administrator manages Almacén, Comprador and Consulta of other
  *   people, never their own roles.
  */
-import { isRole, type Permission, type Role } from "./catalog";
+import { ROLES, isRole, type Permission, type Role } from "./catalog";
 import { can, type Subject } from "./policy";
 
 export type TeamPerson = Subject & { userId: string };
@@ -49,7 +49,7 @@ const deny = (reason: TeamRuleReason): TeamRuleResult => ({
 /** Roles a person may hand out: the titular all, an administrator all but administrator. */
 export function assignableRoles(actor: Subject): Role[] {
   if (!can(actor, "platform.team.assign_roles")) return [];
-  const all: Role[] = ["administrator", "warehouse", "buyer", "viewer"];
+  const all: Role[] = [...ROLES];
   return actor.isOwner === true
     ? all
     : all.filter((r) => r !== "administrator");

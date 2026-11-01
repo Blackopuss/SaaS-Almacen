@@ -186,6 +186,9 @@ describe("Almacén no compra (NEG-03, NEG-04)", () => {
       "purchasing.return.create",
       "purchasing.cost.read",
       "purchasing.suggestion.generate",
+      // VAL-05: nor the value of the inventory it moves.
+      "inventory.cost.read",
+      "inventory.cost.record",
     ] as const) {
       await denied(org, warehouse, permission);
     }
@@ -194,6 +197,8 @@ describe("Almacén no compra (NEG-03, NEG-04)", () => {
   it("Consulta does not see costs either", async () => {
     await denied(org, viewer, "purchasing.cost.read");
     await denied(org, viewer, "purchasing.cost.record");
+    await denied(org, viewer, "inventory.cost.read");
+    await denied(org, viewer, "inventory.cost.record");
   });
 });
 
@@ -360,6 +365,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
         "tests/purchasing/product-suppliers.int.test.ts",
         "tests/purchasing/reports.int.test.ts",
         "tests/purchasing/module-guard.int.test.ts",
+        "tests/inventory/valuation.int.test.ts",
       ],
     },
     "NEG-05": { tests: ["tests/platform/negative-by-role.int.test.ts"] },

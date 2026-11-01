@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { dec, formatDecimal, isAppError, newId } from "@/lib";
-import { formatStock } from "@/modules/inventory";
+import { COST_FORMAT_ERROR, formatStock, parseCost } from "@/modules/inventory";
 import { recordAuditEvent } from "@/platform/audit";
 import { assertModulePermission } from "@/platform/billing";
 import {
@@ -295,19 +295,6 @@ export type OrderLineInput = {
   unitCost?: string;
 };
 
-const MAX_COST = "9999999999.9999";
-
-/** A cost as typed («250.50», «1,250»), exact; null when it is not one. */
-function parseCost(text: string): string | null {
-  const value = text
-    .trim()
-    .replace(/^\$\s*/, "")
-    .replace(/,(?=\d{3}(\D|$))/g, "");
-  if (!/^\d{1,10}(\.\d{1,4})?$/.test(value)) return null;
-  const cost = dec(value);
-  return cost.greaterThan(MAX_COST) ? null : cost.toString();
-}
-
 function captureOf(text: string, quantity: string): Capture | null {
   if (text === "base" || text === "") return { kind: "base", quantity };
   const match = /^p:([0-9a-f-]{36})$/i.exec(text);
@@ -373,11 +360,7 @@ async function costOf(
   if (text === "") return { ok: true, cost: null };
   const cost = parseCost(text);
   return cost === null
-    ? refuse(
-        "invalid",
-        "unitCost",
-        "Escribe el costo como 250.50, con hasta 4 decimales, o déjalo vacío.",
-      )
+    ? refuse("invalid", "unitCost", COST_FORMAT_ERROR)
     : { ok: true, cost };
 }
 

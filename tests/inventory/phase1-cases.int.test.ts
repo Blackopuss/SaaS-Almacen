@@ -410,6 +410,7 @@ describe("the reconciliation task", () => {
       organizationId: owner.organizationId,
       pairs: 2,
       drift: [],
+      valueDrift: [],
     });
 
     // A balance changed without a movement: the defect this task exists for.

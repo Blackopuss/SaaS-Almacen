@@ -21,3 +21,17 @@ export type {
   SupplierPage,
   SupplierSummary,
 } from "./suppliers";
+export {
+  createCustomer,
+  customerSchema,
+  findCustomers,
+  getCustomer,
+  setCustomerEmail,
+} from "./customers";
+export type {
+  CreateCustomerResult,
+  CustomerEmailResult,
+  CustomerField,
+  CustomerInput,
+  CustomerSummary,
+} from "./customers";

@@ -23,9 +23,11 @@ import { dec, formatDateTime } from "@/lib";
 import {
   formatStock,
   getMinimum,
+  getProductCost,
   getProductStock,
   listRecentMovements,
 } from "@/modules/inventory";
+import { getSalePrices } from "@/modules/sales";
 import { listSuppliersOfProduct } from "@/modules/purchasing";
 import { getModuleAccess } from "@/platform/billing";
 import { getProduct, getUnit, listPresentations } from "@/platform/catalog";
@@ -83,7 +85,10 @@ export default async function ProductoPage({
   const showSuppliers =
     access.moduleState("purchasing") !== "none" &&
     access.can("purchasing.product_supplier.read");
-  const [stock, presentations, movements, minimum, suppliers] =
+  // VEN-03: what it sells at, with Ventas contracted.
+  const showPrices =
+    access.moduleState("sales") !== "none" && access.can("sales.price.read");
+  const [stock, presentations, movements, minimum, suppliers, cost, prices] =
     await Promise.all([
       access.can("inventory.stock.read")
         ? getProductStock(actor, product.id)
@@ -98,6 +103,11 @@ export default async function ProductoPage({
         ? getMinimum(actor, product.id)
         : null,
       showSuppliers ? listSuppliersOfProduct(actor, product.id) : null,
+      // VAL-05: what it is worth, only for who may see costs.
+      access.can("inventory.cost.read")
+        ? getProductCost(actor, product.id)
+        : null,
+      showPrices ? getSalePrices(actor, product.id) : null,
     ]);
   // Low = the real balance is at or below the minimum (INV-30).
   const low =
@@ -245,6 +255,12 @@ export default async function ProductoPage({
                 {equivalence.text}
               </p>
             ))}
+            {cost && (
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Costo promedio {cost.averageCost} por {unit.name} · Vale{" "}
+                {cost.stockValue}
+              </p>
+            )}
           </div>
           {stock.locations.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground sm:px-5">
@@ -289,6 +305,52 @@ export default async function ProductoPage({
                 />
               </div>
             )}
+        </section>
+      )}
+
+      {prices && (
+        <section
+          aria-labelledby="precios"
+          className="rounded-xl border bg-card"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b p-4 sm:px-5">
+            <h2 id="precios" className="font-medium">
+              Precio de venta
+            </h2>
+            {active && access.allows("sales.price.update") && (
+              <Link
+                href={`/inventario/${product.id}/precios`}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Cambiar precios
+              </Link>
+            )}
+          </div>
+          <ul className="divide-y">
+            {prices.rows.map((row) => (
+              <li
+                key={row.presentationId ?? "unit"}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 p-4 sm:px-5"
+              >
+                <span>{row.label}</span>
+                <span className="text-right tabular-nums">
+                  <span className="font-medium">
+                    {row.sellsAt ?? "Sin precio"}
+                  </span>
+                  {row.derived && (
+                    <span className="block text-sm text-muted-foreground">
+                      Por su contenido
+                    </span>
+                  )}
+                  {row.margin && (
+                    <span className="block text-sm text-muted-foreground">
+                      Ganancia {row.margin}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

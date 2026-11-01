@@ -1,8 +1,10 @@
 import "server-only";
 
 import {
+  ADD_ON_CHOICES,
   PLAN_TIERS,
   PURCHASE_MONTHS,
+  addOnKey,
   formatMxn,
   quote,
   type Quote,
@@ -17,9 +19,12 @@ export type ShownQuote = {
   free: boolean;
 };
 
-/** «t500:3:1» = 500 productos, 3 meses, con Compras. */
-export const quoteKey = (tier: string, months: number, purchasing: boolean) =>
-  `${tier}:${months}:${purchasing ? 1 : 0}`;
+/** «t500:3:purchasing+sales» = 500 productos, 3 meses, con Compras y Ventas. */
+export const quoteKey = (
+  tier: string,
+  months: number | string,
+  modules: readonly string[],
+) => `${tier}:${months}:${addOnKey(modules)}`;
 
 export function showQuote(value: Quote): ShownQuote {
   return {
@@ -39,9 +44,9 @@ export function quoteTable(percentOff: number): Record<string, ShownQuote> {
   const table: Record<string, ShownQuote> = {};
   for (const tier of PLAN_TIERS) {
     for (const months of PURCHASE_MONTHS) {
-      for (const purchasing of [false, true]) {
-        table[quoteKey(tier.id, months, purchasing)] = showQuote(
-          quote(tier, purchasing ? ["purchasing"] : [], months, percentOff),
+      for (const modules of ADD_ON_CHOICES) {
+        table[quoteKey(tier.id, months, modules)] = showQuote(
+          quote(tier, modules, months, percentOff),
         );
       }
     }

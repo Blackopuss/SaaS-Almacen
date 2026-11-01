@@ -14,21 +14,41 @@ export type PriceTier = {
   users: number;
   inventory: number;
   purchasing: number;
+  sales: number;
 };
 
+const ADD_ONS = [
+  {
+    id: "purchasing",
+    name: "Compras",
+    summary: "Proveedores, órdenes y recepciones",
+  },
+  {
+    id: "sales",
+    name: "Ventas",
+    summary: "Punto de venta, cotizaciones y ventas a plazos",
+  },
+] as const;
+
 /**
- * Pick how many products you manage and whether you want Compras; the
+ * Pick how many products you manage and which modules you want; the
  * monthly total counts to the new amount (anime.js, still with reduced
  * motion). The slider moves between the capacity tiers.
  */
 export function PriceCalculator({ tiers }: { tiers: PriceTier[] }) {
   const [index, setIndex] = useState(1);
-  const [purchasing, setPurchasing] = useState(true);
+  const [chosen, setChosen] = useState<Record<string, boolean>>({
+    purchasing: true,
+    sales: true,
+  });
   const total = useRef<HTMLSpanElement>(null);
   const shown = useRef({ value: 0 });
   const sliderId = useId();
   const tier = tiers[index]!;
-  const amount = tier.inventory + (purchasing ? tier.purchasing : 0);
+  const amount = ADD_ONS.reduce(
+    (sum, module) => sum + (chosen[module.id] ? tier[module.id] : 0),
+    tier.inventory,
+  );
 
   useEffect(() => {
     const label = total.current;
@@ -97,25 +117,33 @@ export function PriceCalculator({ tiers }: { tiers: PriceTier[] }) {
               {formatMoney(tier.inventory)}
             </span>
           </div>
-          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-background p-4 transition-colors has-[:checked]:border-primary has-[:checked]:bg-accent/60 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50">
-            <span className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={purchasing}
-                onChange={(event) => setPurchasing(event.target.checked)}
-                className="size-5 accent-[var(--primary)]"
-              />
-              <span>
-                <span className="block font-medium">Compras</span>
-                <span className="block text-sm text-muted-foreground">
-                  Proveedores, órdenes y recepciones
+          {ADD_ONS.map((module) => (
+            <label
+              key={module.id}
+              className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-background p-4 transition-colors has-[:checked]:border-primary has-[:checked]:bg-accent/60 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50"
+            >
+              <span className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={chosen[module.id] ?? false}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setChosen((now) => ({ ...now, [module.id]: checked }));
+                  }}
+                  className="size-5 accent-[var(--primary)]"
+                />
+                <span>
+                  <span className="block font-medium">{module.name}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {module.summary}
+                  </span>
                 </span>
               </span>
-            </span>
-            <span className="text-sm font-medium tabular-nums">
-              + {formatMoney(tier.purchasing)}
-            </span>
-          </label>
+              <span className="text-sm font-medium tabular-nums">
+                + {formatMoney(tier[module.id])}
+              </span>
+            </label>
+          ))}
         </fieldset>
       </div>
 

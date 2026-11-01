@@ -4,6 +4,7 @@ export {
   PERMISSIONS,
   ROLES,
   ROLE_LABELS,
+  ROLE_MODULE,
   ROLE_PERMISSIONS,
   isPermission,
   isRole,

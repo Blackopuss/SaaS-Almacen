@@ -29,6 +29,8 @@ registerHooks({
 const { db } = await import("@/server/db");
 const { runWorker } = await import("@/platform/jobs/queue");
 const { jobHandlers } = await import("@/modules/registry/jobs");
+const { scheduledRounds } = await import("@/modules/registry/rounds");
+const { runScheduledRounds } = await import("@/platform/jobs/rounds");
 const {
   ALERT_EVERY_MS,
   HEARTBEAT_EVERY_MS,
@@ -69,6 +71,22 @@ const alerts = setInterval(() => {
     .finally(() => (checking = false));
 }, ALERT_EVERY_MS);
 
+// Scheduled rounds of the modules (PAG-07): a minute after starting and
+// then once an hour, never two at once.
+const ROUNDS_EVERY_MS = 60 * 60 * 1000;
+let rounding = false;
+const runRounds = () => {
+  if (rounding) return;
+  rounding = true;
+  runScheduledRounds(scheduledRounds, (round, organizationId, error) =>
+    log.error("scheduled_round_failed", error, { round, organizationId }),
+  )
+    .catch((error: unknown) => log.error("scheduled_rounds_failed", error))
+    .finally(() => (rounding = false));
+};
+const firstRounds = setTimeout(runRounds, 60_000);
+const rounds = setInterval(runRounds, ROUNDS_EVERY_MS);
+
 await runWorker(jobHandlers, {
   workerId,
   signal: stop.signal,
@@ -85,5 +103,7 @@ await runWorker(jobHandlers, {
 });
 clearInterval(heartbeat);
 clearInterval(alerts);
+clearTimeout(firstRounds);
+clearInterval(rounds);
 await db.$disconnect();
 log.info("worker_stopped", { workerId });

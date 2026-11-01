@@ -232,6 +232,115 @@ export function purchaseOrderEmail(input: {
   };
 }
 
+/** A quote to a customer, with its PDF (COT-03). */
+export function salesQuoteEmail(input: {
+  to: string;
+  /** Who is greeted: the customer. */
+  greeting: string;
+  organizationName: string;
+  quoteNumber: number;
+  /** «12 de noviembre de 2026». */
+  validUntil: string;
+  /** «$1,252.81». */
+  total: string;
+  sender: { name: string; email: string };
+  pdf: EmailAttachment;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.sender.email,
+    subject: `Cotización ${input.quoteNumber} de ${company}`,
+    attachments: [input.pdf],
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `${company} te envía su cotización ${input.quoteNumber} por ${oneLine(input.total, 30)}. Va adjunta en PDF y vale hasta el ${oneLine(input.validUntil, 40)}.`,
+      "",
+      `Para aceptarla o si tienes dudas, responde a este correo: le llega a ${oneLine(input.sender.name, 120)} (${input.sender.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}. Si no esperabas esta cotización, ignora el mensaje.`,
+    ].join("\n"),
+  };
+}
+
+/** A customer's statement of account, from the business (PAG-06). */
+export function salesStatementEmail(input: {
+  to: string;
+  greeting: string;
+  organizationName: string;
+  /** «$6,800.00». */
+  balance: string;
+  /** «28 nov 2026» and its amount; null when nothing is due. */
+  next: { dueText: string; amount: string } | null;
+  sender: { name: string; email: string };
+  pdf: EmailAttachment;
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.sender.email,
+    subject: `Estado de cuenta de ${company}`,
+    attachments: [input.pdf],
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      `${company} te envía tu estado de cuenta. Tu saldo es de ${oneLine(input.balance, 30)}.`,
+      ...(input.next
+        ? [
+            `Tu próximo pago es el ${oneLine(input.next.dueText, 40)} por ${oneLine(input.next.amount, 30)}.`,
+          ]
+        : []),
+      "Va adjunto en PDF, con tus pagos hechos y los próximos.",
+      "",
+      `Si tienes dudas, responde a este correo: le llega a ${oneLine(input.sender.name, 120)} (${input.sender.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}.`,
+    ].join("\n"),
+  };
+}
+
+/**
+ * A reminder of a payment, from the business (PAG-07): what is overdue and
+ * since when or, sent by a person before anything is due, the next payment.
+ */
+export function overdueReminderEmail(input: {
+  to: string;
+  greeting: string;
+  organizationName: string;
+  /** «$1,000.00» overdue since «28 nov 2026»; null when nothing is. */
+  overdue: { amount: string; sinceText: string } | null;
+  /** The next payment, when nothing is overdue. */
+  next: { amount: string; dueText: string } | null;
+  balance: string;
+  /** Who answers: the titular, or the person who sent it. */
+  replyTo: { name: string; email: string };
+}): EmailMessage {
+  const company = oneLine(input.organizationName, 100);
+  return {
+    to: input.to,
+    replyTo: input.replyTo.email,
+    subject: input.overdue
+      ? `Tienes un pago vencido con ${company}`
+      : `Recordatorio de pago de ${company}`,
+    text: [
+      `Hola, ${oneLine(input.greeting, 120)}:`,
+      "",
+      input.overdue
+        ? `Te recordamos que tienes ${oneLine(input.overdue.amount, 30)} vencidos con ${company}, desde el ${oneLine(input.overdue.sinceText, 40)}.`
+        : input.next
+          ? `Te recordamos que tu próximo pago con ${company} es de ${oneLine(input.next.amount, 30)} el ${oneLine(input.next.dueText, 40)}.`
+          : `Te recordamos tu saldo con ${company}.`,
+      `Tu saldo total es de ${oneLine(input.balance, 30)}.`,
+      "",
+      "Si ya pagaste, no hagas caso de este aviso.",
+      `Si tienes dudas, responde a este correo: le llega a ${oneLine(input.replyTo.name, 120)} (${input.replyTo.email}).`,
+      "",
+      `Este mensaje se envió desde Almacén a nombre de ${company}.`,
+    ].join("\n"),
+  };
+}
+
 /** Operations alert for whoever runs the server (PIL-04). */
 export function operationsAlertEmail(input: {
   to: string;

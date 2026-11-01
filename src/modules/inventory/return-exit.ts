@@ -4,6 +4,7 @@ import { dec, newId } from "@/lib";
 import { lockRows, type TenantDb } from "@/server";
 
 import { formatStock, type InventoryActor } from "./movements";
+import { costPerUnit, lineCost, openCostBook } from "./valuation";
 
 type Tx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 type Decimal = ReturnType<typeof dec>;
@@ -17,7 +18,9 @@ type Decimal = ReturnType<typeof dec>;
  *
  * Unlike an exit, nothing is converted with the content in force: each
  * line leaves with the factor it was received with (what entered for that
- * box is what goes back), given by the caller from the receipt line.
+ * box is what goes back), given by the caller from the receipt line, and
+ * at the cost it came in with (VAL-02, ADR 0031): the average of what stays
+ * moves accordingly.
  */
 export type ReturnExitLine = {
   productId: string;
@@ -28,6 +31,8 @@ export type ReturnExitLine = {
   presentationVersionId: string | null;
   factor: Decimal;
   unitCode: string;
+  /** Cost of one captured unit (one box) it was received at; null if unknown. */
+  unitCost: { toString(): string } | null;
 };
 
 export type ReturnExitResult =
@@ -107,6 +112,20 @@ export async function postReturnExit(
     }
   }
 
+  // Read before any balance changes: the stock all locations had.
+  const costs = await openCostBook(
+    tx,
+    organizationId,
+    lines.map((line) => line.productId),
+  );
+  const unitCosts = lines.map((line) =>
+    costs.exitAt(
+      line.productId,
+      line.baseQuantity,
+      costPerUnit(line.unitCost?.toString(), line.factor),
+    ),
+  );
+
   const movementId = newId();
   await tx.stockMovement.create({
     data: {
@@ -133,8 +152,10 @@ export async function postReturnExit(
       factor: line.factor.toString(),
       baseQuantity: line.baseQuantity.toString(),
       unitCode: line.unitCode,
+      unitCost: lineCost(unitCosts[index]!),
     })),
   });
+  await costs.save();
   for (const [slot, quantity] of taken) {
     const row = current.get(slot)!;
     // Conditioned like every exit; the CHECK of the table is the last line.

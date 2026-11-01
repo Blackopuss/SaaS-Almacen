@@ -286,6 +286,8 @@ export async function returnToSupplier(
               presentationVersionId: true,
               factor: true,
               unitCode: true,
+              // VAL-02: goes back at the cost it came in with. Never shown.
+              unitCost: true,
               product: { select: { name: true, quantityStep: true } },
               presentation: { select: { name: true } },
             },
@@ -381,6 +383,7 @@ export async function returnToSupplier(
           presentationVersionId: item.line.presentationVersionId,
           factor: dec(item.line.factor.toString()),
           unitCode: item.line.unitCode,
+          unitCost: item.line.unitCost,
         })),
         reference: `${numberText} · Devolución`,
         reason: data.reason,

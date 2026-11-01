@@ -12,6 +12,7 @@ import {
 import { readSpreadsheet, readStoredFile } from "@/platform/files";
 import { forOrganization } from "@/server";
 
+import { COST_FORMAT_ERROR, parseCost } from "./average-cost";
 import { IMPORT_COLUMNS, type ImportColumnKey } from "./import-template";
 import {
   normalizeDecimal,
@@ -64,6 +65,8 @@ export type ValidImportRow = {
     inPresentation: boolean;
     locationId: string;
     locationPath: string;
+    /** Cost of one unit of the product, before taxes (VAL-03B); null if not given. */
+    unitCost: string | null;
   } | null;
   minimum: string | null;
 };
@@ -338,7 +341,24 @@ export function validateImportRows(
           inPresentation,
           locationId: location.id,
           locationPath: location.path,
+          unitCost: null,
         };
+      }
+    }
+
+    // VAL-03B: the cost of that stock, per unit of the product.
+    const costText = number("unitCost");
+    if (costText !== null) {
+      const cost = parseCost(costText);
+      if (cost === null) {
+        issue("unitCost", COST_FORMAT_ERROR);
+      } else if (stockText === null) {
+        issue(
+          "unitCost",
+          "El costo solo se usa con una existencia inicial: escribe cuánto hay o deja el costo vacío.",
+        );
+      } else if (stock) {
+        stock.unitCost = cost;
       }
     }
 

@@ -101,7 +101,7 @@ describe("module of a permission", () => {
     expect(moduleOfPermission("purchasing.order.create")).toBe("purchasing");
     expect(moduleOfPermission("platform.team.invite")).toBeNull();
     for (const permission of PERMISSIONS) {
-      expect(["inventory", "purchasing", null]).toContain(
+      expect(["inventory", "purchasing", "sales", null]).toContain(
         moduleOfPermission(permission),
       );
     }

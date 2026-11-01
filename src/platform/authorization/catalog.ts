@@ -8,7 +8,14 @@
  * grant anything outside their list (deny by default).
  */
 
-export const ROLES = ["administrator", "warehouse", "buyer", "viewer"] as const;
+export const ROLES = [
+  "administrator",
+  "warehouse",
+  "buyer",
+  "viewer",
+  "cashier",
+  "cash_manager",
+] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Names shown in the interface. */
@@ -17,6 +24,18 @@ export const ROLE_LABELS: Record<Role, string> = {
   warehouse: "Almacén",
   buyer: "Comprador",
   viewer: "Consulta",
+  cashier: "Cajero",
+  cash_manager: "Encargado de caja",
+};
+
+/**
+ * Roles that only make sense with a module contracted (VEN-02): the team
+ * screen offers them only then. Without the module they grant nothing of
+ * it — only reading products — so assigning one is never a way in.
+ */
+export const ROLE_MODULE: Partial<Record<Role, string>> = {
+  cashier: "sales",
+  cash_manager: "sales",
 };
 
 export const PERMISSIONS = [
@@ -59,6 +78,8 @@ export const PERMISSIONS = [
   "inventory.movement.read",
   "inventory.minimum.read",
   "inventory.minimum.update",
+  "inventory.cost.read",
+  "inventory.cost.record",
   "inventory.dashboard.read",
   "inventory.entry.create",
   "inventory.opening.create",
@@ -99,6 +120,24 @@ export const PERMISSIONS = [
   "purchasing.suggestion.generate",
   "purchasing.report.read",
   "purchasing.report.export",
+  "sales.price.read",
+  "sales.price.update",
+  "sales.settings.update",
+  "sales.sale.create",
+  "sales.sale.read",
+  "sales.customer.read",
+  "sales.customer.create",
+  "sales.sale.cancel",
+  "sales.return.create",
+  "sales.discount.authorize",
+  "sales.below_cost.authorize",
+  "sales.cash.operate",
+  "sales.cash.close",
+  "sales.quote.create",
+  "sales.quote.read",
+  "sales.receivable.read",
+  "sales.report.read",
+  "sales.report.export",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -142,6 +181,8 @@ export const OWNER_PERMISSIONS: readonly Permission[] = [
   "inventory.movement.read",
   "inventory.minimum.read",
   "inventory.minimum.update",
+  "inventory.cost.read",
+  "inventory.cost.record",
   "inventory.dashboard.read",
   "inventory.entry.create",
   "inventory.opening.create",
@@ -182,6 +223,24 @@ export const OWNER_PERMISSIONS: readonly Permission[] = [
   "purchasing.suggestion.generate",
   "purchasing.report.read",
   "purchasing.report.export",
+  "sales.price.read",
+  "sales.price.update",
+  "sales.settings.update",
+  "sales.sale.create",
+  "sales.sale.read",
+  "sales.customer.read",
+  "sales.customer.create",
+  "sales.sale.cancel",
+  "sales.return.create",
+  "sales.discount.authorize",
+  "sales.below_cost.authorize",
+  "sales.cash.operate",
+  "sales.cash.close",
+  "sales.quote.create",
+  "sales.quote.read",
+  "sales.receivable.read",
+  "sales.report.read",
+  "sales.report.export",
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -215,6 +274,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory.movement.read",
     "inventory.minimum.read",
     "inventory.minimum.update",
+    "inventory.cost.read",
+    "inventory.cost.record",
     "inventory.dashboard.read",
     "inventory.entry.create",
     "inventory.opening.create",
@@ -255,6 +316,23 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "purchasing.suggestion.generate",
     "purchasing.report.read",
     "purchasing.report.export",
+    "sales.price.read",
+    "sales.price.update",
+    "sales.sale.create",
+    "sales.sale.read",
+    "sales.customer.read",
+    "sales.customer.create",
+    "sales.sale.cancel",
+    "sales.return.create",
+    "sales.discount.authorize",
+    "sales.below_cost.authorize",
+    "sales.cash.operate",
+    "sales.cash.close",
+    "sales.quote.create",
+    "sales.quote.read",
+    "sales.receivable.read",
+    "sales.report.read",
+    "sales.report.export",
   ],
   warehouse: [
     "platform.organization.read",
@@ -293,6 +371,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory.import.confirm",
     "inventory.import.cancel",
     "inventory.export.create",
+    "sales.price.read",
   ],
   buyer: [
     "platform.organization.read",
@@ -305,6 +384,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory.stock.read",
     "inventory.movement.read",
     "inventory.minimum.read",
+    "inventory.cost.read",
+    "inventory.cost.record",
     "inventory.dashboard.read",
     "inventory.export.create",
     "purchasing.supplier.read",
@@ -331,6 +412,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "purchasing.suggestion.generate",
     "purchasing.report.read",
     "purchasing.report.export",
+    "sales.price.read",
   ],
   viewer: [
     "platform.organization.read",
@@ -354,6 +436,56 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "purchasing.suggestion.read",
     "purchasing.report.read",
     "purchasing.report.export",
+    "sales.price.read",
+    "sales.sale.read",
+    "sales.customer.read",
+    "sales.quote.read",
+    "sales.receivable.read",
+    "sales.report.read",
+    "sales.report.export",
+  ],
+  cashier: [
+    "platform.organization.read",
+    "platform.module.read",
+    "inventory.product.read",
+    "inventory.unit.read",
+    "inventory.presentation.read",
+    "inventory.location.read",
+    "inventory.stock.read",
+    "sales.price.read",
+    "sales.sale.create",
+    "sales.sale.read",
+    "sales.customer.read",
+    "sales.customer.create",
+    "sales.cash.operate",
+    "sales.quote.create",
+    "sales.quote.read",
+    "sales.receivable.read",
+  ],
+  cash_manager: [
+    "platform.organization.read",
+    "platform.module.read",
+    "inventory.product.read",
+    "inventory.unit.read",
+    "inventory.presentation.read",
+    "inventory.location.read",
+    "inventory.stock.read",
+    "inventory.movement.read",
+    "sales.price.read",
+    "sales.sale.create",
+    "sales.sale.read",
+    "sales.customer.read",
+    "sales.customer.create",
+    "sales.sale.cancel",
+    "sales.return.create",
+    "sales.discount.authorize",
+    "sales.cash.operate",
+    "sales.cash.close",
+    "sales.quote.create",
+    "sales.quote.read",
+    "sales.receivable.read",
+    "sales.report.read",
+    "sales.report.export",
   ],
 };
 

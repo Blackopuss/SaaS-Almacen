@@ -367,6 +367,7 @@ export async function MovementScreen({
       <EntryForm
         idempotencyKey={newId()}
         mode={kind === "adjustment" ? "adjustment" : "entry"}
+        askCost={kind === "entry" && access.can("inventory.cost.record")}
         productId={product.id}
         captures={captureOptions(product, presentations)}
         locations={locations.map((location) => ({

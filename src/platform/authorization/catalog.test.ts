@@ -20,10 +20,18 @@ const doc = readFileSync(
   path.join(process.cwd(), "docs/MATRIZ_ROLES_PERMISOS.md"),
   "utf8",
 );
-const COLUMNS = ["owner", "administrator", "warehouse", "buyer", "viewer"];
+const COLUMNS = [
+  "owner",
+  "administrator",
+  "warehouse",
+  "buyer",
+  "viewer",
+  "cashier",
+  "cash_manager",
+];
 const rows = [
   ...doc.matchAll(
-    /^\| `([a-z_.]+)` \|[^\n]*?\| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \|$/gm,
+    /^\| `([a-z_.]+)` \|[^\n]*?\| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \| (Sí|No) \|$/gm,
   ),
 ].map(([, id, ...cells]) => ({ id: id!, cells: cells as string[] }));
 
@@ -56,7 +64,7 @@ describe("catalog = approved matrix", () => {
   it("uses stable module.resource.action identifiers", () => {
     for (const permission of PERMISSIONS) {
       expect(permission).toMatch(
-        /^(platform|inventory|purchasing)\.[a-z_]+\.[a-z_]+$/,
+        /^(platform|inventory|purchasing|sales)\.[a-z_]+\.[a-z_]+$/,
       );
     }
   });

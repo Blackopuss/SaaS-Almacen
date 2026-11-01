@@ -128,6 +128,7 @@ const SYNONYMS: Record<ImportColumnKey, string[]> = {
     "saldo",
   ],
   initialStockIn: ["existencia contada en", "contada en", "existencia en"],
+  unitCost: ["costo unitario", "costo", "costo por pieza", "precio de compra"],
   location: ["ubicacion", "estante", "anaquel", "localizacion"],
   minimum: ["minimo", "stock minimo", "existencia minima", "punto de reorden"],
 };

@@ -103,7 +103,7 @@ export function LoadingState({ rows = 6 }: { rows?: number }) {
 /** Standard page padding and width. */
 export function PageContainer({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-10">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-10 print:p-0">
       {children}
     </div>
   );

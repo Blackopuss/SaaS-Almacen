@@ -1,11 +1,11 @@
 // Company for manual browser checks WITHOUT touching development data:
-// creates, in almacen_test, a company with Inventario + Compras and an
+// creates, in almacen_test, a company with Inventario, Compras and Ventas and an
 // account with the role you ask for (no MFA needed unless administrator).
 // The test database is emptied by every `npm test`, so nothing has to be
 // cleaned afterwards — important now that several tables are append-only.
 //
 // Usage (with `npm run dev:test` running on http://localhost:3100):
-//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator]
+//   npm run test:company -- "<contraseña de 12+ caracteres>" [warehouse|buyer|viewer|administrator|cashier|cash_manager|titular]
 // Prints the email to sign in with.
 import { existsSync } from "node:fs";
 
@@ -65,17 +65,24 @@ const membershipId = newId();
 await db.membership.create({
   data: { id: membershipId, organizationId, userId },
 });
-await db.membershipRole.create({
-  data: {
-    id: newId(),
-    organizationId,
-    membershipId,
-    role: process.argv[3] ?? "warehouse",
-  },
-});
+const role = process.argv[3] ?? "warehouse";
+if (role === "titular") {
+  // The account is the titular itself (no role), to check what only the
+  // titular sees.
+  await db.organization.update({
+    where: { id: organizationId },
+    data: { ownerUserId: userId },
+  });
+} else {
+  await db.membershipRole.create({
+    data: { id: newId(), organizationId, membershipId, role },
+  });
+}
 for (const grant of [
   { kind: "MODULE" as const, key: "inventory", value: null },
   { kind: "MODULE" as const, key: "purchasing", value: null },
+  // Ventas, so its screens can be checked (contracted online since VEN-27).
+  { kind: "MODULE" as const, key: "sales", value: null },
   { kind: "LIMIT" as const, key: "active_products", value: 100 },
   { kind: "LIMIT" as const, key: "users", value: 5 },
 ]) {

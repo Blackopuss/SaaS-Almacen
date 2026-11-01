@@ -1,6 +1,15 @@
 // Public API of the inventory module: Units, locations, stock movements and balances (INV).
 // Other modules and app/ may import only from this file.
 export { inventoryModule } from "./contract";
+export { COST_FORMAT_ERROR, parseCost } from "./average-cost";
+export {
+  formatCost,
+  formatValue,
+  getInventoryValue,
+  getProductCost,
+  mayReadInventoryCosts,
+} from "./inventory-value";
+export type { InventoryValue, ProductCostView } from "./inventory-value";
 export {
   MOVEMENT_PAGE_SIZE,
   MOVEMENT_TYPE_LABELS,
@@ -50,8 +59,18 @@ export {
   type ReturnExitLine,
   type ReturnExitResult,
 } from "./return-exit";
-export { reconcileStock } from "./reconciliation";
-export type { StockDrift } from "./reconciliation";
+export {
+  postSaleExit,
+  type SaleExitLine,
+  type SaleExitResult,
+} from "./sale-exit";
+export {
+  postSaleReturnEntry,
+  type SaleReturnEntryLine,
+  type SaleReturnEntryResult,
+} from "./sale-return-entry";
+export { reconcileStock, reconcileValue } from "./reconciliation";
+export type { StockDrift, ValueDrift } from "./reconciliation";
 export { getProductStock } from "./product-stock";
 export type { ProductStock } from "./product-stock";
 export {

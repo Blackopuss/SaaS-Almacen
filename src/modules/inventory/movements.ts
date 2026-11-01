@@ -14,6 +14,9 @@ import {
 import { compareLocationNames, formatLocationPath } from "@/platform/locations";
 import { LOCKING_TRANSACTION, forOrganization, lockRows } from "@/server";
 
+import { COST_FORMAT_ERROR, parseCost } from "./average-cost";
+import { costPerUnit, lineCost, openCostBook } from "./valuation";
+
 /**
  * Stock movements (INV-16 on). A confirmation writes the movement, its
  * lines and the balances in one transaction: all of it exists or none.
@@ -83,6 +86,17 @@ const entrySchema = z.object({
     500,
     "La nota es demasiado larga (máximo 500 caracteres).",
   ),
+  /**
+   * What one captured unit cost (one box, one piece), before taxes, as
+   * typed (VAL-03). Only entries and initial balances take it, and only
+   * from who may record costs; empty = the average cost in force.
+   */
+  unitCost: z
+    .string()
+    .trim()
+    .max(30)
+    .optional()
+    .transform((value) => value || null),
   /**
    * Key of this confirmation (INV-21), created when the form is shown and
    * sent again on every retry: the same key never writes a second
@@ -256,6 +270,32 @@ async function post(
     };
   }
   const data = parsed.data;
+  // VAL-03: a cost moves the average; it is written only by who may.
+  let typedCost: string | null = null;
+  if (data.unitCost !== null) {
+    if (kind.direction === "OUT") {
+      return {
+        ok: false,
+        reason: "invalid",
+        fieldErrors: {
+          unitCost: "Una salida no lleva costo: sale al costo promedio.",
+        },
+      };
+    }
+    await assertModulePermission(
+      organizationId,
+      userId,
+      "inventory.cost.record",
+    );
+    typedCost = parseCost(data.unitCost);
+    if (typedCost === null) {
+      return {
+        ok: false,
+        reason: "invalid",
+        fieldErrors: { unitCost: COST_FORMAT_ERROR },
+      };
+    }
+  }
   if (data.presentationId && data.unitCode) {
     return {
       ok: false,
@@ -383,6 +423,17 @@ async function post(
         );
       }
 
+      // VAL-03: read before the balance changes, under the product's lock.
+      const costs = await openCostBook(tx, organizationId, [product.id]);
+      const unitCost =
+        kind.direction === "IN"
+          ? costs.entry(
+              product.id,
+              base,
+              costPerUnit(typedCost, conversion.factor),
+            )
+          : costs.exit(product.id, base);
+
       const movementId = newId();
       await tx.stockMovement.create({
         data: {
@@ -411,8 +462,10 @@ async function post(
           factor: conversion.factor.toString(),
           baseQuantity: base.toString(),
           unitCode,
+          unitCost: lineCost(unitCost),
         },
       });
+      await costs.save();
       if (kind.direction === "OUT") {
         // The condition repeats the check in the same statement that
         // changes the balance; the CHECK of the table is the last defense.
@@ -613,6 +666,8 @@ export const MOVEMENT_TYPE_LABELS = {
   REVERSAL: "Reversa",
   RECEIPT: "Recepción de compra",
   RETURN: "Devolución a proveedor",
+  SALE: "Venta",
+  SALE_RETURN: "Devolución de venta",
 } as const;
 
 export type MovementType = keyof typeof MOVEMENT_TYPE_LABELS;
@@ -1163,6 +1218,10 @@ export async function registerTransfer(
         );
       }
 
+      // VAL-04: moving it to another place does not change its value.
+      const costs = await openCostBook(tx, organizationId, [product.id]);
+      const price = lineCost(costs.price(product.id));
+
       const movementId = newId();
       await tx.stockMovement.create({
         data: {
@@ -1186,6 +1245,7 @@ export async function registerTransfer(
         factor: conversion.factor.toString(),
         baseQuantity: base.toString(),
         unitCode,
+        unitCost: price,
       };
       await tx.stockMovementLine.create({
         data: {
@@ -1440,6 +1500,12 @@ export async function registerAdjustment(
       }
       const direction = difference.isPositive() ? "IN" : "OUT";
       const amount = difference.abs();
+      // VAL-04: what appears or goes missing is valued at the average.
+      const costs = await openCostBook(tx, organizationId, [product.id]);
+      const unitCost =
+        direction === "IN"
+          ? costs.entry(product.id, amount, null)
+          : costs.exit(product.id, amount);
 
       const movementId = newId();
       await tx.stockMovement.create({
@@ -1471,8 +1537,10 @@ export async function registerAdjustment(
           factor: "1",
           baseQuantity: amount.toString(),
           unitCode,
+          unitCost: lineCost(unitCost),
         },
       });
+      await costs.save();
       if (current) {
         const changed = await tx.stockBalance.updateMany({
           where: { id: current.id, quantity: before.toString() },
@@ -1633,6 +1701,8 @@ export async function reverseMovement(
           factor: true,
           baseQuantity: true,
           unitCode: true,
+          // VAL-04: undone at the cost it was done with. Never shown.
+          unitCost: true,
         },
       },
     },
@@ -1703,6 +1773,15 @@ export async function reverseMovement(
           "Esta salida es una devolución al proveedor: no se reversa desde Inventario. Si regresa la mercancía, recíbela con una orden de compra.",
         );
       }
+      // Nor a sale (VEN-05): its ticket and payments would still stand.
+      if (original.type === "SALE" || original.type === "SALE_RETURN") {
+        return stop(
+          "not_allowed",
+          original.type === "SALE"
+            ? "Esta salida es una venta: no se reversa desde Inventario. Se devuelve o se cancela desde Ventas."
+            : "Esta entrada es una devolución de venta: no se reversa desde Inventario.",
+        );
+      }
       const already = await tx.stockMovement.findFirst({
         where: { reversesMovementId: original.id },
         select: { id: true },
@@ -1723,6 +1802,12 @@ export async function reverseMovement(
       ]);
       const productOf = new Map(products.map((p) => [p.id, p]));
       const locationOf = new Map(locations.map((l) => [l.id, l]));
+      // VAL-04: read before any balance changes, under the products' locks.
+      const costs = await openCostBook(
+        tx,
+        organizationId,
+        original.lines.map((line) => line.productId),
+      );
 
       const movementId = newId();
       await tx.stockMovement.create({
@@ -1777,6 +1862,13 @@ export async function reverseMovement(
           return stop("invalid", "El saldo resultante sería demasiado grande.");
         }
 
+        // What came in leaves at the cost it came in with, and the other
+        // way around (VAL-04).
+        const doneAt = line.unitCost?.toString() ?? null;
+        const unitCost =
+          direction === "OUT"
+            ? costs.exitAt(product.id, base, doneAt)
+            : costs.entry(product.id, base, doneAt);
         // Same capture, same version, same factor as the original line.
         await tx.stockMovementLine.create({
           data: {
@@ -1794,6 +1886,7 @@ export async function reverseMovement(
             factor: line.factor.toString(),
             baseQuantity: base.toString(),
             unitCode: line.unitCode,
+            unitCost: lineCost(unitCost),
           },
         });
         if (current) {
@@ -1820,6 +1913,7 @@ export async function reverseMovement(
         );
       }
 
+      await costs.save();
       const first = productOf.get(original.lines[0]?.productId ?? "");
       await recordAuditEvent(tx, {
         organizationId,

@@ -14,6 +14,7 @@ import {
   optionalText,
   type InventoryActor,
 } from "./movements";
+import { lineCost, openCostBook } from "./valuation";
 
 /**
  * Quick exit of several lines (INV-28), «salida por venta»: many products
@@ -403,6 +404,17 @@ export async function registerQuickExit(
         });
       }
 
+      // VAL-04: each line leaves at the average, read before any balance
+      // changes, under the products' locks.
+      const costs = await openCostBook(
+        tx,
+        organizationId,
+        resolved.map((line) => line.productId),
+      );
+      const unitCosts = resolved.map((line) =>
+        costs.exit(line.productId, line.base),
+      );
+
       const movementId = newId();
       await tx.stockMovement.create({
         data: {
@@ -432,9 +444,11 @@ export async function registerQuickExit(
             factor: line.factor,
             baseQuantity: line.base.toString(),
             unitCode: line.unitCode,
+            unitCost: lineCost(unitCosts[position]!),
           },
         });
       }
+      await costs.save();
       for (const [key, quantity] of taken) {
         // The condition repeats the check in the statement that changes
         // the balance; the CHECK of the table is the last defense.

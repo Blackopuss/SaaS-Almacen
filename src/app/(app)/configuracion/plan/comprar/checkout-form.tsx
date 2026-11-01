@@ -20,17 +20,30 @@ export type TierCard = {
   /** «1,000», already written for Mexico. */
   products: string;
   users: number;
-  /** What Compras adds per month, «$299.00». */
-  purchasingMonthly: string;
+  /** What each add-on adds per month, «$299.00». */
+  addOnMonthly: Record<string, string>;
 };
 
-const key = (tier: string, months: string, purchasing: boolean) =>
-  `${tier}:${months}:${purchasing ? 1 : 0}`;
+export type AddOnOption = { id: string; name: string; summary: string };
+
+/** The same key the server priced with: add-ons in their listed order. */
+const key = (
+  tier: string,
+  months: string,
+  modules: readonly string[],
+  listed: readonly AddOnOption[],
+) =>
+  `${tier}:${months}:${
+    listed
+      .map((option) => option.id)
+      .filter((id) => modules.includes(id))
+      .join("+") || "-"
+  }`;
 /** Same shape the server gives a code («pepito gratis» → «PEPITOGRATIS»). */
 const asCode = (text: string) => text.replace(/\s+/g, "").toUpperCase();
 
 /**
- * The checkout of a plan: tier (a carousel on phones), Compras, months,
+ * The checkout of a plan: tier (a carousel on phones), modules, months,
  * code and how to pay. Every amount is looked up in what the server
  * priced; the browser never adds or multiplies.
  */
@@ -41,10 +54,13 @@ export function CheckoutForm({
   providers,
   refundTerms,
   initial,
-  lockPurchasing = false,
+  addOns,
+  lockAddOns = false,
 }: {
-  /** Renewal of a live plan: Compras stays as it is. */
-  lockPurchasing?: boolean;
+  /** Modules that can be added on top of Inventario. */
+  addOns: AddOnOption[];
+  /** Renewal of a live plan: the modules stay as they are. */
+  lockAddOns?: boolean;
   tiers: TierCard[];
   months: number[];
   quotes: Record<string, ShownQuote>;
@@ -79,7 +95,8 @@ export function CheckoutForm({
         providers={providers}
         refundTerms={refundTerms}
         busy={busy}
-        lockPurchasing={lockPurchasing}
+        addOns={addOns}
+        lockAddOns={lockAddOns}
       />
     </form>
   );
@@ -109,9 +126,11 @@ function Choices({
   providers,
   refundTerms,
   busy,
-  lockPurchasing,
+  addOns,
+  lockAddOns,
 }: {
-  lockPurchasing: boolean;
+  addOns: AddOnOption[];
+  lockAddOns: boolean;
   state: CheckoutState;
   values: CheckoutValues;
   tiers: TierCard[];
@@ -123,14 +142,14 @@ function Choices({
 }) {
   const [tier, setTier] = useState(values.tier);
   const [length, setLength] = useState(values.months || "1");
-  const [purchasing, setPurchasing] = useState(values.purchasing);
+  const [modules, setModules] = useState<string[]>(values.modules);
   const [codeText, setCodeText] = useState(values.code);
 
   const applied =
     state.applied && asCode(codeText) === state.applied.code
       ? state.applied
       : null;
-  const shown = (applied?.quotes ?? quotes)[key(tier, length, purchasing)];
+  const shown = (applied?.quotes ?? quotes)[key(tier, length, modules, addOns)];
   const chosenTier = tiers.find((t) => t.id === tier) ?? tiers[0];
   const errors = state.fieldErrors;
   const root = useRef<HTMLDivElement>(null);
@@ -163,7 +182,7 @@ function Choices({
           {/* Carousel on phones (scroll-snap), a row from lg up. */}
           <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:-mx-0 sm:scroll-px-0 sm:px-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0">
             {tiers.map((each) => {
-              const price = quotes[key(each.id, "1", purchasing)];
+              const price = quotes[key(each.id, "1", modules, addOns)];
               return (
                 <label
                   key={each.id}
@@ -201,31 +220,47 @@ function Choices({
           </div>
         </fieldset>
 
-        {lockPurchasing ? (
-          purchasing && <input type="hidden" name="purchasing" value="1" />
+        {lockAddOns ? (
+          modules.map((module) => (
+            <input key={module} type="hidden" name="modules" value={module} />
+          ))
         ) : (
-          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-            <input
-              type="checkbox"
-              name="purchasing"
-              value="1"
-              defaultChecked={purchasing}
-              onChange={(event) => setPurchasing(event.currentTarget.checked)}
-              className="mt-0.5 size-5 accent-primary"
-            />
-            <span>
-              <span className="block font-medium">
-                Agregar Compras{" "}
-                <span className="font-normal text-muted-foreground tabular-nums">
-                  (+{chosenTier?.purchasingMonthly} al mes)
+          <fieldset className="space-y-3">
+            <legend className="text-lg font-semibold">Módulos</legend>
+            {addOns.map((option) => (
+              <label
+                key={option.id}
+                className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+              >
+                <input
+                  type="checkbox"
+                  name="modules"
+                  value={option.id}
+                  defaultChecked={modules.includes(option.id)}
+                  onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setModules((chosen) =>
+                      checked
+                        ? [...chosen, option.id]
+                        : chosen.filter((id) => id !== option.id),
+                    );
+                  }}
+                  className="mt-0.5 size-5 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">
+                    Agregar {option.name}{" "}
+                    <span className="font-normal text-muted-foreground tabular-nums">
+                      (+{chosenTier?.addOnMonthly[option.id]} al mes)
+                    </span>
+                  </span>
+                  <span className="block text-sm text-muted-foreground">
+                    {option.summary}
+                  </span>
                 </span>
-              </span>
-              <span className="block text-sm text-muted-foreground">
-                Proveedores, órdenes de compra, recepciones y sugerencias de
-                compra.
-              </span>
-            </span>
-          </label>
+              </label>
+            ))}
+          </fieldset>
         )}
 
         <fieldset className="space-y-3">
@@ -335,8 +370,11 @@ function Choices({
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">
               {chosenTier?.products} productos
-              {purchasing ? " + Compras" : ""} · {length}{" "}
-              {length === "1" ? "mes" : "meses"}
+              {addOns
+                .filter((option) => modules.includes(option.id))
+                .map((option) => ` + ${option.name}`)
+                .join("")}{" "}
+              · {length} {length === "1" ? "mes" : "meses"}
             </dt>
             <dd>{shown?.subtotal}</dd>
           </div>

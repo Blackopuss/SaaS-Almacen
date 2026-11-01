@@ -60,3 +60,39 @@ export function shortenValidity(
   const floor = currentEnd < now ? currentEnd : now;
   return shortened > floor ? shortened : floor;
 }
+
+/** Days before the end of the plan when its people are warned (founder, 2026-11-01). */
+export const RENEWAL_NOTICE_DAYS = 15;
+
+/**
+ * Whole calendar days (central Mexico) left until the plan ends, when that
+ * is within the warning window: 0 = it ends today. Null when there is no
+ * end, it already ended, or it is further away.
+ */
+export function renewalDaysLeft(
+  validUntil: Date | null,
+  now: Date = new Date(),
+): number | null {
+  if (!validUntil || validUntil.getTime() <= now.getTime()) return null;
+  const days = Math.round(
+    (mexicoDay(validUntil).getTime() - mexicoDay(now).getTime()) / 86_400_000,
+  );
+  return days <= RENEWAL_NOTICE_DAYS ? days : null;
+}
+
+/** «Tu plan vence en 5 días (el 6 nov 2026)». */
+export function renewalText(days: number, validUntil: Date): string {
+  const day = new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "America/Mexico_City",
+  }).format(validUntil);
+  const when =
+    days === 0
+      ? "hoy"
+      : days === 1
+        ? `mañana (${day})`
+        : `en ${days} días (el ${day})`;
+  return `Tu plan vence ${when}. Renuévalo para que tus módulos no queden en solo lectura.`;
+}

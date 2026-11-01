@@ -202,7 +202,7 @@ describe("rules of the approved matrix", () => {
 
 // USR-03A: only the titular contracts, cancels and changes the payment method.
 describe("actions reserved to the titular", () => {
-  it("are exactly the commercial ones, the transfer and support access", () => {
+  it("are the commercial ones, the transfer, support access and sales settings", () => {
     expect([...OWNER_ONLY_PERMISSIONS].sort()).toEqual([
       "platform.billing.manage",
       "platform.billing.read",
@@ -213,6 +213,7 @@ describe("actions reserved to the titular", () => {
       "platform.subscription.cancel",
       "platform.subscription.create",
       "platform.support.grant",
+      "sales.settings.update",
     ]);
   });
 

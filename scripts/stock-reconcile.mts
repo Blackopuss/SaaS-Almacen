@@ -34,7 +34,14 @@ try {
       const report = await reconcileCompany(organization.id);
       companies++;
       pairs += report.pairs;
-      differences += report.drift.length;
+      differences += report.drift.length + report.valueDrift.length;
+      for (const row of report.valueDrift) {
+        console.log(
+          `VALOR  empresa=${organization.id} (${organization.name})  ` +
+            `producto=${row.sku} (${row.productName})  existencias=${row.quantity}  ` +
+            `costo promedio=${row.averageCost}  valor guardado=${row.stockValue}  esperado=${row.expected}`,
+        );
+      }
       for (const row of report.drift) {
         console.log(
           `DIFERENCIA  empresa=${organization.id} (${organization.name})  ` +
@@ -53,7 +60,7 @@ console.log(
 );
 if (differences > 0) {
   console.log(
-    "Hay saldos que no coinciden con su historial. No se corrigió nada: investiga cada caso antes de ajustar.",
+    "Hay saldos o valores que no coinciden. No se corrigió nada: investiga cada caso antes de ajustar.",
   );
   process.exit(1);
 }

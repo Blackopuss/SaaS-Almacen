@@ -26,5 +26,8 @@ export {
   passwordResetEmail,
   planPurchaseEmail,
   purchaseOrderEmail,
+  salesQuoteEmail,
+  salesStatementEmail,
+  overdueReminderEmail,
   verificationEmail,
 } from "./templates";

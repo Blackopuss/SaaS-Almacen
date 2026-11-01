@@ -97,12 +97,12 @@ function afterDays(days: number) {
   restoreClock = setEntitlementClock(() => Date.now() + days * DAY);
 }
 
-const READS = PERMISSIONS.filter(
-  (p) => !p.startsWith("platform.") && isReadOrExport(p),
-);
-const WRITES = PERMISSIONS.filter(
-  (p) => !p.startsWith("platform.") && !isReadOrExport(p),
-);
+// The modules the company of these tests has: Inventario and Compras
+// (Ventas cannot be contracted yet, VEN-02).
+const contracted = (p: string) =>
+  p.startsWith("inventory.") || p.startsWith("purchasing.");
+const READS = PERMISSIONS.filter((p) => contracted(p) && isReadOrExport(p));
+const WRITES = PERMISSIONS.filter((p) => contracted(p) && !isReadOrExport(p));
 
 afterEach(() => {
   restoreClock?.();
@@ -125,8 +125,16 @@ describe("what counts as reading or exporting", () => {
     expect(WRITES).toContain("purchasing.order.send");
     expect(WRITES).toContain("purchasing.receipt.create");
     expect(READS.length + WRITES.length).toBe(
-      PERMISSIONS.filter((p) => !p.startsWith("platform.")).length,
+      PERMISSIONS.filter(contracted).length,
     );
+    // Ventas follows the same naming: what reads ends like a read.
+    for (const permission of PERMISSIONS.filter((p) =>
+      p.startsWith("sales."),
+    )) {
+      expect(isReadOrExport(permission), permission).toBe(
+        /\.read$|\.export$/.test(permission),
+      );
+    }
     // Nothing that reads or exports changes stock or documents.
     for (const permission of READS) {
       expect(permission).toMatch(/\.read$|\.export$|\.export\.create$/);
