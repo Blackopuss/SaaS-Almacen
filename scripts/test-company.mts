@@ -81,7 +81,7 @@ if (role === "titular") {
 for (const grant of [
   { kind: "MODULE" as const, key: "inventory", value: null },
   { kind: "MODULE" as const, key: "purchasing", value: null },
-  // Ventas cannot be contracted yet (VEN-02); only here and in tests.
+  // Ventas, so its screens can be checked (contracted online since VEN-27).
   { kind: "MODULE" as const, key: "sales", value: null },
   { kind: "LIMIT" as const, key: "active_products", value: 100 },
   { kind: "LIMIT" as const, key: "users", value: 5 },
