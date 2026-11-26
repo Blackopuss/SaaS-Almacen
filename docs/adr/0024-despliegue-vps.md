@@ -66,4 +66,4 @@
 - **Un solo servidor es un solo punto de falla.** Mitigado con respaldos cifrados verificados, snapshots del VPS y copia fuera con rclone. El RPO es de un día (o el último despliegue) y el RTO es lo que tarde `instalar.sh` más una restauración. Se mide en PIL-03.
 - **El fundador guarda dos secretos fuera del servidor:** la llave privada de respaldos y `BETTER_AUTH_SECRET`.
 - **Una versión nueva de `deploy/`** se aplica volviendo a correr el instalador. Los scripts que corren como root no los puede cambiar la cuenta `almacen`.
-- Guía de operación: `docs/DESPLIEGUE.md`.
+- Guía de operación: `docs/operacion/DESPLIEGUE.md`.

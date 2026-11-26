@@ -471,7 +471,7 @@ const NEGATIVE_CASES: Record<string, { tests?: string[]; waitsFor?: string }> =
 
 describe("negative cases of the matrix", () => {
   const doc = readFileSync(
-    path.join(process.cwd(), "docs/MATRIZ_ROLES_PERMISOS.md"),
+    path.join(process.cwd(), "docs/producto/MATRIZ_ROLES_PERMISOS.md"),
     "utf8",
   );
   const ids = [...doc.matchAll(/^\| (NEG-\d+) \|/gm)].map((m) => m[1]!);

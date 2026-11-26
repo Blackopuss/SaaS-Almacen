@@ -1,22 +1,35 @@
-# SaaS de inventario modular
+# SaaS Almacén
 
-Aplicación en construcción (Next.js + TypeScript). Pasos completados según `docs/PLAN_IMPLEMENTACION.md`: BAS-01, BAS-02, BAS-03, BAS-04, BAS-05, BAS-06, BAS-07, BAS-08, BAS-12, BAS-13, PLT-01, PLT-02, PLT-03, PLT-04, PLT-05, PLT-06, PLT-07, PLT-08A, PLT-08B, PLT-09, PLT-10, PLT-11, PLT-12, PLT-13, PLT-14, PLT-15, PLT-16, USR-01 (con FUN-07 aprobada). Rama de trabajo: `pruebas` (CI en GitHub Actions).
+SaaS de inventario modular para pymes en México. **Inventario** es la base, y sobre ella se contratan **Compras** y **Ventas** (punto de venta, cotizaciones, pedidos y ventas a plazos).
 
-```powershell
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript estricto · MySQL 9.4 · Prisma 7 · Better Auth · Tailwind CSS 4 + shadcn/ui · Vitest. Es un monolito modular con un worker para el trabajo en segundo plano.
+
+## Empezar
+
+```bash
 npm install
 # Primera vez: copia .env.example a .env.local y pon MYSQL_ROOT_PASSWORD
-npm run setup      # secretos, bases, usuarios y migraciones
-npm run db:seed    # cuenta demo: DEMO_EMAIL / DEMO_PASSWORD en .env.local
+npm run setup        # secretos, bases, usuarios y migraciones
+npm run db:seed      # cuenta demo: DEMO_EMAIL / DEMO_PASSWORD en .env.local
 npm run demo:codigo  # código de verificación en dos pasos de la cuenta demo
-npm run dev      # http://localhost:3000
-npm run check    # tipos, lint, límites, formato y pruebas
-# Correos en desarrollo: se guardan localmente; ábrelos en http://localhost:3000/correos
+npm run dev          # http://localhost:3000 (correos de desarrollo en /correos)
+npm run worker       # cola de trabajos (importaciones, correos)
+npm run check        # tipos, lint, límites, formato y pruebas
 ```
 
-- [Plan de implementación](docs/PLAN_IMPLEMENTACION.md): modelo modular (Inventario base + Compras, Ventas y CRM con precio por nivel), roles, 224 pasos de unas 3 horas y criterios para lanzar.
-- [Memoria del proyecto](MEMORY.md): requisitos confirmados, propuestas y preguntas pendientes.
-- [Entregables de fase 1](docs/FASE_01_DEFINICION.md): alcance inicial (antes del cambio a roles y módulos de v0.6), reglas, investigación preparada, riesgos y estado real de cada jornada.
-- [Cuestionario para almacenes](docs/CUESTIONARIO_ALMACEN.md): 24 preguntas operativas, 6 para quien decide la compra y hoja para convertir respuestas en requisitos.
+## Dónde está cada cosa
 
-Antes de continuar el proyecto, leer la memoria y el plan. Las propuestas técnicas y comerciales todavía no son decisiones confirmadas por el usuario.
-# SaaS-Almacen
+| Quiero entender… | Leer |
+| --- | --- |
+| Qué tecnologías usamos y por qué | [docs/arquitectura/01-stack.md](docs/arquitectura/01-stack.md) |
+| Cómo están organizadas las carpetas | [docs/arquitectura/02-estructura.md](docs/arquitectura/02-estructura.md) y [src/README.md](src/README.md) |
+| Qué patrones de diseño usamos | [docs/arquitectura/03-patrones.md](docs/arquitectura/03-patrones.md) |
+| Cómo funciona el código por dentro | [docs/arquitectura/04-recorrido-del-codigo.md](docs/arquitectura/04-recorrido-del-codigo.md) |
+| Pruebas, seguridad y despliegue | [docs/arquitectura/05-calidad-y-operacion.md](docs/arquitectura/05-calidad-y-operacion.md) |
+| Por qué se tomó cada decisión | [docs/adr/](docs/adr/) |
+| Qué se construye y en qué orden | [docs/producto/PLAN_IMPLEMENTACION.md](docs/producto/PLAN_IMPLEMENTACION.md) |
+| Reglas para trabajar en el código | [AGENTS.md](AGENTS.md) |
+| Decisiones del fundador e historial | [MEMORY.md](MEMORY.md) |
+| Todo lo demás | [docs/README.md](docs/README.md) |
+
+Rama de trabajo: `pruebas` (CI en GitHub Actions). Producción se despliega desde `produccion`.

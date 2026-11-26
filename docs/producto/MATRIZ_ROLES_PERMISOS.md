@@ -9,9 +9,9 @@ Este documento propone permisos y su asignación para el lanzamiento. No constit
 
 - [Plan de implementación v0.6](PLAN_IMPLEMENTACION.md): secciones 1 y 3 (alcance e integridad), sección 4 «Módulos y modelo comercial», en particular «Usuarios y roles», y pasos FUN-07, USR-01 a USR-11, MOD-01 a MOD-11, INV-01 a INV-35, IMP-01 a IMP-12 y CMP-01 a CMP-18, incluidos sus pasos con sufijo.
 - [Fase 1 — Definición](FASE_01_DEFINICION.md): alcance operativo, reglas D04, importación, aislamiento y trazabilidad. Sus referencias a un perfil único, invitaciones diferidas y Compras posterior son históricas, reemplazadas por el plan v0.6 y la decisión posterior registrada en memoria. Sus IDs INV/UNI/MOV son casos de aceptación, no los pasos actuales del plan.
-- [Memoria del proyecto](../MEMORY.md): decisión del 2026-10-02 de varios usuarios con roles predefinidos combinables, Inventario obligatorio, Compras en el lanzamiento, cupos por empresa y estado real de PLT-10. Las propuestas antiguas de perfil único no prevalecen sobre esa decisión.
-- [ADR 0005 — Alta de empresa con titular](adr/0005-empresas.md): titular creado junto con su membresía, MFA, una empresa por cuenta al crearla y futuras invitaciones a empresas existentes.
-- [Reglas del proyecto](../AGENTS.md): contexto de empresa, reglas en servicios, cantidades exactas y conservación del historial.
+- [Memoria del proyecto](../../MEMORY.md): decisión del 2026-10-02 de varios usuarios con roles predefinidos combinables, Inventario obligatorio, Compras en el lanzamiento, cupos por empresa y estado real de PLT-10. Las propuestas antiguas de perfil único no prevalecen sobre esa decisión.
+- [ADR 0005 — Alta de empresa con titular](../adr/0005-empresas.md): titular creado junto con su membresía, MFA, una empresa por cuenta al crearla y futuras invitaciones a empresas existentes.
+- [Reglas del proyecto](../../AGENTS.md): contexto de empresa, reglas en servicios, cantidades exactas y conservación del historial.
 
 Los cinco perfiles provienen del plan. Los identificadores, la granularidad y las asignaciones detalladas de esta matriz son propuestas para USR-01, no permisos ya existentes en código. Las decisiones que las fuentes no resuelven se señalan en «Preguntas para el fundador».
 

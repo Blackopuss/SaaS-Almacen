@@ -5,7 +5,7 @@
 # branch). The server never compiles: it gets
 # the finished package over SSH, checks its sha256, backs up, migrates and
 # switches versions (deploy/bin/desplegar). Needs these repository secrets
-# (docs/DESPLIEGUE.md):
+# (docs/operacion/DESPLIEGUE.md):
 #   DEPLOY_HOST         server address
 #   DEPLOY_SSH_KEY      private key whose public half went in --llave-ci
 #   DEPLOY_KNOWN_HOSTS  output of: ssh-keyscan -t ed25519 <server>

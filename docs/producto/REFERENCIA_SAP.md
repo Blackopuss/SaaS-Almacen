@@ -1,7 +1,7 @@
 # SAP como referencia: qué ya seguimos y qué falta
 
 Fecha: 2026-10-26. Propuesta para que el fundador decida. No cambia el plan
-(`docs/PLAN_IMPLEMENTACION.md`) hasta que se apruebe.
+(`docs/producto/PLAN_IMPLEMENTACION.md`) hasta que se apruebe.
 
 ## La idea en una línea
 

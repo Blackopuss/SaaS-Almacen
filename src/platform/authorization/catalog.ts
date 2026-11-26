@@ -1,6 +1,6 @@
 /**
  * Roles and permissions (USR-01), as approved by the founder in
- * docs/MATRIZ_ROLES_PERMISOS.md (FUN-07). catalog.test.ts compares this file
+ * docs/producto/MATRIZ_ROLES_PERMISOS.md (FUN-07). catalog.test.ts compares this file
  * with the document: change both together.
  *
  * The titular is not a role: it is Organization.ownerUserId and gets

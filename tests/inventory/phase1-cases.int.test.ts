@@ -26,7 +26,7 @@ import { createLocation } from "@/platform/locations";
 import { createOrganization } from "@/platform/tenancy";
 import { db } from "@/server";
 
-// INV-34: the acceptance cases of phase 1 (docs/FASE_01_DEFINICION.md),
+// INV-34: the acceptance cases of phase 1 (docs/producto/FASE_01_DEFINICION.md),
 // end to end, each one leaving balances that agree with their history;
 // and the reconciliation that would tell if they did not.
 

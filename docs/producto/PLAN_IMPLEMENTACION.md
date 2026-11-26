@@ -2,7 +2,7 @@
 
 Versión 0.7 · 27 de octubre de 2026 (Ventas adelantada, ADR 0030) · Modelo modular acordado: Inventario como base por capacidad, Compras en el primer lanzamiento, después Ventas (punto de venta, cotizaciones) y CRM; varios usuarios con roles. Plan revisado en conjunto por Claude y Codex en 224 pasos de unas 3 horas.
 
-Ejecución de la primera fase: [definición, reglas, investigación y riesgos](FASE_01_DEFINICION.md). Prototipo navegable: [instrucciones y validación](../prototype/README.md). Entregables internos preparados; entrevistas, validación con ferreterías y decisiones comerciales siguen pendientes.
+Ejecución de la primera fase: [definición, reglas, investigación y riesgos](FASE_01_DEFINICION.md). Prototipo navegable: [instrucciones y validación](../../prototype/README.md). Entregables internos preparados; entrevistas, validación con ferreterías y decisiones comerciales siguen pendientes.
 
 ## 1. Producto y alcance
 
@@ -353,7 +353,7 @@ Distinguir dos necesidades: **emitir el comprobante fiscal por la suscripción q
 
 ### FUN — Validación comercial (8)
 
-D01–D06 dejaron preparados (sin validación externa) los documentos de [fase 1](FASE_01_DEFINICION.md) y el [prototipo](../prototype/README.md). Esta fase los completa con el nuevo alcance modular.
+D01–D06 dejaron preparados (sin validación externa) los documentos de [fase 1](FASE_01_DEFINICION.md) y el [prototipo](../../prototype/README.md). Esta fase los completa con el nuevo alcance modular.
 
 | ID | Paso | Requiere | Listo cuando |
 | --- | --- | --- | --- |

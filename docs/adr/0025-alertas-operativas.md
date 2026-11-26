@@ -26,7 +26,7 @@ PIL-04 pide que los errores, una cola detenida y un respaldo fallido generen avi
 
 ## Consecuencias
 
-- Si el worker o el servidor entero se caen, nadie adentro puede avisar: eso lo cubre el monitor externo sobre `/api/salud` (UptimeRobot, `docs/DESPLIEGUE.md`), que ya reporta `worker: falla`.
+- Si el worker o el servidor entero se caen, nadie adentro puede avisar: eso lo cubre el monitor externo sobre `/api/salud` (UptimeRobot, `docs/operacion/DESPLIEGUE.md`), que ya reporta `worker: falla`.
 - Un aviso tarda entre 1 y 2 minutos (dos rondas). Los umbrales siguen siendo los de `checkHealth`.
 - Un correo que no sale se pierde (queda en el registro). Es a propósito: reintentar cada minuto llenaría el registro de errores y dispararía la alerta de errores.
 - El fundador debe llenar `ALERT_EMAIL` y el SMTP (ADR 0023). `instalar.sh` agrega la clave vacía a instalaciones existentes.

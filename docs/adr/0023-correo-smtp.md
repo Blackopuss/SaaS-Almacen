@@ -36,6 +36,6 @@ Producción se niega a arrancar sin un proveedor real (ADR 0003, «Requisitos de
 
 ## Consecuencias
 
-- Para producción hay que elegir un proveedor y verificar el dominio (SPF, DKIM y DMARC), o los correos irán a spam. Los pasos están en `docs/DESPLIEGUE.md`.
+- Para producción hay que elegir un proveedor y verificar el dominio (SPF, DKIM y DMARC), o los correos irán a spam. Los pasos están en `docs/operacion/DESPLIEGUE.md`.
 - El texto de los correos sigue siendo texto plano. Una versión HTML queda para después.
 - Prueba: `tests/platform/email-smtp.int.test.ts`. Un servidor SMTP mínimo en la misma máquina recibe el mensaje real (remitente, `Reply-To`, asunto y adjunto). También comprueba que nunca se mande sin cifrar por la red.

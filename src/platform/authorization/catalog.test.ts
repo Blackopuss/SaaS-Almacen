@@ -14,10 +14,10 @@ import {
 } from "./catalog";
 
 // USR-01: the catalog in code is exactly the matrix approved by the founder
-// (docs/MATRIZ_ROLES_PERMISOS.md, FUN-07), and the founder's decisions hold.
+// (docs/producto/MATRIZ_ROLES_PERMISOS.md, FUN-07), and the founder's decisions hold.
 
 const doc = readFileSync(
-  path.join(process.cwd(), "docs/MATRIZ_ROLES_PERMISOS.md"),
+  path.join(process.cwd(), "docs/producto/MATRIZ_ROLES_PERMISOS.md"),
   "utf8",
 );
 const COLUMNS = [

@@ -13,7 +13,7 @@
 #                                           (solo si se compila en el servidor)
 #     [--admin usuario --llave-admin "ssh-ed25519 AAAA..."]
 #
-# Guía completa: docs/DESPLIEGUE.md
+# Guía completa: docs/operacion/DESPLIEGUE.md
 set -euo pipefail
 
 DOMINIO=""
@@ -252,7 +252,7 @@ if [[ -f "$RESPALDO_ENV" ]]; then
 else
   cat > "$RESPALDO_ENV" <<EOF
 # Llave pública de age: los respaldos se cifran para ella. La privada vive
-# fuera del servidor (docs/DESPLIEGUE.md).
+# fuera del servidor (docs/operacion/DESPLIEGUE.md).
 AGE_RECIPIENT=$CLAVE_RESPALDOS
 # Días que se conservan en el servidor.
 RETENER_DIAS=14
