@@ -9,6 +9,7 @@ Material para entender y explicar el sistema: qué tecnologías usa, por qué, c
 | 3 | [Patrones de diseño](03-patrones.md) | ¿Qué patrones usamos, dónde y qué problema resuelve cada uno? |
 | 4 | [Recorrido del código](04-recorrido-del-codigo.md) | ¿Qué pasa, archivo por archivo, al registrar una entrada o cobrar una venta? |
 | 5 | [Calidad y operación](05-calidad-y-operacion.md) | ¿Cómo se prueba, se asegura y se despliega? |
+| 6 | [Código clave, explicado](06-codigo-clave.md) | Las 14 piezas de código más importantes, con fragmentos reales: qué hacen, por qué así y cómo se prueban |
 
 ## El sistema en un minuto
 

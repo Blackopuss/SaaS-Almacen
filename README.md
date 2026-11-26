@@ -25,6 +25,7 @@ npm run check        # tipos, lint, límites, formato y pruebas
 | Cómo están organizadas las carpetas | [docs/arquitectura/02-estructura.md](docs/arquitectura/02-estructura.md) y [src/README.md](src/README.md) |
 | Qué patrones de diseño usamos | [docs/arquitectura/03-patrones.md](docs/arquitectura/03-patrones.md) |
 | Cómo funciona el código por dentro | [docs/arquitectura/04-recorrido-del-codigo.md](docs/arquitectura/04-recorrido-del-codigo.md) |
+| Las partes más importantes del código | [docs/arquitectura/06-codigo-clave.md](docs/arquitectura/06-codigo-clave.md) |
 | Pruebas, seguridad y despliegue | [docs/arquitectura/05-calidad-y-operacion.md](docs/arquitectura/05-calidad-y-operacion.md) |
 | Por qué se tomó cada decisión | [docs/adr/](docs/adr/) |
 | Qué se construye y en qué orden | [docs/producto/PLAN_IMPLEMENTACION.md](docs/producto/PLAN_IMPLEMENTACION.md) |
